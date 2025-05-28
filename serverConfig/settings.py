@@ -74,7 +74,8 @@ AUTHENTICATION_BACKENDS = [
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_ORIGIN_WHITELIST = [
-    'http://localhost:3000',  # your Next.js frontend
+    'http://localhost:3000',
+    "https://shining-light-demo.vercel.app"
 ]
 
 JWT_COOKIE_SAMESITE = 'Lax'
