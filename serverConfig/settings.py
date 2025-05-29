@@ -73,6 +73,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "https://shining-light-demo.vercel.app"
+]
 CORS_ORIGIN_WHITELIST = [
     'http://localhost:3000',
     "https://shining-light-demo.vercel.app"
@@ -88,6 +92,10 @@ CSRF_COOKIE_SECURE = True         # Cookie only sent over HTTPS
 CSRF_COOKIE_HTTPONLY = False      # CSRF cookie must be accessible via JavaScript
 CSRF_COOKIE_PATH = '/' 
 
+SESSION_COOKIE_SAMESITE = 'None'     # Allow cross-site cookies (for use with HTTPS)
+SESSION_COOKIE_SECURE = True         # Cookie only sent over HTTPS
+SESSION_COOKIE_HTTPONLY = False      # CSRF cookie must be accessible via JavaScript
+SESSION_COOKIE_PATH = '/' 
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
