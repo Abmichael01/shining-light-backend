@@ -82,13 +82,12 @@ JWT_COOKIE_SAMESITE = 'None'  # Allow cross-site cookies
 JWT_COOKIE_SECURE = True      # Must be True if using HTTPS
 JWT_COOKIE_HTTPONLY = True    # Prevent XSS
 JWT_COOKIE_PATH = '/'         # Available site-wide
-# JWT_COOKIE_DOMAIN = '.domain.com'  # Shared across subdomains
 
-# SESSION_COOKIE_DOMAIN = JWT_COOKIE_DOMAIN
-# SESSION_COOKIE_SAMESITE = settings.JWT_COOKIE_SAMESITE
-# SESSION_COOKIE_SECURE = settings.JWT_COOKIE_SECURE
-# SESSION_COOKIE_HTTPONLY = settings.JWT_COOKIE_HTTPONLY
-# SESSION_COOKIE_PATH = settings.JWT_COOKIE_PATH
+CSRF_COOKIE_SAMESITE = 'None'     # Allow cross-site cookies (for use with HTTPS)
+CSRF_COOKIE_SECURE = True         # Cookie only sent over HTTPS
+CSRF_COOKIE_HTTPONLY = False      # CSRF cookie must be accessible via JavaScript
+CSRF_COOKIE_PATH = '/' 
+
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
