@@ -21,17 +21,24 @@ class RegisterView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 class LoginView(BaseLoginView):
     def get_response(self):
-        response = super().get_response()
+        super().get_response()  # This sets the cookies or does other side-effects if needed
 
         if not self.user:
-            return response
+            return JsonResponse({'error': 'Authentication failed'}, status=401)
 
         refresh = RefreshToken.for_user(self.user)
         access_token = str(refresh.access_token)
         refresh_token = str(refresh)
+
+        # Serialize user data
+        user_data = {
+            'id': self.user.id,
+            'email': self.user.email,
+            'role': list(self.user.groups.values_list('name', flat=True)),  # Adjust based on how roles are stored
+        }
 
         # Get cookie settings from settings.py
         cookie_settings = {
@@ -45,17 +52,18 @@ class LoginView(BaseLoginView):
             cookie_settings['domain'] = settings.JWT_COOKIE_DOMAIN
 
         # Set access token cookie
+        response = JsonResponse({'user': user_data})
         response.set_cookie(
             key='access_token',
             value=access_token,
             **cookie_settings
         )
 
-        # Set refresh token cookie (longer expiration)
+        # Set refresh token cookie
         response.set_cookie(
             key='refresh_token',
             value=refresh_token,
-            **cookie_settings,
+            **cookie_settings
         )
 
         return response
