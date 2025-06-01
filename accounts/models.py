@@ -76,6 +76,7 @@ class Biodata(models.Model):
         related_name='biodata'
     )
     
+    # Personal Information
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     date_of_birth = models.DateField()
@@ -86,7 +87,7 @@ class Biodata(models.Model):
     )
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES)
     
-    # Optional fields (can be null or blank)
+    # Contact Information
     phone = models.CharField(max_length=20, blank=True, null=True)
     address = models.TextField(blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
@@ -96,7 +97,24 @@ class Biodata(models.Model):
     # Emergency Contact
     emergency_contact_name = models.CharField(max_length=100, blank=True, null=True)
     emergency_contact_phone = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Father's Information
+    father_name = models.CharField(max_length=100, blank=True, null=True)
+    father_occupation = models.CharField(max_length=100, blank=True, null=True)
+    father_phone = models.CharField(max_length=20, blank=True, null=True)
+    father_email = models.EmailField(blank=True, null=True)
+    
+    # Mother's Information
+    mother_name = models.CharField(max_length=100, blank=True, null=True)
+    mother_occupation = models.CharField(max_length=100, blank=True, null=True)
+    mother_phone = models.CharField(max_length=20, blank=True, null=True)
+    mother_email = models.EmailField(blank=True, null=True)
+    
+    # Parents' Address (if different from student's)
+    guardians_address = models.TextField(blank=True, null=True)
+    guardians_city = models.CharField(max_length=100, blank=True, null=True)
+    guardians_state = models.CharField(max_length=100, blank=True, null=True)
+    guardians_country = models.CharField(max_length=100, default="Nigeria", blank=True, null=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.user.email})"
-    

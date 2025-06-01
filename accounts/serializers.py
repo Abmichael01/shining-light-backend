@@ -4,6 +4,7 @@ from django.contrib.auth import authenticate
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from .models import Biodata
 
 User = get_user_model()
 
@@ -50,3 +51,9 @@ class RegisterSerializer(serializers.Serializer):
         data = super().to_representation(instance)
         data['email'] = instance.email
         return data
+    
+class BiodataSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Biodata
+        fields = '__all__'
+        read_only_fields = ['user']

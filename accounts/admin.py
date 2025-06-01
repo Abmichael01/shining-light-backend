@@ -26,4 +26,4 @@ class UserAdminConfig(UserAdmin):
         ),
     )
     
-admin.register(Biodata)
+admin.site.register(Biodata)

@@ -5,9 +5,12 @@ from django.http import JsonResponse
 from django.contrib.auth import logout as django_logout
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, viewsets
 from .serializers import RegisterSerializer
 from django.conf import settings
+from .models import Biodata
+from .serializers import BiodataSerializer
+from rest_framework.permissions import IsAuthenticated
 
 
 class RegisterView(APIView):
@@ -126,3 +129,16 @@ class RefreshTokenView(APIView):
             max_age=3600  # 1 hour
         )
         return response
+    
+
+class BiodataViewSet(viewsets.ModelViewSet):
+    serializer_class = BiodataSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.is_staff:
+            return Biodata.objects.all()
+        return Biodata.objects.filter(user=self.request.user)
+    
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
