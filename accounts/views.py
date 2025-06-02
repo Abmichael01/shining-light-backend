@@ -11,6 +11,7 @@ from django.conf import settings
 from .models import Biodata
 from .serializers import BiodataSerializer
 from rest_framework.permissions import IsAuthenticated
+from django.shortcuts import get_object_or_404
 
 
 class RegisterView(APIView):
@@ -134,11 +135,11 @@ class RefreshTokenView(APIView):
 class BiodataViewSet(viewsets.ModelViewSet):
     serializer_class = BiodataSerializer
     permission_classes = [IsAuthenticated]
+    queryset = Biodata.objects.all()
     
-    def get_queryset(self):
-        if self.request.user.is_staff:
-            return Biodata.objects.all()
-        return Biodata.objects.get(user=self.request.user)
+    def get_object(self):
+        # Returns single object or 404
+        return get_object_or_404(Biodata, user=self.request.user)
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
