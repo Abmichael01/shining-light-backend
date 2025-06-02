@@ -138,7 +138,7 @@ class BiodataViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         if self.request.user.is_staff:
             return Biodata.objects.all()
-        return Biodata.objects.filter(user=self.request.user)
+        return Biodata.objects.get(user=self.request.user)
     
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
