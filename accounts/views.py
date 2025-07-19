@@ -136,10 +136,7 @@ class BiodataViewSet(viewsets.ModelViewSet):
     serializer_class = BiodataSerializer
     permission_classes = [IsAuthenticated]
     queryset = Biodata.objects.all()
-    
-    def get_object(self):
-        # Returns single object or 404
-        return get_object_or_404(Biodata, user=self.request.user)
-    
+    lookup_field = 'user' 
+
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)

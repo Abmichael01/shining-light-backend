@@ -8,6 +8,11 @@ from .models import Biodata
 
 User = get_user_model()
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'role', 'date_joined']
+        read_only_fields = ['id', 'email', 'role', 'date_joined']
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
@@ -38,13 +43,18 @@ class RegisterSerializer(serializers.Serializer):
     def validate(self, data):
         if data['password'] != data['confirmPassword']:
             raise ValidationError({"confirmPassword": "Passwords do not match."})
-        return data
 
+        if User.objects.filter(email__iexact=data['email']).exists():
+            raise ValidationError({"email": "This email is already in use."})
+
+        return data
+    
     def create(self, validated_data):
         user = User.objects.create_user(
             email=validated_data['email'],
             password=validated_data['password']
         )
+        
         return user
 
     def to_representation(self, instance):

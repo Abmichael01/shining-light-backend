@@ -1,11 +1,11 @@
 # urls.py
 from django.urls import path, include
-from .views import LoginView, LogoutView, RefreshTokenView, RegisterView
+from .views import *
 
-from rest_framework.routers import DefaultRouter
+from rest_framework.routers import SimpleRouter
 from .views import BiodataViewSet
 
-router = DefaultRouter()
+router = SimpleRouter()
 router.register('biodata', BiodataViewSet, basename='biodata')
 
 urlpatterns = [
@@ -14,5 +14,6 @@ urlpatterns = [
     path('refresh-token/', RefreshTokenView.as_view(), name='token_refresh'),
     path('register/', RegisterView.as_view()),
     path('', include('dj_rest_auth.urls')),
+    
     path('', include(router.urls)),
 ]

@@ -65,6 +65,7 @@ AUTH_USER_MODEL = 'accounts.User'
 
 REST_AUTH = {
     'LOGIN_SERIALIZER': 'accounts.serializers.LoginSerializer',
+    'USER_DETAILS_SERIALIZER': 'accounts.serializers.UserSerializer',
 }
 
 REST_FRAMEWORK = {
