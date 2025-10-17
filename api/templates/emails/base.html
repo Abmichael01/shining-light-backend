@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Shining Light Group of Schools{% endblock %}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 20px auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .email-header {
+            background: linear-gradient(135deg, #1a0c66 0%, #2d1a8f 100%);
+            color: #ffffff;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .email-header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .email-header p {
+            margin: 5px 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        .email-body {
+            padding: 30px 20px;
+        }
+        .email-body h2 {
+            color: #1a0c66;
+            font-size: 20px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .email-body h3 {
+            color: #1a0c66;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+        .email-body p {
+            margin: 15px 0;
+            font-size: 15px;
+        }
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .info-table tr {
+            border-bottom: 1px solid #e9ecef;
+        }
+        .info-table tr:last-child {
+            border-bottom: none;
+        }
+        .info-table td {
+            padding: 12px 15px;
+        }
+        .info-table td:first-child {
+            font-weight: 600;
+            color: #1a0c66;
+            width: 40%;
+        }
+        .info-table td:last-child {
+            color: #333;
+        }
+        .credentials-box {
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe9e9 100%);
+            border: 2px solid #d71f0f;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .credentials-box .credential-item {
+            margin: 10px 0;
+            padding: 12px;
+            background-color: #ffffff;
+            border-radius: 6px;
+            border: 1px solid #ffe0e0;
+        }
+        .credentials-box .credential-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        .credentials-box .credential-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a0c66;
+            font-family: 'Courier New', monospace;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 30px;
+            background-color: #1a0c66;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        .button:hover {
+            background-color: #140952;
+        }
+        .info-box {
+            background-color: #f0f4ff;
+            border-left: 4px solid #1a0c66;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .info-box strong {
+            color: #1a0c66;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .warning-box {
+            background-color: #fff5f5;
+            border-left: 4px solid #d71f0f;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .warning-box strong {
+            color: #d71f0f;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .email-footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #666666;
+            border-top: 1px solid #e9ecef;
+        }
+        .email-footer p {
+            margin: 5px 0;
+        }
+        .email-footer a {
+            color: #1a0c66;
+            text-decoration: none;
+        }
+        .divider {
+            height: 1px;
+            background-color: #e9ecef;
+            margin: 25px 0;
+        }
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .info-table td {
+                display: block;
+                width: 100%;
+                padding: 8px 15px;
+            }
+            .info-table td:first-child {
+                padding-bottom: 4px;
+                border-bottom: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <!-- Header -->
+        <div class="email-header">
+            <h1>Shining Light Group of Schools</h1>
+            <p>Excellence in Education</p>
+        </div>
+
+        <!-- Body -->
+        <div class="email-body">
+            {% block content %}
+            <!-- Email content goes here -->
+            {% endblock %}
+        </div>
+
+        <!-- Footer -->
+        <div class="email-footer">
+            <p><strong>Shining Light Group of Schools</strong></p>
+            <p>Contact us: info@shininglightschools.com | +234 XXX XXX XXXX</p>
+            <p>Address: School Address, City, State, Nigeria</p>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                <p style="font-size: 12px; color: #999;">
+                    This is an automated email. Please do not reply to this message.
+                    <br>
+                    © {{ year }} Shining Light Group of Schools. All rights reserved.
+                </p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+
