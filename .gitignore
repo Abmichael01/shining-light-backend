@@ -45,6 +45,5 @@ db.sqlite3-journal
 # OS
 .DS_Store
 Thumbs.db
-
-# Poetry
+      
 poetry.lock
