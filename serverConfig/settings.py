@@ -75,15 +75,17 @@ REST_AUTH = {
 
 # Session Security Settings
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
-SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = True  # Required for SameSite=None
+SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain cookies
+SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = True  # Required for SameSite=None
+CSRF_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain requests
+CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000').split(',')
 
 # CORS Settings
@@ -184,6 +186,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # File Upload Settings
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # 10MB
