@@ -86,11 +86,23 @@ CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
 CSRF_COOKIE_SECURE = True  # Required for SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain requests
 CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
-CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000').split(',')
+CSRF_TRUSTED_ORIGINS = [
+    'https://shininglightschoolsijebuode.com',
+    'https://www.shininglightschoolsijebuode.com',
+    'https://api.shininglightschoolsijebuode.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 # CORS Settings
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = [
+    'https://shininglightschoolsijebuode.com',
+    'https://www.shininglightschoolsijebuode.com',
+    'https://api.shininglightschoolsijebuode.com',
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+]
 
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
