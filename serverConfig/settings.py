@@ -77,7 +77,7 @@ REST_AUTH = {
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True  # Required for SameSite=None
 SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain cookies
-SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+# SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
@@ -85,13 +85,15 @@ SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
 CSRF_COOKIE_SECURE = True  # Required for SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain requests
-CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+# CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
 CSRF_TRUSTED_ORIGINS = [
     'https://shininglightschoolsijebuode.com',
     'https://www.shininglightschoolsijebuode.com',
     'https://api.shininglightschoolsijebuode.com',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
 ]
 
 # CORS Settings
@@ -101,7 +103,9 @@ CORS_ALLOWED_ORIGINS = [
     'https://www.shininglightschoolsijebuode.com',
     'https://api.shininglightschoolsijebuode.com',
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
 ]
 
 MIDDLEWARE = [
