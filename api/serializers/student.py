@@ -8,6 +8,7 @@ import uuid
 class BioDataSerializer(serializers.ModelSerializer):
     """Serializer for BioData model"""
     age = serializers.SerializerMethodField()
+    passport_photo = serializers.SerializerMethodField()
     
     class Meta:
         model = BioData
@@ -22,6 +23,15 @@ class BioDataSerializer(serializers.ModelSerializer):
     def get_age(self, obj):
         """Calculate and return age"""
         return obj.get_age()
+    
+    def get_passport_photo(self, obj):
+        """Return full URL for passport photo"""
+        if obj.passport_photo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.passport_photo.url)
+            return obj.passport_photo.url
+        return None
 
 
 class GuardianSerializer(serializers.ModelSerializer):
@@ -134,6 +144,7 @@ class StudentListSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     full_name = serializers.SerializerMethodField()
+    passport_photo = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
@@ -141,6 +152,7 @@ class StudentListSerializer(serializers.ModelSerializer):
             'id', 'application_number', 'admission_number', 'full_name',
             'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
+            'passport_photo',
             'application_date', 'enrollment_date', 'created_at'
         ]
         read_only_fields = fields
@@ -148,6 +160,18 @@ class StudentListSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Get student's full name"""
         return obj.get_full_name()
+    
+    def get_passport_photo(self, obj):
+        """Return full URL for passport photo if available"""
+        try:
+            if obj.biodata and obj.biodata.passport_photo:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.biodata.passport_photo.url)
+                return obj.biodata.passport_photo.url
+        except:
+            pass
+        return None
 
 
 class StudentRegistrationSerializer(serializers.Serializer):
@@ -220,20 +244,22 @@ class StudentRegistrationSerializer(serializers.Serializer):
             # Extract biodata fields
             biodata_fields = [
                 'surname', 'first_name', 'other_names', 'gender', 'date_of_birth',
-                'nationality', 'state_of_origin', 'permanent_address', 'lin',
+                'passport_photo', 'nationality', 'state_of_origin', 'permanent_address', 'lin',
                 'has_medical_condition', 'medical_condition_details', 'blood_group'
             ]
             biodata_data = {key: validated_data.pop(key, '') for key in biodata_fields if key in validated_data}
             
             # Handle passport photo (base64 to file conversion)
-            passport_photo_data = validated_data.pop('passport_photo', None)
-            if passport_photo_data and passport_photo_data.startswith('data:image'):
-                # Extract base64 data
-                format, imgstr = passport_photo_data.split(';base64,')
-                ext = format.split('/')[-1]
-                # Create file from base64
-                passport_file = ContentFile(base64.b64decode(imgstr), name=f'{uuid.uuid4()}.{ext}')
-                biodata_data['passport_photo'] = passport_file
+            passport_photo_data = biodata_data.get('passport_photo', None)
+            if passport_photo_data:
+                if isinstance(passport_photo_data, str) and passport_photo_data.startswith('data:image'):
+                    # Extract base64 data
+                    format, imgstr = passport_photo_data.split(';base64,')
+                    ext = format.split('/')[-1]
+                    # Create file from base64
+                    passport_file = ContentFile(base64.b64decode(imgstr), name=f'{uuid.uuid4()}.{ext}')
+                    biodata_data['passport_photo'] = passport_file
+                # If it's already a file URL, keep it as is
             
             # Get request user (for created_by)
             request_user = self.context.get('request').user if self.context.get('request') else None

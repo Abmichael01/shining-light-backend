@@ -113,7 +113,8 @@ class Staff(models.Model):
         ]
     
     def __str__(self):
-        return f"{self.staff_id} - {self.get_full_name()}"
+        """Return staff ID as the string representation"""
+        return self.staff_id
     
     def get_full_name(self):
         """Return staff member's full name with title"""

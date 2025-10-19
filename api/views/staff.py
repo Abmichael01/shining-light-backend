@@ -409,7 +409,8 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         queryset = LoanApplication.objects.select_related(
             'staff',
             'staff__user',
-            'staff__school',
+            'staff__assigned_class',
+            'staff__assigned_class__school',
             'reviewed_by'
         ).prefetch_related('loan_payments')
         
@@ -418,10 +419,10 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         if staff_id:
             queryset = queryset.filter(staff_id=staff_id)
         
-        # Filter by school
+        # Filter by school (via assigned_class)
         school_id = self.request.query_params.get('school')
         if school_id:
-            queryset = queryset.filter(staff__school_id=school_id)
+            queryset = queryset.filter(staff__assigned_class__school_id=school_id)
         
         # Filter by status
         status_param = self.request.query_params.get('status')

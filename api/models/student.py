@@ -137,9 +137,10 @@ class Student(models.Model):
         ]
     
     def __str__(self):
+        """Return admission/application number as the string representation"""
         if self.admission_number:
-            return f"{self.admission_number} - {self.get_full_name()}"
-        return f"{self.application_number} - {self.get_full_name()}"
+            return self.admission_number
+        return self.application_number
     
     def get_full_name(self):
         """Get student's full name from biodata"""
