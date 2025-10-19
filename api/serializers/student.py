@@ -178,6 +178,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
     """Serializer for complete student registration (admin creates student)"""
     
     # Student basic info (now uses codes instead of IDs)
+    admission_number = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     school = serializers.CharField()  # School code (e.g., "NUR-001")
     class_model = serializers.CharField()  # Class code (e.g., "SS1")
     department = serializers.IntegerField(required=False, allow_null=True)
@@ -233,6 +234,11 @@ class StudentRegistrationSerializer(serializers.Serializer):
         from api.models import User, School, Class, Department
         
         with transaction.atomic():
+            # Debug logging for admission number
+            print('=== STUDENT REGISTRATION DEBUG ===')
+            print('Received admission_number:', validated_data.get('admission_number'))
+            print('All validated_data keys:', list(validated_data.keys()))
+            
             # Extract nested data
             guardians_data = validated_data.pop('guardians', [])
             email = validated_data.pop('email')

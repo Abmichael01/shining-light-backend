@@ -156,8 +156,14 @@ class Student(models.Model):
             self.application_number = self._generate_application_number()
         
         # Generate admission number when status changes to accepted or enrolled
-        if not self.admission_number and self.status in ['accepted', 'enrolled']:
-            self.admission_number = self._generate_admission_number()
+        # Only auto-generate if admission_number is None or empty string
+        if self.status in ['accepted', 'enrolled']:
+            if not self.admission_number or self.admission_number.strip() == '':
+                print(f'📝 Auto-generating admission number for student (status: {self.status})')
+                self.admission_number = self._generate_admission_number()
+                print(f'✅ Generated admission number: {self.admission_number}')
+            else:
+                print(f'✅ Using provided admission number: {self.admission_number}')
         
         super().save(*args, **kwargs)
     
