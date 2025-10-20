@@ -1,6 +1,6 @@
 from django.urls import path, include
 from api.views import LoginView
-from api.views.dashboard import admin_dashboard_stats
+from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart
 from api.views.config import school_configs
 
 app_name = 'api'
@@ -14,12 +14,14 @@ urlpatterns = [
     
     # Dashboard
     path('dashboard/stats/', admin_dashboard_stats, name='admin-dashboard-stats'),
+    path('dashboard/student-growth/', student_growth_chart, name='student-growth-chart'),
+    path('dashboard/payment-growth/', payment_growth_chart, name='payment-growth-chart'),
     
     # Configs (centralized config data for caching)
     path('configs/', school_configs, name='school-configs'),
     
     # Academic endpoints (schools, sessions, classes, subjects, etc.)
-    path('', include('api.urls.academic')),
+    path('academic/', include('api.urls.academic')),
     
     # Student endpoints (students, biodata, guardians, documents, etc.)
     path('', include('api.urls.student')),

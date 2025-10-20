@@ -6,7 +6,9 @@ from .academic import (
     ClassViewSet,
     DepartmentViewSet,
     SubjectGroupViewSet,
-    SubjectViewSet
+    SubjectViewSet,
+    GradeViewSet,
+    QuestionViewSet
 )
 from .student import (
     StudentViewSet,
@@ -26,6 +28,8 @@ __all__ = [
     'DepartmentViewSet',
     'SubjectGroupViewSet',
     'SubjectViewSet',
+    'GradeViewSet',
+    'QuestionViewSet',
     'StudentViewSet',
     'BioDataViewSet',
     'GuardianViewSet',

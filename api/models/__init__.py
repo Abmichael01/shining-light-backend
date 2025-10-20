@@ -6,7 +6,9 @@ from .academic import (
     Class,
     Department,
     SubjectGroup,
-    Subject
+    Subject,
+    Grade,
+    Question
 )
 from .student import (
     Student,
@@ -40,6 +42,8 @@ __all__ = [
     'Department',
     'SubjectGroup',
     'Subject',
+    'Grade',
+    'Question',
     'Student',
     'BioData',
     'Guardian',

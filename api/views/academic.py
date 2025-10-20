@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Grade, Question
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -11,7 +11,10 @@ from api.serializers import (
     ClassSerializer,
     DepartmentSerializer,
     SubjectGroupSerializer,
-    SubjectSerializer
+    SubjectSerializer,
+    GradeSerializer,
+    QuestionSerializer,
+    QuestionListSerializer
 )
 from api.permissions import IsSchoolAdmin
 from datetime import date
@@ -228,15 +231,6 @@ class SubjectViewSet(viewsets.ModelViewSet):
         if department:
             queryset = queryset.filter(department=department)
         
-        # Filter by core/trade
-        is_core = self.request.query_params.get('is_core', None)
-        if is_core is not None:
-            queryset = queryset.filter(is_core=is_core.lower() == 'true')
-        
-        is_trade = self.request.query_params.get('is_trade', None)
-        if is_trade is not None:
-            queryset = queryset.filter(is_trade=is_trade.lower() == 'true')
-        
         # Search
         search = self.request.query_params.get('search', None)
         if search:
@@ -246,4 +240,121 @@ class SubjectViewSet(viewsets.ModelViewSet):
             )
         
         return queryset
+
+
+class GradeViewSet(viewsets.ModelViewSet):
+    """ViewSet for Grade CRUD operations"""
+    queryset = Grade.objects.all().order_by('order')
+    serializer_class = GradeSerializer
+    permission_classes = [IsSchoolAdmin]
+
+
+class QuestionViewSet(viewsets.ModelViewSet):
+    """ViewSet for Question CRUD operations"""
+    queryset = Question.objects.all().select_related('subject', 'subject__class_model', 'subject__class_model__school', 'created_by')
+    permission_classes = [IsSchoolAdmin]
+    
+    def get_serializer_class(self):
+        """Use different serializer for list vs detail"""
+        if self.action == 'list':
+            return QuestionListSerializer
+        return QuestionSerializer
+    
+    def get_queryset(self):
+        """Filter questions based on query params"""
+        queryset = super().get_queryset()
+        
+        # Filter by subject
+        subject = self.request.query_params.get('subject', None)
+        if subject:
+            queryset = queryset.filter(subject_id=subject)
+        
+        # Filter by school (via subject's class's school)
+        school = self.request.query_params.get('school', None)
+        if school:
+            queryset = queryset.filter(subject__class_model__school_id=school)
+        
+        # Filter by class
+        class_id = self.request.query_params.get('class', None)
+        if class_id:
+            queryset = queryset.filter(subject__class_model_id=class_id)
+        
+        # Filter by difficulty
+        difficulty = self.request.query_params.get('difficulty', None)
+        if difficulty:
+            queryset = queryset.filter(difficulty=difficulty)
+        
+        # Filter by question type
+        question_type = self.request.query_params.get('question_type', None)
+        if question_type:
+            queryset = queryset.filter(question_type=question_type)
+        
+        # Filter by topic
+        topic = self.request.query_params.get('topic', None)
+        if topic:
+            queryset = queryset.filter(topic__icontains=topic)
+        
+        # Filter by verified status
+        is_verified = self.request.query_params.get('is_verified', None)
+        if is_verified is not None:
+            queryset = queryset.filter(is_verified=is_verified.lower() == 'true')
+        
+        # Search
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(question_text__icontains=search) |
+                models.Q(topic__icontains=search) |
+                models.Q(subject__name__icontains=search)
+            )
+        
+        return queryset.order_by('-created_at')
+    
+    def perform_create(self, serializer):
+        """Set the created_by field to current user"""
+        serializer.save(created_by=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """Get question bank statistics"""
+        total_questions = Question.objects.count()
+        verified_questions = Question.objects.filter(is_verified=True).count()
+        
+        # Count by difficulty
+        difficulty_counts = Question.objects.values('difficulty').annotate(count=models.Count('id'))
+        
+        # Count by type
+        type_counts = Question.objects.values('question_type').annotate(count=models.Count('id'))
+        
+        # Count topics
+        total_topics = Question.objects.values('topic').distinct().count()
+        
+        # Count subjects with questions
+        total_subjects = Question.objects.values('subject').distinct().count()
+        
+        return Response({
+            'total_questions': total_questions,
+            'verified_questions': verified_questions,
+            'unverified_questions': total_questions - verified_questions,
+            'total_topics': total_topics,
+            'total_subjects': total_subjects,
+            'difficulty_breakdown': {item['difficulty']: item['count'] for item in difficulty_counts},
+            'type_breakdown': {item['question_type']: item['count'] for item in type_counts},
+        })
+    
+    @action(detail=True, methods=['post'])
+    def verify(self, request, pk=None):
+        """Verify a question"""
+        question = self.get_object()
+        question.is_verified = True
+        question.save(update_fields=['is_verified'])
+        return Response({'status': 'Question verified successfully'})
+    
+    @action(detail=True, methods=['post'])
+    def unverify(self, request, pk=None):
+        """Unverify a question"""
+        question = self.get_object()
+        question.is_verified = False
+        question.save(update_fields=['is_verified'])
+        return Response({'status': 'Question unverified successfully'})
 

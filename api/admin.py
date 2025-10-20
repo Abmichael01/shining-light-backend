@@ -10,6 +10,8 @@ from .models import (
     Department,
     SubjectGroup,
     Subject,
+    Grade,
+    Question,
     Student,
     BioData,
     Guardian,
@@ -157,8 +159,8 @@ class SubjectGroupAdmin(admin.ModelAdmin):
 class SubjectAdmin(admin.ModelAdmin):
     """Admin interface for Subject model"""
     
-    list_display = ['name', 'code', 'class_model', 'school', 'department', 'is_core', 'is_trade']
-    list_filter = ['school', 'class_model', 'department', 'is_core', 'is_trade', 'subject_group']
+    list_display = ['name', 'code', 'class_model', 'school', 'department', 'ca_max', 'exam_max']
+    list_filter = ['school', 'class_model', 'department', 'subject_group']
     search_fields = ['name', 'code']
     ordering = ['school', 'class_model', 'order', 'name']
     
@@ -167,12 +169,62 @@ class SubjectAdmin(admin.ModelAdmin):
             'fields': ('name', 'code', 'school', 'class_model')
         }),
         (_('Classification'), {
-            'fields': ('department', 'subject_group', 'is_core', 'is_trade')
+            'fields': ('department', 'subject_group')
+        }),
+        (_('Assessment Configuration'), {
+            'fields': ('ca_max', 'exam_max')
         }),
         (_('Display'), {
             'fields': ('order',)
         }),
     )
+
+
+@admin.register(Question)
+class QuestionAdmin(admin.ModelAdmin):
+    """Admin interface for Question model"""
+    
+    list_display = ['question_text_preview', 'subject', 'topic', 'question_type', 'difficulty', 'is_verified', 'usage_count', 'created_at']
+    list_filter = ['subject__school', 'subject', 'question_type', 'difficulty', 'is_verified', 'created_at']
+    search_fields = ['question_text', 'topic', 'subject__name']
+    ordering = ['-created_at']
+    readonly_fields = ['usage_count', 'created_at', 'updated_at', 'created_by']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('subject', 'topic', 'question_type', 'difficulty', 'marks')
+        }),
+        (_('Question Content'), {
+            'fields': ('question_text',)
+        }),
+        (_('Options (For Multiple Choice)'), {
+            'fields': ('option_a', 'option_b', 'option_c', 'option_d', 'option_e'),
+            'classes': ('collapse',)
+        }),
+        (_('Answer'), {
+            'fields': ('correct_answer', 'explanation')
+        }),
+        (_('Status'), {
+            'fields': ('is_verified', 'usage_count')
+        }),
+        (_('Metadata'), {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def question_text_preview(self, obj):
+        """Show first 100 chars of question"""
+        from django.utils.html import strip_tags
+        text = strip_tags(obj.question_text)
+        return text[:100] + '...' if len(text) > 100 else text
+    question_text_preview.short_description = 'Question'
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by to current user if not set"""
+        if not obj.pk:  # New object
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 # ===== Student Management =====

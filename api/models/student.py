@@ -503,7 +503,7 @@ class Biometric(models.Model):
 
 
 class StudentSubject(models.Model):
-    """Student subject registration for each session"""
+    """Student subject registration and results for each session"""
     
     student = models.ForeignKey(
         Student,
@@ -532,8 +532,76 @@ class StudentSubject(models.Model):
         verbose_name=_('session term')
     )
     
-    # Status
+    # Registration Status
     is_active = models.BooleanField(_('active'), default=True)
+    
+    # Result/Assessment Scores
+    ca_score = models.DecimalField(
+        _('CA score'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_('Continuous Assessment score (max 40)')
+    )
+    exam_score = models.DecimalField(
+        _('exam score'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_('Examination score (max 60)')
+    )
+    total_score = models.DecimalField(
+        _('total score'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_('Total = CA + Exam (max 100)')
+    )
+    grade = models.ForeignKey(
+        'Grade',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='student_subjects',
+        verbose_name=_('grade'),
+        help_text=_('Auto-calculated based on total score')
+    )
+    
+    # Position/Rank
+    position = models.PositiveIntegerField(
+        _('position'),
+        null=True,
+        blank=True,
+        help_text=_('Rank in class for this subject')
+    )
+    
+    # Teacher's Remark
+    teacher_comment = models.TextField(
+        _('teacher comment'),
+        blank=True,
+        help_text=_('Subject teacher\'s remark')
+    )
+    
+    # Result Entry Tracking
+    result_entered_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='results_entered',
+        verbose_name=_('result entered by')
+    )
+    result_entered_at = models.DateTimeField(
+        _('result entered at'),
+        null=True,
+        blank=True
+    )
     
     # Timestamps
     registered_at = models.DateTimeField(_('registered at'), auto_now_add=True)
@@ -548,8 +616,34 @@ class StudentSubject(models.Model):
     def __str__(self):
         return f"{self.student} - {self.subject} ({self.session})"
     
+    def calculate_total(self):
+        """Calculate total score from CA and Exam"""
+        if self.ca_score is not None and self.exam_score is not None:
+            from decimal import Decimal
+            return Decimal(str(self.ca_score)) + Decimal(str(self.exam_score))
+        return None
+    
+    def calculate_grade(self):
+        """Automatically determine grade based on total score"""
+        if self.total_score is not None:
+            from api.models.academic import Grade
+            return Grade.get_grade_for_score(float(self.total_score))
+        return None
+    
+    def save(self, *args, **kwargs):
+        """Auto-calculate total score and grade"""
+        # Calculate total if CA and Exam are provided
+        if self.ca_score is not None and self.exam_score is not None:
+            self.total_score = self.calculate_total()
+            
+            # Auto-determine grade based on total
+            if self.total_score is not None:
+                self.grade = self.calculate_grade()
+        
+        super().save(*args, **kwargs)
+    
     def clean(self):
-        """Validate subject registration"""
+        """Validate subject registration and scores"""
         super().clean()
         
         # Ensure subject belongs to student's class
@@ -563,4 +657,20 @@ class StudentSubject(models.Model):
             raise ValidationError(
                 _('Subject must belong to the student\'s school')
             )
+        
+        # Validate CA score against subject's ca_max
+        if self.ca_score is not None:
+            ca_max = float(self.subject.ca_max)
+            if self.ca_score < 0 or self.ca_score > ca_max:
+                raise ValidationError({
+                    'ca_score': _(f'CA score must be between 0 and {ca_max}')
+                })
+        
+        # Validate exam score against subject's exam_max
+        if self.exam_score is not None:
+            exam_max = float(self.subject.exam_max)
+            if self.exam_score < 0 or self.exam_score > exam_max:
+                raise ValidationError({
+                    'exam_score': _(f'Exam score must be between 0 and {exam_max}')
+                })
 

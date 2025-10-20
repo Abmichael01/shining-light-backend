@@ -81,20 +81,32 @@ class BiometricSerializer(serializers.ModelSerializer):
 
 
 class StudentSubjectSerializer(serializers.ModelSerializer):
-    """Serializer for StudentSubject model"""
+    """Serializer for StudentSubject model with results"""
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     session_name = serializers.CharField(source='session.name', read_only=True)
     term_name = serializers.CharField(source='session_term.term_name', read_only=True, allow_null=True)
+    grade_name = serializers.CharField(source='grade.grade_name', read_only=True, allow_null=True)
+    grade_description = serializers.CharField(source='grade.grade_description', read_only=True, allow_null=True)
     
     class Meta:
         model = StudentSubject
         fields = [
             'id', 'student', 'subject', 'subject_name', 'subject_code',
             'session', 'session_name', 'session_term', 'term_name',
-            'is_active', 'registered_at', 'updated_at'
+            'is_active',
+            # Result fields
+            'ca_score', 'exam_score', 'total_score', 
+            'grade', 'grade_name', 'grade_description',
+            'position', 'teacher_comment',
+            'result_entered_by', 'result_entered_at',
+            'registered_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'registered_at', 'updated_at', 'subject_name', 'subject_code', 'session_name', 'term_name']
+        read_only_fields = [
+            'id', 'registered_at', 'updated_at', 'total_score',
+            'subject_name', 'subject_code', 'session_name', 'term_name',
+            'grade', 'grade_name', 'grade_description'
+        ]
 
 
 class StudentSerializer(serializers.ModelSerializer):

@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -379,9 +380,24 @@ class Subject(models.Model):
         related_name='subjects',
         verbose_name=_('subject group')
     )
-    is_core = models.BooleanField(_('core/compulsory'), default=False)
-    is_trade = models.BooleanField(_('trade subject'), default=False)
     order = models.PositiveSmallIntegerField(_('display order'), default=0)
+    
+    # Assessment Configuration
+    ca_max = models.DecimalField(
+        _('CA maximum score'),
+        max_digits=5,
+        decimal_places=2,
+        default=40,
+        help_text=_('Maximum Continuous Assessment score (default: 40)')
+    )
+    exam_max = models.DecimalField(
+        _('Exam maximum score'),
+        max_digits=5,
+        decimal_places=2,
+        default=60,
+        help_text=_('Maximum Examination score (default: 60)')
+    )
+    
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
     class Meta:
@@ -440,4 +456,252 @@ class Subject(models.Model):
         # Subject group must belong to same class
         if self.subject_group and self.subject_group.class_model != self.class_model:
             raise ValidationError(_('Subject group must belong to the same class'))
+
+
+class Grade(models.Model):
+    """Configurable grading system - Admin can define grade ranges"""
+    
+    GRADE_LETTER_CHOICES = [
+        ('A', 'A'),
+        ('B', 'B'),
+        ('C', 'C'),
+        ('D', 'D'),
+        ('E', 'E'),
+        ('F', 'F'),
+    ]
+    
+    grade_letter = models.CharField(
+        _('grade letter'),
+        max_length=1,
+        choices=GRADE_LETTER_CHOICES,
+        unique=True,
+        help_text=_('Grade letter: A, B, C, D, E, or F')
+    )
+    grade_name = models.CharField(
+        _('grade name'),
+        max_length=20,
+        help_text=_('Display name: A1, A+, B2, etc.')
+    )
+    grade_description = models.CharField(
+        _('grade description'),
+        max_length=100,
+        help_text=_('Text description: Excellent, Very Good, Good, etc.')
+    )
+    min_score = models.DecimalField(
+        _('minimum score'),
+        max_digits=5,
+        decimal_places=2,
+        help_text=_('Minimum score for this grade (e.g., 75.00)')
+    )
+    max_score = models.DecimalField(
+        _('maximum score'),
+        max_digits=5,
+        decimal_places=2,
+        help_text=_('Maximum score for this grade (e.g., 100.00)')
+    )
+    order = models.PositiveSmallIntegerField(
+        _('display order'),
+        editable=False,
+        help_text=_('Auto-generated from grade letter (A=1, B=2, etc.)')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _('Grade')
+        verbose_name_plural = _('Grades')
+        ordering = ['order', '-min_score']
+    
+    def __str__(self):
+        return f"{self.grade_name} ({self.min_score}-{self.max_score})"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate order from grade letter"""
+        # Map grade letters to order (A=1, B=2, C=3, D=4, E=5, F=6)
+        grade_order_map = {'A': 1, 'B': 2, 'C': 3, 'D': 4, 'E': 5, 'F': 6}
+        self.order = grade_order_map.get(self.grade_letter, 99)
+        super().save(*args, **kwargs)
+    
+    def clean(self):
+        """Validate grade ranges"""
+        super().clean()
+        
+        # Ensure min_score is less than max_score
+        if self.min_score >= self.max_score:
+            raise ValidationError(_('Minimum score must be less than maximum score'))
+        
+        # Ensure scores are within 0-100
+        if self.min_score < 0 or self.max_score > 100:
+            raise ValidationError(_('Scores must be between 0 and 100'))
+        
+        # Check for overlapping grade ranges
+        overlapping_grades = Grade.objects.exclude(pk=self.pk).filter(
+            models.Q(min_score__lte=self.max_score, max_score__gte=self.min_score)
+        )
+        if overlapping_grades.exists():
+            raise ValidationError(
+                _('This grade range overlaps with existing grades: %(grades)s') % 
+                {'grades': ', '.join([g.grade_name for g in overlapping_grades])}
+            )
+    
+    @classmethod
+    def get_grade_for_score(cls, score):
+        """Get the appropriate grade for a given score"""
+        try:
+            return cls.objects.get(
+                min_score__lte=score,
+                max_score__gte=score
+            )
+        except cls.DoesNotExist:
+            return None
+        except cls.MultipleObjectsReturned:
+            # If multiple grades match (shouldn't happen with proper validation), return the first
+            return cls.objects.filter(
+                min_score__lte=score,
+                max_score__gte=score
+            ).first()
+
+
+class Question(models.Model):
+    """Represents a question in the question bank for CBT"""
+    
+    QUESTION_TYPE_CHOICES = [
+        ('multiple_choice', 'Multiple Choice'),
+        ('true_false', 'True/False'),
+        ('essay', 'Essay'),
+        ('fill_blank', 'Fill in the Blank'),
+        ('short_answer', 'Short Answer'),
+    ]
+    
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('medium', 'Medium'),
+        ('hard', 'Hard'),
+    ]
+    
+    subject = models.ForeignKey(
+        'Subject',
+        on_delete=models.CASCADE,
+        related_name='questions',
+        verbose_name=_('subject')
+    )
+    topic = models.CharField(
+        _('topic'),
+        max_length=200,
+        help_text=_('Specific topic or unit this question covers')
+    )
+    question_text = models.TextField(
+        _('question text'),
+        help_text=_('The question text (supports HTML and LaTeX for math formulas)')
+    )
+    question_type = models.CharField(
+        _('question type'),
+        max_length=20,
+        choices=QUESTION_TYPE_CHOICES,
+        default='multiple_choice'
+    )
+    difficulty = models.CharField(
+        _('difficulty level'),
+        max_length=10,
+        choices=DIFFICULTY_CHOICES,
+        default='medium'
+    )
+    
+    # For multiple choice questions
+    option_a = models.TextField(_('option A'), blank=True, null=True)
+    option_b = models.TextField(_('option B'), blank=True, null=True)
+    option_c = models.TextField(_('option C'), blank=True, null=True)
+    option_d = models.TextField(_('option D'), blank=True, null=True)
+    option_e = models.TextField(_('option E'), blank=True, null=True)
+    
+    correct_answer = models.TextField(
+        _('correct answer'),
+        help_text=_('For multiple choice: A, B, C, D, or E. For true/false: True or False. For others: the complete answer')
+    )
+    
+    # Additional information
+    explanation = models.TextField(
+        _('explanation'),
+        blank=True,
+        null=True,
+        help_text=_('Explanation of the correct answer (supports HTML and LaTeX)')
+    )
+    marks = models.PositiveSmallIntegerField(
+        _('marks'),
+        default=1,
+        help_text=_('Points awarded for correct answer')
+    )
+    
+    # Status and usage tracking
+    is_verified = models.BooleanField(
+        _('verified'),
+        default=False,
+        help_text=_('Indicates if the question has been reviewed and approved')
+    )
+    usage_count = models.PositiveIntegerField(
+        _('usage count'),
+        default=0,
+        help_text=_('Number of times this question has been used in exams')
+    )
+    
+    # Metadata
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_questions',
+        verbose_name=_('created by')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Question')
+        verbose_name_plural = _('Questions')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subject', 'topic']),
+            models.Index(fields=['difficulty']),
+            models.Index(fields=['question_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.subject.name} - {self.topic} ({self.get_difficulty_display()})"
+    
+    def clean(self):
+        """Validate question based on type"""
+        super().clean()
+        
+        # Validate multiple choice questions
+        if self.question_type == 'multiple_choice':
+            if not all([self.option_a, self.option_b, self.option_c, self.option_d]):
+                raise ValidationError(_('Multiple choice questions must have at least 4 options (A-D)'))
+            
+            if self.correct_answer.upper() not in ['A', 'B', 'C', 'D', 'E']:
+                raise ValidationError(_('Correct answer for multiple choice must be A, B, C, D, or E'))
+            
+            # Ensure the selected option actually exists
+            option_map = {'A': self.option_a, 'B': self.option_b, 'C': self.option_c, 
+                         'D': self.option_d, 'E': self.option_e}
+            if not option_map.get(self.correct_answer.upper()):
+                raise ValidationError(_('The selected correct answer option does not exist'))
+        
+        # Validate true/false questions
+        elif self.question_type == 'true_false':
+            if self.correct_answer.lower() not in ['true', 'false']:
+                raise ValidationError(_('Correct answer for true/false must be True or False'))
+    
+    @property
+    def school(self):
+        """Get the school from the subject's class"""
+        return self.subject.school if self.subject and self.subject.school else None
+    
+    @property
+    def class_level(self):
+        """Get the class level from the subject"""
+        return self.subject.class_model
+    
+    def increment_usage(self):
+        """Increment usage count when question is used in an exam"""
+        self.usage_count += 1
+        self.save(update_fields=['usage_count'])
 

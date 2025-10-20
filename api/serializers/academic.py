@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Grade, Question
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -78,7 +78,7 @@ class SubjectSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'code', 'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'subject_group', 'subject_group_name',
-            'is_core', 'is_trade', 'order', 'created_at'
+            'order', 'ca_max', 'exam_max', 'created_at'
         ]
         read_only_fields = ['id', 'code', 'created_at']
     
@@ -154,4 +154,87 @@ class SessionSerializer(serializers.ModelSerializer):
         if current_term:
             return SessionTermSerializer(current_term).data
         return None  # Code is auto-generated
+
+
+class GradeSerializer(serializers.ModelSerializer):
+    """Serializer for Grade model"""
+    
+    class Meta:
+        model = Grade
+        fields = [
+            'id', 'grade_letter', 'grade_name', 'grade_description',
+            'min_score', 'max_score', 'order', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+
+
+class QuestionSerializer(serializers.ModelSerializer):
+    """Serializer for Question model"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    school_name = serializers.CharField(source='subject.class_model.school.name', read_only=True)
+    class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Question
+        fields = [
+            'id', 'subject', 'subject_name', 'school_name', 'class_name',
+            'topic', 'question_text', 'question_type', 'difficulty',
+            'option_a', 'option_b', 'option_c', 'option_d', 'option_e',
+            'correct_answer', 'explanation', 'marks',
+            'is_verified', 'usage_count', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'usage_count', 'created_at', 'updated_at']
+    
+    def get_created_by_name(self, obj):
+        """Get creator's email (custom User model only has email field)"""
+        if obj.created_by:
+            return obj.created_by.email
+        return None
+    
+    def validate(self, data):
+        """Additional validation based on question type"""
+        question_type = data.get('question_type', self.instance.question_type if self.instance else None)
+        
+        if question_type == 'multiple_choice':
+            # Ensure required options are provided
+            required_options = ['option_a', 'option_b', 'option_c', 'option_d']
+            for option in required_options:
+                if not data.get(option):
+                    raise serializers.ValidationError({
+                        option: 'Multiple choice questions must have at least 4 options (A-D)'
+                    })
+            
+            # Validate correct answer
+            correct = data.get('correct_answer', '').upper()
+            if correct not in ['A', 'B', 'C', 'D', 'E']:
+                raise serializers.ValidationError({
+                    'correct_answer': 'Correct answer for multiple choice must be A, B, C, D, or E'
+                })
+        
+        elif question_type == 'true_false':
+            correct = data.get('correct_answer', '').lower()
+            if correct not in ['true', 'false']:
+                raise serializers.ValidationError({
+                    'correct_answer': 'Correct answer for true/false must be True or False'
+                })
+        
+        return data
+
+
+class QuestionListSerializer(serializers.ModelSerializer):
+    """Simplified serializer for listing questions"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    school_name = serializers.CharField(source='subject.class_model.school.name', read_only=True)
+    class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
+    
+    class Meta:
+        model = Question
+        fields = [
+            'id', 'subject', 'subject_name', 'school_name', 'class_name',
+            'topic', 'question_text', 'question_type', 'difficulty',
+            'is_verified', 'usage_count', 'created_at'
+        ]
+        read_only_fields = ['id', 'usage_count', 'created_at']
 
