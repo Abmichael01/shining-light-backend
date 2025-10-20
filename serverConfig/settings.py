@@ -78,20 +78,29 @@ REST_AUTH = {
 
 # Session Security Settings
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SECURE = True  # Required for SameSite=None
-SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain cookies
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
-CSRF_COOKIE_SECURE = True  # Required for SameSite=None
-CSRF_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain requests
 
-# Set cookie domain only in production
+# Environment-specific cookie settings
 if ENV == 'production':
-    SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
-    CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+    # Production: HTTPS with cross-subdomain support
+    SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SAMESITE = 'None'
+    SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'
+    CSRF_COOKIE_SECURE = True
+    CSRF_COOKIE_SAMESITE = 'None'
+    CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'
+else:
+    # Development: HTTP localhost
+    SESSION_COOKIE_SECURE = False  # Allow HTTP
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Standard for same-origin
+    # No SESSION_COOKIE_DOMAIN for localhost
+    CSRF_COOKIE_SECURE = False  # Allow HTTP
+    CSRF_COOKIE_SAMESITE = 'Lax'  # Standard for same-origin
+    # No CSRF_COOKIE_DOMAIN for localhost
 
 CSRF_TRUSTED_ORIGINS = [
     'https://shininglightschoolsijebuode.com',
