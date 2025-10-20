@@ -23,6 +23,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
+# Get environment mode
+ENV = os.getenv('ENV', 'development')
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-+5plz)e584@+t(w$r=h!v1^8k#(zjv%pk=&@qhy(w#yu8v+wyn')
 
@@ -77,7 +80,6 @@ REST_AUTH = {
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = True  # Required for SameSite=None
 SESSION_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain cookies
-# SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
 
@@ -85,7 +87,12 @@ SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
 CSRF_COOKIE_SECURE = True  # Required for SameSite=None
 CSRF_COOKIE_SAMESITE = 'None'  # Allow cross-subdomain requests
-# CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+
+# Set cookie domain only in production
+if ENV == 'production':
+    SESSION_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+    CSRF_COOKIE_DOMAIN = '.shininglightschoolsijebuode.com'  # Share across subdomains
+
 CSRF_TRUSTED_ORIGINS = [
     'https://shininglightschoolsijebuode.com',
     'https://www.shininglightschoolsijebuode.com',
@@ -141,9 +148,6 @@ WSGI_APPLICATION = "serverConfig.wsgi.application"
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-# Get environment mode
-ENV = os.getenv('ENV', 'development')
 
 if ENV == 'production':
     # PostgreSQL configuration for production
