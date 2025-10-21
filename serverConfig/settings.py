@@ -80,9 +80,11 @@ REST_AUTH = {
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_AGE = 86400  # 24 hours
 SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_NAME = 'shinninglight_sessionid'  # Unique name to avoid conflicts with other projects
 
 # CSRF Settings
 CSRF_COOKIE_HTTPONLY = False  # JavaScript needs to read this
+CSRF_COOKIE_NAME = 'shinninglight_csrftoken'  # Unique name to avoid conflicts with other projects
 
 # Environment-specific cookie settings
 if ENV == 'production':
