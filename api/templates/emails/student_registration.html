@@ -3,95 +3,87 @@
 {% block title %}Welcome to Shining Light Group of Schools{% endblock %}
 
 {% block content %}
-<h2>🎉 Welcome to Shining Light Group of Schools!</h2>
+<h2>Registration Successful!</h2>
 
 <p>Dear <strong>{{ student_name }}</strong>,</p>
 
 <p>
-    Congratulations! 🎊 Your registration has been successfully completed at <strong>Shining Light Group of Schools</strong>.
-    We are delighted to welcome you to our community of learners. 📚
+    Congratulations! Your registration has been successfully completed at <strong>Shining Light Group of Schools</strong>.
+    We are delighted to welcome you to our community of learners.
 </p>
 
 <div class="divider"></div>
 
-<h3>📋 Student Information</h3>
+<div class="info-box">
+    <h3 style="margin-top: 0; color: #111827;">Student Information</h3>
+    <div class="detail-row">
+        <span><strong>Full Name:</strong></span>
+        <span>{{ student_name }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>Admission Number:</strong></span>
+        <span>{{ admission_number }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>Class:</strong></span>
+        <span>{{ class_name }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>School Division:</strong></span>
+        <span>{{ school_name }}</span>
+    </div>
+</div>
 
-<table class="info-table">
-    <tr>
-        <td>👤 Full Name</td>
-        <td>{{ student_name }}</td>
-    </tr>
-    <tr>
-        <td>🎓 Admission Number</td>
-        <td><strong>{{ admission_number }}</strong></td>
-    </tr>
-    <tr>
-        <td>📖 Class</td>
-        <td>{{ class_name }}</td>
-    </tr>
-    <tr>
-        <td>🏫 School Division</td>
-        <td>{{ school_name }}</td>
-    </tr>
-</table>
+<h3>Your Login Credentials</h3>
 
-<div class="divider"></div>
-
-<h3>🔐 Your Login Credentials</h3>
-
-<p>
-    Below are your login credentials to access the student portal. Please keep this information secure! 🔒
-</p>
+<p>Below are your login credentials to access the student portal. Please keep this information secure.</p>
 
 <div class="credentials-box">
+    <p>YOUR PORTAL CREDENTIALS</p>
     <div class="credential-item">
-        <div class="credential-label">📧 Email / Username</div>
+        <div class="credential-label">Email / Username</div>
         <div class="credential-value">{{ email }}</div>
     </div>
     <div class="credential-item">
-        <div class="credential-label">🔑 Temporary Password</div>
+        <div class="credential-label">Temporary Password</div>
         <div class="credential-value">{{ password }}</div>
     </div>
 </div>
 
-<p style="text-align: center;">
-    <a href="{{ portal_url }}" class="button">🚀 Access Student Portal</a>
-</p>
+<div style="text-align: center;">
+    <a href="{{ portal_url }}" class="button" style="color: white;">Access Student Portal</a>
+</div>
 
 <div class="divider"></div>
 
-<div class="warning-box">
-    <strong>⚠️ Important Security Notice</strong>
-    <ul style="margin: 10px 0 0; padding-left: 20px;">
-        <li>🔑 <strong>Change your password immediately</strong> after your first login</li>
-        <li>🔒 Keep your login credentials secure and confidential</li>
-        <li>🚫 Never share your password with anyone</li>
-        <li>📧 Verify this email is from an official school address</li>
+<div class="alert-box warning-box">
+    <h4>⚠️ Important Security Notice</h4>
+    <ul>
+        <li><strong>Change your password immediately</strong> after your first login</li>
+        <li>Keep your login credentials secure and confidential</li>
+        <li>Never share your password with anyone</li>
+        <li>Verify this email is from an official school address</li>
     </ul>
 </div>
 
-<div class="info-box">
-    <strong>📝 Next Steps</strong>
-    <ul style="margin: 10px 0 0; padding-left: 20px;">
-        <li>✅ Log in to the student portal using the credentials above</li>
-        <li>🔄 Change your password to something memorable</li>
-        <li>✏️ Complete your profile information</li>
-        <li>💳 Check your fee payment status</li>
-        <li>📖 View your class schedule and assignments</li>
-        <li>🔔 Enable notifications for important updates</li>
+<div class="alert-box info-highlight">
+    <h4>Next Steps</h4>
+    <ul>
+        <li>Log in to the student portal using the credentials above</li>
+        <li>Change your password to something memorable</li>
+        <li>Complete your profile information</li>
+        <li>Check your fee payment status</li>
+        <li>View your class schedule and assignments</li>
+        <li>Enable notifications for important updates</li>
     </ul>
 </div>
 
-<p>
-    If you have any questions or need assistance, please don't hesitate to contact our administration office. 💬
-</p>
+<p>If you have any questions or need assistance, please don't hesitate to contact our administration office.</p>
+
+<p>We wish you a successful and enriching academic journey with us!</p>
 
 <p>
-    We wish you a successful and enriching academic journey with us! 🌟
-</p>
-
-<p>
-    <strong>Best regards,</strong> ✨<br>
+    <strong>Best regards,</strong><br>
     <strong>Shining Light Group of Schools Administration</strong>
 </p>
 {% endblock %}

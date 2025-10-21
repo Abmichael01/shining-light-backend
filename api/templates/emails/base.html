@@ -6,155 +6,175 @@
     <title>{% block title %}Shining Light Group of Schools{% endblock %}</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Arial, sans-serif;
             line-height: 1.6;
-            color: #333333;
+            color: #333;
             background-color: #f4f4f4;
             margin: 0;
-            padding: 0;
+            padding: 20px;
         }
         .email-container {
             max-width: 600px;
-            margin: 20px auto;
+            margin: 0 auto;
             background-color: #ffffff;
-            border-radius: 8px;
+            border-radius: 10px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         .email-header {
             background: linear-gradient(135deg, #1a0c66 0%, #2d1a8f 100%);
-            color: #ffffff;
-            padding: 30px 20px;
+            color: white;
+            padding: 40px 30px;
             text-align: center;
         }
         .email-header h1 {
             margin: 0;
-            font-size: 24px;
-            font-weight: 600;
+            font-size: 28px;
+            font-weight: bold;
         }
         .email-header p {
-            margin: 5px 0 0;
-            font-size: 14px;
-            opacity: 0.9;
+            margin: 10px 0 0;
+            font-size: 16px;
+            opacity: 0.95;
         }
         .email-body {
-            padding: 30px 20px;
+            background: white;
+            padding: 40px 30px;
+            border: 1px solid #e5e7eb;
         }
         .email-body h2 {
             color: #1a0c66;
-            font-size: 20px;
-            margin-top: 0;
-            margin-bottom: 20px;
+            font-size: 24px;
+            margin: 0 0 20px 0;
+            font-weight: bold;
         }
         .email-body h3 {
-            color: #1a0c66;
+            color: #111827;
             font-size: 18px;
-            margin-bottom: 15px;
+            margin: 30px 0 15px 0;
+            font-weight: bold;
         }
         .email-body p {
             margin: 15px 0;
             font-size: 15px;
+            color: #333;
+        }
+        .info-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid #e5e7eb;
         }
         .info-table {
             width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            overflow: hidden;
+            margin: 0;
         }
-        .info-table tr {
-            border-bottom: 1px solid #e9ecef;
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #e5e7eb;
         }
-        .info-table tr:last-child {
+        .detail-row:last-child {
             border-bottom: none;
         }
-        .info-table td {
-            padding: 12px 15px;
-        }
-        .info-table td:first-child {
+        .detail-row strong {
+            color: #111827;
             font-weight: 600;
-            color: #1a0c66;
-            width: 40%;
         }
-        .info-table td:last-child {
+        .detail-row span {
             color: #333;
         }
         .credentials-box {
-            background: linear-gradient(135deg, #fff5f5 0%, #ffe9e9 100%);
-            border: 2px solid #d71f0f;
-            border-radius: 8px;
-            padding: 20px;
-            margin: 20px 0;
+            background: white;
+            border: 3px dashed #1a0c66;
+            border-radius: 10px;
+            padding: 30px;
+            margin: 25px 0;
             text-align: center;
         }
-        .credentials-box .credential-item {
-            margin: 10px 0;
-            padding: 12px;
-            background-color: #ffffff;
-            border-radius: 6px;
-            border: 1px solid #ffe0e0;
+        .credentials-box p {
+            margin: 0 0 15px 0;
+            color: #6b7280;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
-        .credentials-box .credential-label {
+        .credential-item {
+            margin: 15px 0;
+            padding: 20px;
+            background-color: #f9fafb;
+            border-radius: 8px;
+        }
+        .credential-label {
             font-size: 12px;
-            color: #666;
+            color: #6b7280;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
         }
-        .credentials-box .credential-value {
-            font-size: 18px;
-            font-weight: 600;
+        .credential-value {
+            font-size: 24px;
+            font-weight: bold;
             color: #1a0c66;
             font-family: 'Courier New', monospace;
+            letter-spacing: 2px;
         }
         .button {
             display: inline-block;
-            padding: 12px 30px;
-            background-color: #1a0c66;
-            color: #ffffff;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #1a0c66 0%, #2d1a8f 100%);
+            color: white !important;
             text-decoration: none;
-            border-radius: 5px;
-            margin: 20px 0;
-            font-weight: 600;
+            border-radius: 8px;
+            margin: 25px 0;
+            font-weight: bold;
+            font-size: 16px;
         }
-        .button:hover {
-            background-color: #140952;
+        .alert-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 25px 0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
-        .info-box {
-            background-color: #f0f4ff;
-            border-left: 4px solid #1a0c66;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
+        .alert-box h4 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            font-weight: bold;
         }
-        .info-box strong {
-            color: #1a0c66;
-            display: block;
-            margin-bottom: 10px;
+        .alert-box ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .alert-box li {
+            margin: 8px 0;
+            color: #4b5563;
         }
         .warning-box {
-            background-color: #fff5f5;
-            border-left: 4px solid #d71f0f;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 4px;
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
         }
-        .warning-box strong {
-            color: #d71f0f;
-            display: block;
-            margin-bottom: 10px;
+        .warning-box h4 {
+            color: #92400e;
+        }
+        .info-highlight {
+            background: #f0f4ff;
+            border-left: 4px solid #1a0c66;
+        }
+        .info-highlight h4 {
+            color: #1a0c66;
         }
         .email-footer {
-            background-color: #f8f9fa;
-            padding: 20px;
+            background-color: white;
+            padding: 30px 20px;
             text-align: center;
             font-size: 13px;
-            color: #666666;
-            border-top: 1px solid #e9ecef;
+            color: #6b7280;
         }
         .email-footer p {
-            margin: 5px 0;
+            margin: 8px 0;
         }
         .email-footer a {
             color: #1a0c66;
@@ -162,22 +182,28 @@
         }
         .divider {
             height: 1px;
-            background-color: #e9ecef;
-            margin: 25px 0;
+            background-color: #e5e7eb;
+            margin: 30px 0;
         }
         @media only screen and (max-width: 600px) {
+            body {
+                padding: 0;
+            }
             .email-container {
-                margin: 0;
                 border-radius: 0;
             }
-            .info-table td {
-                display: block;
-                width: 100%;
-                padding: 8px 15px;
+            .email-header {
+                padding: 30px 20px;
             }
-            .info-table td:first-child {
-                padding-bottom: 4px;
-                border-bottom: none;
+            .email-body {
+                padding: 25px 20px;
+            }
+            .detail-row {
+                flex-direction: column;
+                gap: 5px;
+            }
+            .detail-row span:last-child {
+                margin-top: 2px;
             }
         }
     </style>
@@ -200,15 +226,13 @@
         <!-- Footer -->
         <div class="email-footer">
             <p><strong>Shining Light Group of Schools</strong></p>
-            <p>Contact us: info@shininglightschools.com | +234 XXX XXX XXXX</p>
-            <p>Address: School Address, City, State, Nigeria</p>
-            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
-                <p style="font-size: 12px; color: #999;">
-                    This is an automated email. Please do not reply to this message.
-                    <br>
-                    © {{ year }} Shining Light Group of Schools. All rights reserved.
-                </p>
-            </div>
+            <p>If you have any questions, please contact our support team.</p>
+            <p style="margin-top: 10px;">Contact: info@shininglightschools.com | +234 XXX XXX XXXX</p>
+            <p style="font-size: 12px; color: #999; margin-top: 15px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                This is an automated email. Please do not reply to this message.
+                <br>
+                © {% now "Y" %} Shining Light Group of Schools. All rights reserved.
+            </p>
         </div>
     </div>
 </body>

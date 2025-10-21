@@ -36,10 +36,10 @@ class Student(models.Model):
     )
     admission_number = models.CharField(
         _('admission number'),
-        max_length=20,
+        max_length=10,
         unique=True,
         blank=True,
-        help_text=_('Auto-generated on acceptance')
+        help_text=_('Auto-generated on acceptance (Format: YYYYMMDD + Serial)')
     )
     
     # User account (optional until accepted)
@@ -186,23 +186,40 @@ class Student(models.Model):
         return f"{prefix}-{new_number:04d}"
     
     def _generate_admission_number(self):
-        """Generate unique admission number: SLGSYYYY001 (e.g., SLGS2025001)"""
-        current_year = date.today().year
-        prefix = f"SLGS{current_year}"
+        """
+        Generate unique admission number based on date of birth + serial number
+        Format: YYYYMMDD + Serial Number (2 digits)
+        Example: Date of birth 2012-06-15 → 20120615 + 02 → 2012061502
+        """
+        # Check if biodata exists and has date of birth
+        if not hasattr(self, 'biodata') or not self.biodata or not self.biodata.date_of_birth:
+            raise ValidationError(_('Student biodata with date of birth is required to generate admission number'))
         
-        # Get the last admission number for this year
+        # Format: YYYYMMDD from date of birth
+        dob_prefix = self.biodata.date_of_birth.strftime('%Y%m%d')
+        
+        # Get the last admission number with the same date of birth prefix
         last_student = Student.objects.filter(
-            admission_number__startswith=prefix
+            admission_number__startswith=dob_prefix
         ).exclude(admission_number='').order_by('admission_number').last()
         
         if last_student:
-            # Extract the numeric part (last 3 digits)
-            last_number = int(last_student.admission_number[-3:])
-            new_number = last_number + 1
+            # Extract the serial number (last 2 digits)
+            try:
+                last_serial = int(last_student.admission_number[-2:])
+                new_serial = last_serial + 1
+            except (ValueError, IndexError):
+                new_serial = 1
         else:
-            new_number = 1
+            new_serial = 1
         
-        return f"{prefix}{new_number:03d}"
+        # Ensure serial number doesn't exceed 99
+        if new_serial > 99:
+            raise ValidationError(
+                _('Maximum number of students with the same date of birth (99) has been reached')
+            )
+        
+        return f"{dob_prefix}{new_serial:02d}"
     
     def delete(self, *args, **kwargs):
         """Override delete to also delete associated user account"""

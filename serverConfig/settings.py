@@ -78,8 +78,8 @@ REST_AUTH = {
 
 # Session Security Settings
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_AGE = 86400  # 24 hours
-SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_AGE = 1200  # 10 minutes inactivity timeout (maximum security for school portal)
+SESSION_SAVE_EVERY_REQUEST = True  # Reset timer on each request (creates inactivity timeout)
 SESSION_COOKIE_NAME = 'shinninglight_sessionid'  # Unique name to avoid conflicts with other projects
 
 # CSRF Settings
