@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("api", "0010_alter_student_admission_number"),
+        ("api", "0009_question"),
     ]
 
     operations = [
