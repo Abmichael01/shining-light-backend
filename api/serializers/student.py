@@ -119,6 +119,7 @@ class StudentSerializer(serializers.ModelSerializer):
     
     # Related names for display
     school_name = serializers.CharField(source='school.name', read_only=True)
+    school_type = serializers.CharField(source='school.school_type', read_only=True)
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
@@ -128,7 +129,7 @@ class StudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'application_number', 'admission_number', 'user', 'user_email',
-            'school', 'school_name', 'class_model', 'class_name',
+            'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'former_school_attended',
             'status', 'source', 'full_name',
             'application_date', 'review_date', 'acceptance_date',
@@ -141,7 +142,7 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name',
             'created_at', 'updated_at', 'created_by', 'reviewed_by',
-            'school_name', 'class_name', 'department_name',
+            'school_name', 'school_type', 'class_name', 'department_name',
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations'
         ]
     
