@@ -195,7 +195,7 @@ class QuestionSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'id', 'subject', 'subject_name', 'school_name', 'class_name',
-            'topic', 'question_text', 'question_type', 'difficulty',
+            'topic_model', 'question_text', 'question_type', 'difficulty',
             'option_a', 'option_b', 'option_c', 'option_d', 'option_e',
             'correct_answer', 'explanation', 'marks',
             'is_verified', 'usage_count', 'created_by', 'created_by_name',
@@ -249,7 +249,7 @@ class QuestionListSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'id', 'subject', 'subject_name', 'school_name', 'class_name',
-            'topic', 'question_text', 'question_type', 'difficulty',
+            'topic_model', 'question_text', 'question_type', 'difficulty',
             'is_verified', 'usage_count', 'created_at'
         ]
         read_only_fields = ['id', 'usage_count', 'created_at']

@@ -323,7 +323,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         # Filter by topic
         topic = self.request.query_params.get('topic', None)
         if topic:
-            queryset = queryset.filter(topic__icontains=topic)
+            queryset = queryset.filter(topic_model__name__icontains=topic)
         
         # Filter by verified status
         is_verified = self.request.query_params.get('is_verified', None)
@@ -335,7 +335,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(
                 models.Q(question_text__icontains=search) |
-                models.Q(topic__icontains=search) |
+                models.Q(topic_model__name__icontains=search) |
                 models.Q(subject__name__icontains=search)
             )
         
@@ -358,7 +358,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         type_counts = Question.objects.values('question_type').annotate(count=models.Count('id'))
         
         # Count topics
-        total_topics = Question.objects.values('topic').distinct().count()
+        total_topics = Question.objects.values('topic_model').distinct().count()
         
         # Count subjects with questions
         total_subjects = Question.objects.values('subject').distinct().count()
