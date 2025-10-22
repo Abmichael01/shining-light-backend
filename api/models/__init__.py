@@ -7,8 +7,12 @@ from .academic import (
     Department,
     SubjectGroup,
     Subject,
+    Topic,
     Grade,
-    Question
+    Question,
+    Exam,
+    StudentExam,
+    StudentAnswer
 )
 from .student import (
     Student,
@@ -42,8 +46,12 @@ __all__ = [
     'Department',
     'SubjectGroup',
     'Subject',
+    'Topic',
     'Grade',
     'Question',
+    'Exam',
+    'StudentExam',
+    'StudentAnswer',
     'Student',
     'BioData',
     'Guardian',

@@ -7,6 +7,7 @@ from .academic import (
     DepartmentViewSet,
     SubjectGroupViewSet,
     SubjectViewSet,
+    TopicViewSet,
     GradeViewSet,
     QuestionViewSet
 )
@@ -28,6 +29,7 @@ __all__ = [
     'DepartmentViewSet',
     'SubjectGroupViewSet',
     'SubjectViewSet',
+    'TopicViewSet',
     'GradeViewSet',
     'QuestionViewSet',
     'StudentViewSet',

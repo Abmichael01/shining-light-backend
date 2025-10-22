@@ -168,6 +168,51 @@ class StudentViewSet(viewsets.ModelViewSet):
         student.save()
         
         return Response({'detail': 'Application rejected'})
+    
+    @action(detail=True, methods=['post'])
+    def send_credentials(self, request, pk=None):
+        """
+        Send student login credentials via email
+        Generates a new password and sends it to the student's email
+        """
+        student = self.get_object()
+        
+        if not student.user:
+            return Response(
+                {'detail': 'Student does not have a user account'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            from api.utils.email import generate_password, send_student_registration_email
+            from django.contrib.auth.hashers import make_password
+            
+            # Generate new password
+            new_password = generate_password()
+            
+            # Update user password
+            student.user.set_password(new_password)
+            student.user.save()
+            
+            # Send email with credentials
+            email_sent = send_student_registration_email(student, new_password, request)
+            
+            if email_sent:
+                return Response({
+                    'detail': 'Credentials sent successfully',
+                    'email': student.user.email
+                })
+            else:
+                return Response(
+                    {'detail': 'Failed to send email, but password was updated'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            return Response(
+                {'detail': f'Error sending credentials: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class BioDataViewSet(viewsets.ModelViewSet):

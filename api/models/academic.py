@@ -458,6 +458,49 @@ class Subject(models.Model):
             raise ValidationError(_('Subject group must belong to the same class'))
 
 
+class Topic(models.Model):
+    """Topics within a subject for better question organization"""
+    
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='topics',
+        verbose_name=_('subject')
+    )
+    name = models.CharField(
+        _('topic name'),
+        max_length=200,
+        help_text=_('e.g., Algebra, Geometry, Kinematics, Organic Chemistry')
+    )
+    description = models.TextField(
+        _('description'),
+        blank=True,
+        null=True,
+        help_text=_('Brief description of what this topic covers')
+    )
+    is_active = models.BooleanField(
+        _('active'),
+        default=True,
+        help_text=_('Inactive topics won\'t be available for exam creation')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Topic')
+        verbose_name_plural = _('Topics')
+        ordering = ['subject', 'name']
+        unique_together = [['subject', 'name']]
+    
+    def __str__(self):
+        return f"{self.name} ({self.subject.name})"
+    
+    @property
+    def question_count(self):
+        """Return the number of questions in this topic"""
+        return self.questions.count()
+
+
 class Grade(models.Model):
     """Configurable grading system - Admin can define grade ranges"""
     
@@ -584,9 +627,13 @@ class Question(models.Model):
         related_name='questions',
         verbose_name=_('subject')
     )
-    topic = models.CharField(
-        _('topic'),
-        max_length=200,
+    topic_model = models.ForeignKey(
+        Topic,
+        on_delete=models.CASCADE,
+        related_name='questions',
+        blank=True,
+        null=True,
+        verbose_name=_('topic'),
         help_text=_('Specific topic or unit this question covers')
     )
     question_text = models.TextField(
@@ -659,13 +706,14 @@ class Question(models.Model):
         verbose_name_plural = _('Questions')
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['subject', 'topic']),
+            models.Index(fields=['subject', 'topic_model']),
             models.Index(fields=['difficulty']),
             models.Index(fields=['question_type']),
         ]
     
     def __str__(self):
-        return f"{self.subject.name} - {self.topic} ({self.get_difficulty_display()})"
+        topic_display = self.topic_model.name if self.topic_model else 'No Topic'
+        return f"{self.subject.name} - {topic_display} ({self.get_difficulty_display()})"
     
     def clean(self):
         """Validate question based on type"""
@@ -704,4 +752,363 @@ class Question(models.Model):
         """Increment usage count when question is used in an exam"""
         self.usage_count += 1
         self.save(update_fields=['usage_count'])
+
+
+class Exam(models.Model):
+    """CBT Exam/Test configuration"""
+    
+    EXAM_TYPE_CHOICES = [
+        ('test', 'Test'),
+        ('exam', 'Examination'),
+        ('quiz', 'Quiz'),
+        ('practice', 'Practice'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('scheduled', 'Scheduled'),
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    title = models.CharField(
+        _('exam title'),
+        max_length=200,
+        help_text=_('e.g., Mathematics Mid-Term Test, Physics Final Exam')
+    )
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='exams',
+        verbose_name=_('subject')
+    )
+    topics = models.ManyToManyField(
+        Topic,
+        blank=True,
+        related_name='exams',
+        verbose_name=_('topics'),
+        help_text=_('Select topics for random question selection')
+    )
+    questions = models.ManyToManyField(
+        Question,
+        blank=True,
+        related_name='exams',
+        verbose_name=_('questions'),
+        help_text=_('Select specific questions (use this OR topics, not both)')
+    )
+    exam_type = models.CharField(
+        _('exam type'),
+        max_length=20,
+        choices=EXAM_TYPE_CHOICES,
+        default='test'
+    )
+    session_term = models.ForeignKey(
+        SessionTerm,
+        on_delete=models.CASCADE,
+        related_name='exams',
+        verbose_name=_('session term')
+    )
+    
+    # Exam scheduling
+    start_date = models.DateField(_('start date'))
+    start_time = models.TimeField(_('start time'))
+    end_date = models.DateField(_('end date'))
+    end_time = models.TimeField(_('end time'))
+    
+    # Duration and configuration
+    duration_minutes = models.PositiveIntegerField(
+        _('duration (minutes)'),
+        help_text=_('Total time allowed for the exam in minutes')
+    )
+    total_marks = models.PositiveIntegerField(
+        _('total marks'),
+        help_text=_('Total marks for the exam')
+    )
+    pass_mark = models.PositiveIntegerField(
+        _('pass mark'),
+        help_text=_('Minimum marks required to pass')
+    )
+    
+    # Question selection
+    total_questions = models.PositiveIntegerField(
+        _('total questions'),
+        help_text=_('Number of questions in the exam (auto-calculated from selected questions/topics)')
+    )
+    
+    # Settings
+    shuffle_questions = models.BooleanField(
+        _('shuffle questions'),
+        default=True,
+        help_text=_('Randomize question order for each student')
+    )
+    shuffle_options = models.BooleanField(
+        _('shuffle options'),
+        default=True,
+        help_text=_('Randomize option order for multiple choice questions')
+    )
+    show_results_immediately = models.BooleanField(
+        _('show results immediately'),
+        default=False,
+        help_text=_('Show score to students after submission')
+    )
+    allow_review = models.BooleanField(
+        _('allow review'),
+        default=True,
+        help_text=_('Allow students to review answers before submission')
+    )
+    
+    # Status
+    status = models.CharField(
+        _('status'),
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='draft'
+    )
+    
+    # Instructions
+    instructions = models.TextField(
+        _('instructions'),
+        blank=True,
+        null=True,
+        help_text=_('Instructions to be shown to students before the exam')
+    )
+    
+    # Metadata
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_exams',
+        verbose_name=_('created by')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Exam')
+        verbose_name_plural = _('Exams')
+        ordering = ['-start_date', '-start_time']
+        indexes = [
+            models.Index(fields=['subject', 'session_term']),
+            models.Index(fields=['status', 'start_date']),
+        ]
+    
+    def __str__(self):
+        return f"{self.title} ({self.subject.name})"
+    
+    def clean(self):
+        """Validate exam configuration"""
+        super().clean()
+        
+        # Validate dates
+        if self.end_date < self.start_date:
+            raise ValidationError(_('End date cannot be before start date'))
+        
+        if self.end_date == self.start_date and self.end_time <= self.start_time:
+            raise ValidationError(_('End time must be after start time on the same day'))
+        
+        # Validate marks
+        if self.pass_mark > self.total_marks:
+            raise ValidationError(_('Pass mark cannot exceed total marks'))
+    
+    @property
+    def is_active(self):
+        """Check if exam is currently active"""
+        from django.utils import timezone
+        now = timezone.now()
+        start_datetime = timezone.make_aware(timezone.datetime.combine(self.start_date, self.start_time))
+        end_datetime = timezone.make_aware(timezone.datetime.combine(self.end_date, self.end_time))
+        return self.status == 'active' and start_datetime <= now <= end_datetime
+    
+    @property
+    def has_started(self):
+        """Check if exam has started"""
+        from django.utils import timezone
+        now = timezone.now()
+        start_datetime = timezone.make_aware(timezone.datetime.combine(self.start_date, self.start_time))
+        return now >= start_datetime
+    
+    @property
+    def has_ended(self):
+        """Check if exam has ended"""
+        from django.utils import timezone
+        now = timezone.now()
+        end_datetime = timezone.make_aware(timezone.datetime.combine(self.end_date, self.end_time))
+        return now > end_datetime
+
+
+class StudentExam(models.Model):
+    """Student exam attempt/session"""
+    
+    STATUS_CHOICES = [
+        ('not_started', 'Not Started'),
+        ('in_progress', 'In Progress'),
+        ('submitted', 'Submitted'),
+        ('graded', 'Graded'),
+    ]
+    
+    student = models.ForeignKey(
+        'Student',
+        on_delete=models.CASCADE,
+        related_name='exam_attempts',
+        verbose_name=_('student')
+    )
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name='student_attempts',
+        verbose_name=_('exam')
+    )
+    
+    # Timing
+    started_at = models.DateTimeField(
+        _('started at'),
+        blank=True,
+        null=True
+    )
+    submitted_at = models.DateTimeField(
+        _('submitted at'),
+        blank=True,
+        null=True
+    )
+    time_remaining_seconds = models.PositiveIntegerField(
+        _('time remaining (seconds)'),
+        blank=True,
+        null=True,
+        help_text=_('Used for pause/resume functionality')
+    )
+    
+    # Results
+    status = models.CharField(
+        _('status'),
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='not_started'
+    )
+    score = models.DecimalField(
+        _('score'),
+        max_digits=6,
+        decimal_places=2,
+        blank=True,
+        null=True,
+        help_text=_('Total marks obtained')
+    )
+    percentage = models.DecimalField(
+        _('percentage'),
+        max_digits=5,
+        decimal_places=2,
+        blank=True,
+        null=True
+    )
+    passed = models.BooleanField(
+        _('passed'),
+        blank=True,
+        null=True
+    )
+    
+    # Question order for this student (if shuffled)
+    question_order = models.JSONField(
+        _('question order'),
+        blank=True,
+        null=True,
+        help_text=_('Randomized question order for this student: [question_id1, question_id2, ...]')
+    )
+    
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Student Exam')
+        verbose_name_plural = _('Student Exams')
+        ordering = ['-created_at']
+        unique_together = [['student', 'exam']]
+        indexes = [
+            models.Index(fields=['student', 'exam']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.student} - {self.exam.title}"
+    
+    def calculate_score(self):
+        """Calculate total score from answers"""
+        total = 0
+        for answer in self.answers.all():
+            if answer.is_correct:
+                total += answer.marks_obtained
+        
+        self.score = total
+        self.percentage = (total / self.exam.total_marks) * 100 if self.exam.total_marks > 0 else 0
+        self.passed = self.score >= self.exam.pass_mark
+        self.status = 'graded'
+        self.save()
+        
+        return self.score
+
+
+class StudentAnswer(models.Model):
+    """Student's answer to an exam question"""
+    
+    student_exam = models.ForeignKey(
+        StudentExam,
+        on_delete=models.CASCADE,
+        related_name='answers',
+        verbose_name=_('student exam')
+    )
+    question = models.ForeignKey(
+        Question,
+        on_delete=models.CASCADE,
+        related_name='student_answers',
+        verbose_name=_('question')
+    )
+    question_number = models.PositiveSmallIntegerField(
+        _('question number'),
+        help_text=_('Question number in the exam')
+    )
+    
+    # Answer data
+    answer_text = models.TextField(
+        _('answer text'),
+        help_text=_('Student\'s answer (A, B, C, D, E for multiple choice, or text for other types)')
+    )
+    is_correct = models.BooleanField(
+        _('is correct'),
+        blank=True,
+        null=True
+    )
+    marks_obtained = models.DecimalField(
+        _('marks obtained'),
+        max_digits=5,
+        decimal_places=2,
+        default=0
+    )
+    
+    # Metadata
+    answered_at = models.DateTimeField(_('answered at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Student Answer')
+        verbose_name_plural = _('Student Answers')
+        ordering = ['student_exam', 'question_number']
+        unique_together = [['student_exam', 'question']]
+    
+    def __str__(self):
+        return f"{self.student_exam.student} - Q{self.question_number}"
+    
+    def auto_grade(self):
+        """Auto-grade the answer for multiple choice and true/false questions"""
+        if self.question.question_type in ['multiple_choice', 'true_false']:
+            # Compare answers (case-insensitive)
+            self.is_correct = self.answer_text.strip().upper() == self.question.correct_answer.strip().upper()
+            
+            if self.is_correct:
+                self.marks_obtained = self.question.marks
+            else:
+                self.marks_obtained = 0
+            
+            self.save()
+        
+        return self.is_correct
 

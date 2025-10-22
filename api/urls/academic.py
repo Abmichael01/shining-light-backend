@@ -7,6 +7,7 @@ from api.views.academic import (
     DepartmentViewSet,
     SubjectGroupViewSet,
     SubjectViewSet,
+    TopicViewSet,
     GradeViewSet,
     QuestionViewSet
 )
@@ -20,6 +21,7 @@ router.register(r'departments', DepartmentViewSet, basename='department')
 router.register(r'grades', GradeViewSet, basename='grade')
 router.register(r'subject-groups', SubjectGroupViewSet, basename='subject-group')
 router.register(r'subjects', SubjectViewSet, basename='subject')
+router.register(r'topics', TopicViewSet, basename='topic')
 router.register(r'questions', QuestionViewSet, basename='question')
  
 urlpatterns = router.urls

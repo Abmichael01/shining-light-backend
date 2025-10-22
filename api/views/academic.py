@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Grade, Question
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -12,6 +12,7 @@ from api.serializers import (
     DepartmentSerializer,
     SubjectGroupSerializer,
     SubjectSerializer,
+    TopicSerializer,
     GradeSerializer,
     QuestionSerializer,
     QuestionListSerializer
@@ -237,6 +238,36 @@ class SubjectViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 models.Q(name__icontains=search) |
                 models.Q(code__icontains=search)
+            )
+        
+        return queryset
+
+
+class TopicViewSet(viewsets.ModelViewSet):
+    """ViewSet for Topic CRUD operations"""
+    queryset = Topic.objects.select_related('subject').prefetch_related('questions').all().order_by('subject', 'name')
+    serializer_class = TopicSerializer
+    permission_classes = [IsSchoolAdmin]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by subject
+        subject = self.request.query_params.get('subject', None)
+        if subject:
+            queryset = queryset.filter(subject=subject)
+        
+        # Filter by is_active
+        is_active = self.request.query_params.get('is_active', None)
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        # Search
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search) |
+                models.Q(description__icontains=search)
             )
         
         return queryset

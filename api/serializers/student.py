@@ -299,27 +299,29 @@ class StudentRegistrationSerializer(serializers.Serializer):
                 user_type='student'
             )
             
-            # Create Student with model instances
+            # Create Student with model instances (initially as applicant to avoid admission number generation)
             student = Student.objects.create(
                 user=user,
                 school=school,
                 class_model=class_model,
                 department=department,
                 created_by=request_user,
+                status='applicant',  # Start as applicant to avoid admission number generation
                 **validated_data
             )
-            
-            # If admin registration, set status to enrolled immediately
-            if student.source == 'admin_registration':
-                student.status = 'enrolled'
-                student.enrollment_date = student.application_date
-                student.save()
             
             # Create BioData
             BioData.objects.create(
                 student=student,
                 **biodata_data
             )
+            
+            # For admin registration, automatically enroll the student
+            if student.source == 'admin_registration':
+                student.status = 'enrolled'
+                student.enrollment_date = student.application_date
+                student.acceptance_date = student.application_date
+                student.save()  # This will now generate admission number since biodata exists
             
             # Create Guardians
             for guardian_data in guardians_data:

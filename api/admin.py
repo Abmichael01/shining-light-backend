@@ -10,8 +10,12 @@ from .models import (
     Department,
     SubjectGroup,
     Subject,
+    Topic,
     Grade,
     Question,
+    Exam,
+    StudentExam,
+    StudentAnswer,
     Student,
     BioData,
     Guardian,
@@ -184,15 +188,15 @@ class SubjectAdmin(admin.ModelAdmin):
 class QuestionAdmin(admin.ModelAdmin):
     """Admin interface for Question model"""
     
-    list_display = ['question_text_preview', 'subject', 'topic', 'question_type', 'difficulty', 'is_verified', 'usage_count', 'created_at']
+    list_display = ['question_text_preview', 'subject', 'topic_model', 'question_type', 'difficulty', 'is_verified', 'usage_count', 'created_at']
     list_filter = ['subject__school', 'subject', 'question_type', 'difficulty', 'is_verified', 'created_at']
-    search_fields = ['question_text', 'topic', 'subject__name']
+    search_fields = ['question_text', 'topic_model__name', 'subject__name']
     ordering = ['-created_at']
     readonly_fields = ['usage_count', 'created_at', 'updated_at', 'created_by']
     
     fieldsets = (
         (None, {
-            'fields': ('subject', 'topic', 'question_type', 'difficulty', 'marks')
+            'fields': ('subject', 'topic_model', 'question_type', 'difficulty', 'marks')
         }),
         (_('Question Content'), {
             'fields': ('question_text',)
@@ -225,6 +229,129 @@ class QuestionAdmin(admin.ModelAdmin):
         if not obj.pk:  # New object
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(Topic)
+class TopicAdmin(admin.ModelAdmin):
+    """Admin interface for Topic model"""
+    
+    list_display = ['name', 'subject', 'is_active', 'question_count_display', 'created_at']
+    list_filter = ['subject__school', 'subject', 'is_active', 'created_at']
+    search_fields = ['name', 'description', 'subject__name']
+    ordering = ['subject', 'name']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('subject', 'name', 'description', 'is_active')
+        }),
+        (_('Metadata'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+    
+    def question_count_display(self, obj):
+        """Display number of questions in this topic"""
+        return obj.question_count
+    question_count_display.short_description = 'Questions'
+
+
+@admin.register(Exam)
+class ExamAdmin(admin.ModelAdmin):
+    """Admin interface for Exam model"""
+    
+    list_display = ['title', 'subject', 'exam_type', 'session_term', 'start_date', 'start_time', 'status', 'total_questions', 'created_by']
+    list_filter = ['exam_type', 'status', 'subject__school', 'subject', 'session_term', 'start_date']
+    search_fields = ['title', 'subject__name', 'instructions']
+    ordering = ['-start_date', '-start_time']
+    readonly_fields = ['created_by', 'created_at', 'updated_at']
+    
+    filter_horizontal = ['topics', 'questions']
+    
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': ('title', 'subject', 'exam_type', 'session_term', 'status')
+        }),
+        (_('Schedule'), {
+            'fields': (('start_date', 'start_time'), ('end_date', 'end_time'), 'duration_minutes')
+        }),
+        (_('Question Selection'), {
+            'fields': ('topics', 'questions', 'total_questions')
+        }),
+        (_('Grading'), {
+            'fields': ('total_marks', 'pass_mark')
+        }),
+        (_('Settings'), {
+            'fields': ('shuffle_questions', 'shuffle_options', 'show_results_immediately', 'allow_review')
+        }),
+        (_('Instructions'), {
+            'fields': ('instructions',),
+            'classes': ('collapse',)
+        }),
+        (_('Metadata'), {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by to current user if not set"""
+        if not obj.pk:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(StudentExam)
+class StudentExamAdmin(admin.ModelAdmin):
+    """Admin interface for StudentExam model"""
+    
+    list_display = ['student', 'exam', 'status', 'score', 'percentage', 'passed', 'started_at', 'submitted_at']
+    list_filter = ['status', 'passed', 'exam__exam_type', 'exam__subject', 'exam__session_term']
+    search_fields = ['student__user__email', 'student__admission_number', 'exam__title']
+    ordering = ['-created_at']
+    readonly_fields = ['created_at', 'updated_at', 'score', 'percentage', 'passed']
+    
+    fieldsets = (
+        (_('Exam Details'), {
+            'fields': ('student', 'exam', 'status')
+        }),
+        (_('Timing'), {
+            'fields': ('started_at', 'submitted_at', 'time_remaining_seconds')
+        }),
+        (_('Results'), {
+            'fields': ('score', 'percentage', 'passed'),
+            'classes': ('collapse',)
+        }),
+        (_('Metadata'), {
+            'fields': ('question_order', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(StudentAnswer)
+class StudentAnswerAdmin(admin.ModelAdmin):
+    """Admin interface for StudentAnswer model"""
+    
+    list_display = ['student_exam', 'question_number', 'question', 'is_correct', 'marks_obtained', 'answered_at']
+    list_filter = ['is_correct', 'student_exam__exam', 'answered_at']
+    search_fields = ['student_exam__student__user__email', 'question__question_text']
+    ordering = ['student_exam', 'question_number']
+    readonly_fields = ['answered_at', 'updated_at']
+    
+    fieldsets = (
+        (_('Question'), {
+            'fields': ('student_exam', 'question', 'question_number')
+        }),
+        (_('Answer'), {
+            'fields': ('answer_text', 'is_correct', 'marks_obtained')
+        }),
+        (_('Metadata'), {
+            'fields': ('answered_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 
 # ===== Student Management =====

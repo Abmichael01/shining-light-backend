@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Grade, Question
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -126,6 +126,22 @@ class SubjectSerializer(serializers.ModelSerializer):
     def get_class_name(self, obj):
         """Get class name"""
         return obj.class_model.name
+
+
+class TopicSerializer(serializers.ModelSerializer):
+    """Serializer for Topic model"""
+    question_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Topic
+        fields = ['id', 'subject', 'name', 'description', 'is_active', 'question_count', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'question_count', 'created_at', 'updated_at']
+    
+    def get_question_count(self, obj):
+        """Get question count - either from annotation or direct count"""
+        if hasattr(obj, 'question_count'):
+            return obj.question_count
+        return obj.questions.count()
 
 
 class SessionTermSerializer(serializers.ModelSerializer):
