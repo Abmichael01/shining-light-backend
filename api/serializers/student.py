@@ -125,10 +125,13 @@ class StudentSerializer(serializers.ModelSerializer):
     user_email = serializers.CharField(source='user.email', read_only=True)
     full_name = serializers.SerializerMethodField()
     
+    # Email field for updates
+    email = serializers.EmailField(write_only=True, required=False)
+    
     class Meta:
         model = Student
         fields = [
-            'id', 'application_number', 'admission_number', 'user', 'user_email',
+            'id', 'application_number', 'admission_number', 'user', 'user_email', 'email',
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'former_school_attended',
             'status', 'source', 'full_name',
@@ -149,6 +152,17 @@ class StudentSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Get student's full name"""
         return obj.get_full_name()
+    
+    def update(self, instance, validated_data):
+        """Update student instance with email handling"""
+        # Handle email update
+        email = validated_data.pop('email', None)
+        if email and instance.user:
+            instance.user.email = email
+            instance.user.save()
+        
+        # Update other fields
+        return super().update(instance, validated_data)
 
 
 class StudentListSerializer(serializers.ModelSerializer):

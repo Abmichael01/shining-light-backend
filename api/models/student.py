@@ -36,7 +36,7 @@ class Student(models.Model):
     )
     admission_number = models.CharField(
         _('admission number'),
-        max_length=10,
+        max_length=20,
         unique=True,
         blank=True,
         help_text=_('Auto-generated on acceptance (Format: YYYYMMDD + Serial)')
