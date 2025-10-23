@@ -233,8 +233,39 @@ class Student(models.Model):
     def delete(self, *args, **kwargs):
         """Override delete to also delete associated user account"""
         user = self.user
-        # Delete student first (this will cascade to biodata, guardians, documents, etc.)
-        super().delete(*args, **kwargs)
+        
+        # Handle missing tables gracefully (temporary fix for production)
+        try:
+            # Delete student first (this will cascade to biodata, guardians, documents, etc.)
+            super().delete(*args, **kwargs)
+        except Exception as e:
+            # If there's a database error (like missing table), try to delete manually
+            if "does not exist" in str(e):
+                # Delete related objects manually
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    # Delete from related tables that exist
+                    try:
+                        cursor.execute("DELETE FROM api_biodata WHERE student_id = %s", [self.id])
+                    except:
+                        pass
+                    try:
+                        cursor.execute("DELETE FROM api_guardian WHERE student_id = %s", [self.id])
+                    except:
+                        pass
+                    try:
+                        cursor.execute("DELETE FROM api_document WHERE student_id = %s", [self.id])
+                    except:
+                        pass
+                    try:
+                        cursor.execute("DELETE FROM api_studentsubject WHERE student_id = %s", [self.id])
+                    except:
+                        pass
+                    # Finally delete the student
+                    cursor.execute("DELETE FROM api_student WHERE id = %s", [self.id])
+            else:
+                raise e
+        
         # Then delete the user account if it exists
         if user:
             user.delete()
