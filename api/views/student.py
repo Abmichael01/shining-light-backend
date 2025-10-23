@@ -25,7 +25,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     Handles both applications and enrolled students
     """
     queryset = Student.objects.select_related(
-        'school', 'class_model', 'department', 'user', 'biodata'
+        'school', 'class_model', 'department', 'club', 'user', 'biodata'
     ).prefetch_related(
         'guardians', 'documents', 'subject_registrations'
     ).all().order_by('-created_at')

@@ -9,7 +9,9 @@ from api.views.academic import (
     SubjectViewSet,
     TopicViewSet,
     GradeViewSet,
-    QuestionViewSet
+    QuestionViewSet,
+    ClubViewSet,
+    ExamViewSet
 )
 
 router = DefaultRouter()
@@ -23,6 +25,8 @@ router.register(r'subject-groups', SubjectGroupViewSet, basename='subject-group'
 router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'topics', TopicViewSet, basename='topic')
 router.register(r'questions', QuestionViewSet, basename='question')
+router.register(r'clubs', ClubViewSet, basename='club')
+router.register(r'exams', ExamViewSet, basename='exam')
  
 urlpatterns = router.urls
 

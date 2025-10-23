@@ -12,7 +12,8 @@ from .academic import (
     Question,
     Exam,
     StudentExam,
-    StudentAnswer
+    StudentAnswer,
+    Club
 )
 from .student import (
     Student,
@@ -52,6 +53,7 @@ __all__ = [
     'Exam',
     'StudentExam',
     'StudentAnswer',
+    'Club',
     'Student',
     'BioData',
     'Guardian',

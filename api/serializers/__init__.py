@@ -10,7 +10,9 @@ from .academic import (
     TopicSerializer,
     GradeSerializer,
     QuestionSerializer,
-    QuestionListSerializer
+    QuestionListSerializer,
+    ClubSerializer,
+    ExamSerializer
 )
 from .student import (
     StudentSerializer,
@@ -54,6 +56,8 @@ __all__ = [
     'GradeSerializer',
     'QuestionSerializer',
     'QuestionListSerializer',
+    'ClubSerializer',
+    'ExamSerializer',
     'StudentSerializer',
     'StudentListSerializer',
     'StudentRegistrationSerializer',

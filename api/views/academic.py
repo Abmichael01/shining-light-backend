@@ -3,7 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -15,7 +15,9 @@ from api.serializers import (
     TopicSerializer,
     GradeSerializer,
     QuestionSerializer,
-    QuestionListSerializer
+    QuestionListSerializer,
+    ClubSerializer,
+    ExamSerializer
 )
 from api.permissions import IsSchoolAdmin
 from datetime import date
@@ -388,4 +390,91 @@ class QuestionViewSet(viewsets.ModelViewSet):
         question.is_verified = False
         question.save(update_fields=['is_verified'])
         return Response({'status': 'Question unverified successfully'})
+
+
+class ClubViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Club CRUD operations
+    Only admin users can manage clubs
+    """
+    queryset = Club.objects.all().order_by('name')
+    serializer_class = ClubSerializer
+    permission_classes = [IsAuthenticated, IsSchoolAdmin]
+    
+    def get_queryset(self):
+        """Filter clubs by search parameter"""
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search', None)
+        
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search) |
+                models.Q(description__icontains=search)
+            )
+        
+        return queryset
+
+
+class ExamViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Exam CRUD operations
+    Only school admin users can manage exams
+    """
+    queryset = Exam.objects.select_related(
+        'subject', 'subject__school', 'subject__class_model', 'session_term', 'created_by'
+    ).all().order_by('-start_date', '-start_time')
+    serializer_class = ExamSerializer
+    permission_classes = [IsAuthenticated, IsSchoolAdmin]
+    
+    def get_queryset(self):
+        """Filter exams with search and status filtering"""
+        queryset = super().get_queryset()
+        
+        # Filter by status
+        status = self.request.query_params.get('status', None)
+        if status:
+            queryset = queryset.filter(status=status)
+        
+        # Filter by exam type
+        exam_type = self.request.query_params.get('exam_type', None)
+        if exam_type:
+            queryset = queryset.filter(exam_type=exam_type)
+        
+        # Filter by subject
+        subject = self.request.query_params.get('subject', None)
+        if subject:
+            queryset = queryset.filter(subject=subject)
+        
+        # Filter by today's exams
+        today_only = self.request.query_params.get('today_only', None)
+        if today_only and today_only.lower() == 'true':
+            from django.utils import timezone
+            today = timezone.now().date()
+            queryset = queryset.filter(start_date=today)
+        
+        # Filter by active exams (scheduled and not yet ended)
+        active_only = self.request.query_params.get('active_only', None)
+        if active_only and active_only.lower() == 'true':
+            from django.utils import timezone
+            now = timezone.now()
+            queryset = queryset.filter(
+                status__in=['scheduled', 'active'],
+                start_date__lte=now.date(),
+                end_date__gte=now.date()
+            )
+        
+        # Search
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(title__icontains=search) |
+                models.Q(subject__name__icontains=search) |
+                models.Q(instructions__icontains=search)
+            )
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        """Set created_by to current user"""
+        serializer.save(created_by=self.request.user)
 

@@ -32,6 +32,7 @@ class BioDataSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.passport_photo.url)
             return obj.passport_photo.url
         return None
+    
 
 
 class GuardianSerializer(serializers.ModelSerializer):
@@ -111,7 +112,7 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
 
 class StudentSerializer(serializers.ModelSerializer):
     """Serializer for Student model with nested related data"""
-    biodata = BioDataSerializer(read_only=True)
+    biodata = BioDataSerializer(required=False)
     guardians = GuardianSerializer(many=True, read_only=True)
     documents = DocumentSerializer(many=True, read_only=True)
     biometric = BiometricSerializer(read_only=True)
@@ -122,6 +123,7 @@ class StudentSerializer(serializers.ModelSerializer):
     school_type = serializers.CharField(source='school.school_type', read_only=True)
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
+    club_name = serializers.CharField(source='club.name', read_only=True, allow_null=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     full_name = serializers.SerializerMethodField()
     
@@ -133,7 +135,7 @@ class StudentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'application_number', 'admission_number', 'user', 'user_email', 'email',
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
-            'department', 'department_name', 'former_school_attended',
+            'department', 'department_name', 'former_school_attended', 'club', 'club_name',
             'status', 'source', 'full_name',
             'application_date', 'review_date', 'acceptance_date',
             'enrollment_date', 'graduation_date',
@@ -145,7 +147,7 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name',
             'created_at', 'updated_at', 'created_by', 'reviewed_by',
-            'school_name', 'school_type', 'class_name', 'department_name',
+            'school_name', 'school_type', 'class_name', 'department_name', 'club_name',
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations'
         ]
     
@@ -153,13 +155,47 @@ class StudentSerializer(serializers.ModelSerializer):
         """Get student's full name"""
         return obj.get_full_name()
     
+    def to_representation(self, instance):
+        """Custom representation to ensure club field returns ID"""
+        data = super().to_representation(instance)
+        # Ensure club field returns the ID, not the name
+        if instance.club:
+            data['club'] = instance.club.id
+        return data
+    
     def update(self, instance, validated_data):
-        """Update student instance with email handling"""
+        """Update student instance with email and club handling"""
         # Handle email update
         email = validated_data.pop('email', None)
         if email and instance.user:
             instance.user.email = email
             instance.user.save()
+        
+        # Handle club field separately
+        club_data = validated_data.pop('club', None)
+        
+        if club_data:
+            # If it's already a Club instance, use it directly
+            if hasattr(club_data, 'id'):
+                validated_data['club'] = club_data
+            else:
+                # If it's a string ID, look up the club
+                from api.models import Club
+                try:
+                    club_instance = Club.objects.get(pk=club_data)
+                    validated_data['club'] = club_instance
+                except Club.DoesNotExist:
+                    validated_data['club'] = None
+        elif club_data is not None:  # Explicitly set to None/empty
+            validated_data['club'] = None
+        
+        # Handle biodata updates (without club field)
+        biodata_data = validated_data.pop('biodata', None)
+        if biodata_data and instance.biodata:
+            # Update biodata fields
+            for attr, value in biodata_data.items():
+                setattr(instance.biodata, attr, value)
+            instance.biodata.save()
         
         # Update other fields
         return super().update(instance, validated_data)
@@ -210,6 +246,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
     class_model = serializers.CharField()  # Class code (e.g., "SS1")
     department = serializers.IntegerField(required=False, allow_null=True)
     former_school_attended = serializers.CharField(required=False, allow_blank=True)
+    club = serializers.CharField(required=False, allow_blank=True, allow_null=True)  # Club ID
     source = serializers.ChoiceField(choices=['online_application', 'admin_registration'], default='admin_registration')
     
     # BioData
@@ -282,6 +319,17 @@ class StudentRegistrationSerializer(serializers.Serializer):
             ]
             biodata_data = {key: validated_data.pop(key, '') for key in biodata_fields if key in validated_data}
             
+            # Handle club field separately (convert string ID to Club instance)
+            club_id = validated_data.pop('club', None)
+            club_instance = None
+            if club_id:
+                from api.models import Club
+                try:
+                    club_instance = Club.objects.get(pk=club_id)
+                except Club.DoesNotExist:
+                    # If club doesn't exist, set to None
+                    club_instance = None
+            
             # Handle passport photo (base64 to file conversion)
             passport_photo_data = biodata_data.get('passport_photo', None)
             if passport_photo_data:
@@ -320,6 +368,7 @@ class StudentRegistrationSerializer(serializers.Serializer):
                 school=school,
                 class_model=class_model,
                 department=department,
+                club=club_instance,
                 created_by=request_user,
                 status='applicant',  # Start as applicant to avoid admission number generation
                 **validated_data

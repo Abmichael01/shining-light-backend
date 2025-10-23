@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -53,6 +53,13 @@ class DepartmentSerializer(serializers.ModelSerializer):
         model = Department
         fields = ['id', 'name', 'code', 'school', 'school_name', 'created_at']
         read_only_fields = ['id', 'created_at']
+    
+    def to_representation(self, instance):
+        """Return school code instead of school object when reading"""
+        data = super().to_representation(instance)
+        # Ensure school field returns the code (which is now the ID)
+        data['school'] = instance.school.id if instance.school else None
+        return data
 
 
 class SubjectGroupSerializer(serializers.ModelSerializer):
@@ -253,4 +260,42 @@ class QuestionListSerializer(serializers.ModelSerializer):
             'is_verified', 'usage_count', 'created_at'
         ]
         read_only_fields = ['id', 'usage_count', 'created_at']
+
+
+class ClubSerializer(serializers.ModelSerializer):
+    """Serializer for Club model"""
+    
+    class Meta:
+        model = Club
+        fields = ['id', 'name', 'description', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ExamSerializer(serializers.ModelSerializer):
+    """Serializer for Exam model"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    subject_code = serializers.CharField(source='subject.code', read_only=True)
+    class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
+    school_name = serializers.CharField(source='subject.school.name', read_only=True)
+    session_term_name = serializers.CharField(source='session_term.name', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    total_students = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Exam
+        fields = [
+            'id', 'title', 'subject', 'subject_name', 'subject_code', 'class_name', 'school_name',
+            'exam_type', 'session_term', 'session_term_name', 'start_date', 'start_time',
+            'end_date', 'end_time', 'duration_minutes', 'total_marks', 'pass_mark',
+            'total_questions', 'shuffle_questions', 'shuffle_options', 'show_results_immediately',
+            'allow_review', 'status', 'instructions', 'created_by', 'created_by_name',
+            'total_students', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students']
+    
+    def get_total_students(self, obj):
+        """Get total number of students eligible for this exam"""
+        # This would need to be calculated based on the subject's class
+        # For now, return a mock value
+        return 0
 

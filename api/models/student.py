@@ -80,6 +80,15 @@ class Student(models.Model):
         max_length=255,
         blank=True
     )
+    club = models.ForeignKey(
+        'Club',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='members',
+        verbose_name=_('club'),
+        help_text=_('Student club or society membership')
+    )
     
     # Status tracking
     status = models.CharField(

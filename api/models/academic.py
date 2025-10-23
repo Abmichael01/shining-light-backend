@@ -1112,3 +1112,37 @@ class StudentAnswer(models.Model):
         
         return self.is_correct
 
+
+class Club(models.Model):
+    """Represents school clubs and societies"""
+    
+    id = models.CharField(_('id'), max_length=15, primary_key=True, editable=False)
+    name = models.CharField(_('club name'), max_length=100, unique=True)
+    description = models.TextField(_('description'), blank=True, null=True)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _('Club')
+        verbose_name_plural = _('Clubs')
+        ordering = ['name']
+    
+    def __str__(self):
+        return f"{self.name}"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate unique ID in format CLUB-XXXXXX"""
+        if not self.id:
+            import random
+            import string
+            
+            # Generate random 6-character alphanumeric code
+            random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            self.id = f"CLUB-{random_code}"
+            
+            # Ensure uniqueness
+            while Club.objects.filter(id=self.id).exists():
+                random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                self.id = f"CLUB-{random_code}"
+        
+        super().save(*args, **kwargs)
+
