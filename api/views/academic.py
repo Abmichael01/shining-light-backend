@@ -1,9 +1,10 @@
 from django.db import models
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework import viewsets, status, serializers
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam
+from api.permissions import IsSchoolAdmin
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Student, StudentExam, StudentAnswer
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -422,7 +423,7 @@ class ExamViewSet(viewsets.ModelViewSet):
     """
     queryset = Exam.objects.select_related(
         'subject', 'subject__school', 'subject__class_model', 'session_term', 'created_by'
-    ).all().order_by('-start_date', '-start_time')
+    ).all().order_by('-created_at')
     serializer_class = ExamSerializer
     permission_classes = [IsAuthenticated, IsSchoolAdmin]
     
@@ -445,23 +446,10 @@ class ExamViewSet(viewsets.ModelViewSet):
         if subject:
             queryset = queryset.filter(subject=subject)
         
-        # Filter by today's exams
-        today_only = self.request.query_params.get('today_only', None)
-        if today_only and today_only.lower() == 'true':
-            from django.utils import timezone
-            today = timezone.now().date()
-            queryset = queryset.filter(start_date=today)
-        
-        # Filter by active exams (scheduled and not yet ended)
+        # Filter by active exams only
         active_only = self.request.query_params.get('active_only', None)
         if active_only and active_only.lower() == 'true':
-            from django.utils import timezone
-            now = timezone.now()
-            queryset = queryset.filter(
-                status__in=['scheduled', 'active'],
-                start_date__lte=now.date(),
-                end_date__gte=now.date()
-            )
+            queryset = queryset.filter(status='active')
         
         # Search
         search = self.request.query_params.get('search', None)
@@ -474,7 +462,131 @@ class ExamViewSet(viewsets.ModelViewSet):
         
         return queryset
     
+    def create(self, request, *args, **kwargs):
+        """Custom create to handle questions ManyToMany field"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Handle questions separately
+        questions_data = request.data.get('questions', [])
+        
+        # Create the exam instance
+        exam = serializer.save(created_by=request.user)
+        
+        # Set questions if provided
+        if questions_data:
+            exam.questions.set(questions_data)
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     def perform_create(self, serializer):
         """Set created_by to current user"""
         serializer.save(created_by=self.request.user)
+    
+    def update(self, request, *args, **kwargs):
+        """Custom update to handle questions ManyToMany field"""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=kwargs.get('partial', False))
+        serializer.is_valid(raise_exception=True)
+        
+        # Handle questions separately
+        questions_data = request.data.get('questions', [])
+        if questions_data:
+            instance.questions.set(questions_data)
+        
+        # Update other fields
+        self.perform_update(serializer)
+        
+        return Response(serializer.data)
+
+
+# Student Exam Serializers
+
+class StudentAnswerSerializer(serializers.ModelSerializer):
+    """Serializer for StudentAnswer model"""
+    
+    class Meta:
+        model = StudentAnswer
+        fields = [
+            'id', 'question', 'question_number', 'answer_text', 
+            'is_correct', 'marks_obtained', 'answered_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'answered_at', 'updated_at']
+
+
+class StudentExamSerializer(serializers.ModelSerializer):
+    """Serializer for StudentExam model"""
+    exam_title = serializers.CharField(source='exam.title', read_only=True)
+    exam_subject = serializers.CharField(source='exam.subject.name', read_only=True)
+    
+    class Meta:
+        model = StudentExam
+        fields = [
+            'id', 'student', 'exam', 'exam_title', 'exam_subject',
+            'status', 'score', 'percentage', 'passed', 'started_at', 
+            'submitted_at', 'time_remaining_seconds', 'question_order',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'id', 'score', 'percentage', 'passed', 'created_at', 'updated_at'
+        ]
+
+
+class StudentExamDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer for StudentExam with answers"""
+    exam_title = serializers.CharField(source='exam.title', read_only=True)
+    exam_subject = serializers.CharField(source='exam.subject.name', read_only=True)
+    exam_details = ExamSerializer(source='exam', read_only=True)
+    answers = StudentAnswerSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = StudentExam
+        fields = [
+            'id', 'student', 'exam', 'exam_title', 'exam_subject',
+            'status', 'score', 'percentage', 'passed', 'started_at', 
+            'submitted_at', 'time_remaining_seconds', 'question_order',
+            'created_at', 'updated_at', 'exam_details', 'answers'
+        ]
+
+
+# Student Exam API Views
+from django.shortcuts import get_object_or_404
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_exams(request, student_id):
+    """Get all exams taken by a specific student"""
+    try:
+        student = get_object_or_404(Student, id=student_id)
+        student_exams = StudentExam.objects.filter(student=student).order_by('-submitted_at', '-created_at')
+        
+        serializer = StudentExamSerializer(student_exams, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch student exams: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_student_exam_detail(request, student_exam_id):
+    """Get detailed exam results for a specific student exam attempt"""
+    try:
+        student_exam = get_object_or_404(StudentExam, id=student_exam_id)
+        student_answers = StudentAnswer.objects.filter(student_exam=student_exam).order_by('question_number')
+        
+        # Create the detailed response
+        exam_data = StudentExamDetailSerializer(student_exam).data
+        exam_data['answers'] = StudentAnswerSerializer(student_answers, many=True).data
+        
+        return Response(exam_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch exam details: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 

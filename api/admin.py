@@ -261,10 +261,10 @@ class TopicAdmin(admin.ModelAdmin):
 class ExamAdmin(admin.ModelAdmin):
     """Admin interface for Exam model"""
     
-    list_display = ['title', 'subject', 'exam_type', 'session_term', 'start_date', 'start_time', 'status', 'total_questions', 'created_by']
-    list_filter = ['exam_type', 'status', 'subject__school', 'subject', 'session_term', 'start_date']
+    list_display = ['title', 'subject', 'exam_type', 'session_term', 'status', 'total_questions', 'created_by', 'created_at']
+    list_filter = ['exam_type', 'status', 'subject__school', 'subject', 'session_term']
     search_fields = ['title', 'subject__name', 'instructions']
-    ordering = ['-start_date', '-start_time']
+    ordering = ['-created_at']
     readonly_fields = ['created_by', 'created_at', 'updated_at']
     
     filter_horizontal = ['topics', 'questions']
@@ -273,14 +273,11 @@ class ExamAdmin(admin.ModelAdmin):
         (_('Basic Information'), {
             'fields': ('title', 'subject', 'exam_type', 'session_term', 'status')
         }),
-        (_('Schedule'), {
-            'fields': (('start_date', 'start_time'), ('end_date', 'end_time'), 'duration_minutes')
+        (_('Configuration'), {
+            'fields': ('duration_minutes', 'total_marks', 'pass_mark', 'total_questions')
         }),
         (_('Question Selection'), {
-            'fields': ('topics', 'questions', 'total_questions')
-        }),
-        (_('Grading'), {
-            'fields': ('total_marks', 'pass_mark')
+            'fields': ('topics', 'questions')
         }),
         (_('Settings'), {
             'fields': ('shuffle_questions', 'shuffle_options', 'show_results_immediately', 'allow_review')
@@ -306,45 +303,185 @@ class ExamAdmin(admin.ModelAdmin):
 class StudentExamAdmin(admin.ModelAdmin):
     """Admin interface for StudentExam model"""
     
-    list_display = ['student', 'exam', 'status', 'score', 'percentage', 'passed', 'started_at', 'submitted_at']
-    list_filter = ['status', 'passed', 'exam__exam_type', 'exam__subject', 'exam__session_term']
-    search_fields = ['student__user__email', 'student__admission_number', 'exam__title']
-    ordering = ['-created_at']
-    readonly_fields = ['created_at', 'updated_at', 'score', 'percentage', 'passed']
+    list_display = [
+        'get_student_name', 
+        'get_exam_title', 
+        'status', 
+        'score', 
+        'percentage', 
+        'passed', 
+        'get_duration', 
+        'submitted_at',
+        'view_results_link'
+    ]
+    list_filter = [
+        'status', 
+        'passed', 
+        'exam__exam_type', 
+        'exam__subject', 
+        'exam__session_term',
+        'submitted_at'
+    ]
+    search_fields = [
+        'student__user__email', 
+        'student__admission_number', 
+        'exam__title',
+        'student__biodata__surname',
+        'student__biodata__first_name'
+    ]
+    ordering = ['-submitted_at', '-created_at']
+    readonly_fields = [
+        'created_at', 
+        'updated_at', 
+        'score', 
+        'percentage', 
+        'passed',
+        'get_duration',
+        'get_exam_summary'
+    ]
+    list_per_page = 25
     
     fieldsets = (
         (_('Exam Details'), {
-            'fields': ('student', 'exam', 'status')
+            'fields': ('student', 'exam', 'status', 'get_exam_summary')
         }),
         (_('Timing'), {
-            'fields': ('started_at', 'submitted_at', 'time_remaining_seconds')
+            'fields': ('started_at', 'submitted_at', 'get_duration', 'time_remaining_seconds')
         }),
         (_('Results'), {
             'fields': ('score', 'percentage', 'passed'),
             'classes': ('collapse',)
         }),
+        (_('Question Order'), {
+            'fields': ('question_order',),
+            'classes': ('collapse',)
+        }),
         (_('Metadata'), {
-            'fields': ('question_order', 'created_at', 'updated_at'),
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
+    
+    def get_student_name(self, obj):
+        """Get student's full name"""
+        if obj.student.biodata:
+            return f"{obj.student.biodata.surname} {obj.student.biodata.first_name}"
+        return obj.student.admission_number
+    get_student_name.short_description = 'Student Name'
+    get_student_name.admin_order_field = 'student__biodata__surname'
+    
+    def get_exam_title(self, obj):
+        """Get exam title with subject"""
+        return f"{obj.exam.title} ({obj.exam.subject.name})"
+    get_exam_title.short_description = 'Exam'
+    get_exam_title.admin_order_field = 'exam__title'
+    
+    def get_duration(self, obj):
+        """Calculate exam duration"""
+        if obj.started_at and obj.submitted_at:
+            duration = obj.submitted_at - obj.started_at
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours > 0:
+                return f"{int(hours)}h {int(minutes)}m"
+            else:
+                return f"{int(minutes)}m {int(seconds)}s"
+        return "N/A"
+    get_duration.short_description = 'Duration'
+    
+    def get_exam_summary(self, obj):
+        """Get exam summary information"""
+        return f"Subject: {obj.exam.subject.name} | Type: {obj.exam.exam_type} | Total Marks: {obj.exam.total_marks} | Pass Mark: {obj.exam.pass_mark}"
+    get_exam_summary.short_description = 'Exam Summary'
+    
+    actions = ['mark_as_graded', 'export_results']
+    
+    def mark_as_graded(self, request, queryset):
+        """Mark selected exam attempts as graded"""
+        updated = queryset.filter(status='submitted').update(status='graded')
+        self.message_user(request, f'{updated} exam attempts marked as graded.')
+    mark_as_graded.short_description = "Mark as graded"
+    
+    def export_results(self, request, queryset):
+        """Export exam results to CSV"""
+        # This would implement CSV export functionality
+        self.message_user(request, f'Export functionality will be implemented.')
+    export_results.short_description = "Export results"
+    
+    def get_urls(self):
+        """Add custom URLs for detailed views"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<int:student_exam_id>/results/',
+                self.admin_site.admin_view(self.exam_results_view),
+                name='student_exam_results'
+            ),
+        ]
+        return custom_urls + urls
+    
+    def exam_results_view(self, request, student_exam_id):
+        """View detailed exam results"""
+        from .admin_views import exam_results_view
+        return exam_results_view(request, student_exam_id)
+    
+    def view_results_link(self, obj):
+        """Create a link to view detailed results"""
+        if obj.status in ['submitted', 'graded']:
+            from django.urls import reverse
+            from django.utils.html import format_html
+            url = reverse('admin:student_exam_results', args=[obj.id])
+            return format_html('<a href="{}" target="_blank">View Results</a>', url)
+        return "Not Available"
+    view_results_link.short_description = 'Results'
+    view_results_link.admin_order_field = 'status'
 
 
 @admin.register(StudentAnswer)
 class StudentAnswerAdmin(admin.ModelAdmin):
     """Admin interface for StudentAnswer model"""
     
-    list_display = ['student_exam', 'question_number', 'question', 'is_correct', 'marks_obtained', 'answered_at']
-    list_filter = ['is_correct', 'student_exam__exam', 'answered_at']
-    search_fields = ['student_exam__student__user__email', 'question__question_text']
+    list_display = [
+        'get_student_name', 
+        'get_exam_title', 
+        'question_number', 
+        'get_question_preview', 
+        'answer_text', 
+        'is_correct', 
+        'marks_obtained', 
+        'answered_at'
+    ]
+    list_filter = [
+        'is_correct', 
+        'student_exam__exam', 
+        'student_exam__exam__subject',
+        'answered_at'
+    ]
+    search_fields = [
+        'student_exam__student__user__email', 
+        'student_exam__student__admission_number',
+        'student_exam__student__biodata__surname',
+        'student_exam__student__biodata__first_name',
+        'question__question_text'
+    ]
     ordering = ['student_exam', 'question_number']
-    readonly_fields = ['answered_at', 'updated_at']
+    readonly_fields = [
+        'answered_at', 
+        'updated_at',
+        'get_question_details',
+        'get_correct_answer'
+    ]
+    list_per_page = 50
     
     fieldsets = (
-        (_('Question'), {
-            'fields': ('student_exam', 'question', 'question_number')
+        (_('Student & Exam'), {
+            'fields': ('student_exam', 'question_number')
         }),
-        (_('Answer'), {
+        (_('Question Details'), {
+            'fields': ('question', 'get_question_details', 'get_correct_answer')
+        }),
+        (_('Student Answer'), {
             'fields': ('answer_text', 'is_correct', 'marks_obtained')
         }),
         (_('Metadata'), {
@@ -352,6 +489,52 @@ class StudentAnswerAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def get_student_name(self, obj):
+        """Get student's full name"""
+        if obj.student_exam.student.biodata:
+            return f"{obj.student_exam.student.biodata.surname} {obj.student_exam.student.biodata.first_name}"
+        return obj.student_exam.student.admission_number
+    get_student_name.short_description = 'Student'
+    get_student_name.admin_order_field = 'student_exam__student__biodata__surname'
+    
+    def get_exam_title(self, obj):
+        """Get exam title"""
+        return f"{obj.student_exam.exam.title} ({obj.student_exam.exam.subject.name})"
+    get_exam_title.short_description = 'Exam'
+    get_exam_title.admin_order_field = 'student_exam__exam__title'
+    
+    def get_question_preview(self, obj):
+        """Get question preview"""
+        question_text = obj.question.question_text
+        if len(question_text) > 50:
+            return question_text[:50] + "..."
+        return question_text
+    get_question_preview.short_description = 'Question Preview'
+    
+    def get_question_details(self, obj):
+        """Get full question details with options"""
+        question = obj.question
+        options = []
+        if question.option_a:
+            options.append(f"A. {question.option_a}")
+        if question.option_b:
+            options.append(f"B. {question.option_b}")
+        if question.option_c:
+            options.append(f"C. {question.option_c}")
+        if question.option_d:
+            options.append(f"D. {question.option_d}")
+        if question.option_e:
+            options.append(f"E. {question.option_e}")
+        
+        options_text = "\n".join(options)
+        return f"Question: {question.question_text}\n\nOptions:\n{options_text}\n\nMarks: {question.marks}"
+    get_question_details.short_description = 'Question Details'
+    
+    def get_correct_answer(self, obj):
+        """Get correct answer"""
+        return f"Correct Answer: {obj.question.correct_answer} | Marks: {obj.question.marks}"
+    get_correct_answer.short_description = 'Correct Answer'
 
 
 # ===== Student Management =====
@@ -393,6 +576,34 @@ class StudentSubjectInline(admin.TabularInline):
     fields = ['subject', 'session', 'session_term', 'is_active']
 
 
+class StudentExamInline(admin.TabularInline):
+    """Inline for StudentExam in Student admin"""
+    model = StudentExam
+    extra = 0
+    readonly_fields = [
+        'exam', 'status', 'score', 'percentage', 'passed', 
+        'started_at', 'submitted_at', 'get_duration'
+    ]
+    fields = [
+        'exam', 'status', 'score', 'percentage', 'passed', 
+        'started_at', 'submitted_at', 'get_duration'
+    ]
+    can_delete = False
+    
+    def get_duration(self, obj):
+        """Calculate exam duration"""
+        if obj.started_at and obj.submitted_at:
+            duration = obj.submitted_at - obj.started_at
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours > 0:
+                return f"{int(hours)}h {int(minutes)}m"
+            else:
+                return f"{int(minutes)}m {int(seconds)}s"
+        return "N/A"
+    get_duration.short_description = 'Duration'
+
+
 @admin.register(Student)
 class StudentAdmin(admin.ModelAdmin):
     """Admin interface for Student model"""
@@ -411,7 +622,7 @@ class StudentAdmin(admin.ModelAdmin):
     ordering = ['-created_at']
     readonly_fields = ['application_number', 'admission_number', 'created_at', 'updated_at', 'created_by']
     
-    inlines = [BioDataInline, GuardianInline, DocumentInline, StudentSubjectInline]
+    inlines = [BioDataInline, GuardianInline, DocumentInline, StudentSubjectInline, StudentExamInline]
     
     fieldsets = (
         (_('Student Information'), {

@@ -27,6 +27,14 @@ class Student(models.Model):
         ('admin_registration', 'Admin Registration'),
     ]
     
+    # Override default id field with readable format
+    id = models.CharField(
+        _('student ID'),
+        max_length=20,
+        primary_key=True,
+        help_text=_('Human-readable ID like STU-001ABC')
+    )
+    
     # Unique identifiers
     application_number = models.CharField(
         _('application number'),
@@ -173,6 +181,11 @@ class Student(models.Model):
                 print(f'✅ Generated admission number: {self.admission_number}')
             else:
                 print(f'✅ Using provided admission number: {self.admission_number}')
+        
+        # Generate readable id if not set
+        if not self.id:
+            from ..utils.id_generator import generate_student_id
+            self.id = generate_student_id()
         
         super().save(*args, **kwargs)
     

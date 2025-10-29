@@ -34,3 +34,17 @@ class IsSchoolAdminOrReadOnly(permissions.BasePermission):
         # Write permissions only for admin
         return request.user.user_type == 'admin'
 
+
+class IsAdminOrStaff(permissions.BasePermission):
+    """
+    Permission check for Admin or Staff users.
+    Allows authenticated users with user_type='admin' or 'staff'.
+    """
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and
+            request.user.is_authenticated and
+            request.user.user_type in ['admin', 'staff']
+        )
+

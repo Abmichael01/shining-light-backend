@@ -757,6 +757,14 @@ class Question(models.Model):
 class Exam(models.Model):
     """CBT Exam/Test configuration"""
     
+    # Override default id field with readable format
+    id = models.CharField(
+        _('exam ID'),
+        max_length=20,
+        primary_key=True,
+        help_text=_('Human-readable ID like EXM-IEE83U7')
+    )
+    
     EXAM_TYPE_CHOICES = [
         ('test', 'Test'),
         ('exam', 'Examination'),
@@ -766,7 +774,6 @@ class Exam(models.Model):
     
     STATUS_CHOICES = [
         ('draft', 'Draft'),
-        ('scheduled', 'Scheduled'),
         ('active', 'Active'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),
@@ -810,11 +817,7 @@ class Exam(models.Model):
         verbose_name=_('session term')
     )
     
-    # Exam scheduling
-    start_date = models.DateField(_('start date'))
-    start_time = models.TimeField(_('start time'))
-    end_date = models.DateField(_('end date'))
-    end_time = models.TimeField(_('end time'))
+    # Exam is controlled by admin via status - no date/time scheduling needed
     
     # Duration and configuration
     duration_minutes = models.PositiveIntegerField(
@@ -888,25 +891,25 @@ class Exam(models.Model):
     class Meta:
         verbose_name = _('Exam')
         verbose_name_plural = _('Exams')
-        ordering = ['-start_date', '-start_time']
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['subject', 'session_term']),
-            models.Index(fields=['status', 'start_date']),
+            models.Index(fields=['status', 'created_at']),
         ]
     
     def __str__(self):
         return f"{self.title} ({self.subject.name})"
     
+    def save(self, *args, **kwargs):
+        """Override save to generate readable id if not set"""
+        if not self.id:
+            from ..utils.id_generator import generate_exam_id
+            self.id = generate_exam_id()
+        super().save(*args, **kwargs)
+    
     def clean(self):
         """Validate exam configuration"""
         super().clean()
-        
-        # Validate dates
-        if self.end_date < self.start_date:
-            raise ValidationError(_('End date cannot be before start date'))
-        
-        if self.end_date == self.start_date and self.end_time <= self.start_time:
-            raise ValidationError(_('End time must be after start time on the same day'))
         
         # Validate marks
         if self.pass_mark > self.total_marks:
@@ -914,28 +917,13 @@ class Exam(models.Model):
     
     @property
     def is_active(self):
-        """Check if exam is currently active"""
-        from django.utils import timezone
-        now = timezone.now()
-        start_datetime = timezone.make_aware(timezone.datetime.combine(self.start_date, self.start_time))
-        end_datetime = timezone.make_aware(timezone.datetime.combine(self.end_date, self.end_time))
-        return self.status == 'active' and start_datetime <= now <= end_datetime
+        """Check if exam is currently active - controlled by admin status"""
+        return self.status == 'active'
     
     @property
-    def has_started(self):
-        """Check if exam has started"""
-        from django.utils import timezone
-        now = timezone.now()
-        start_datetime = timezone.make_aware(timezone.datetime.combine(self.start_date, self.start_time))
-        return now >= start_datetime
-    
-    @property
-    def has_ended(self):
-        """Check if exam has ended"""
-        from django.utils import timezone
-        now = timezone.now()
-        end_datetime = timezone.make_aware(timezone.datetime.combine(self.end_date, self.end_time))
-        return now > end_datetime
+    def can_be_taken(self):
+        """Check if exam can be taken by students"""
+        return self.status == 'active'
 
 
 class StudentExam(models.Model):

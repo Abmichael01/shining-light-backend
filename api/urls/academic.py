@@ -11,7 +11,9 @@ from api.views.academic import (
     GradeViewSet,
     QuestionViewSet,
     ClubViewSet,
-    ExamViewSet
+    ExamViewSet,
+    get_student_exams,
+    get_student_exam_detail
 )
 
 router = DefaultRouter()
@@ -27,6 +29,12 @@ router.register(r'topics', TopicViewSet, basename='topic')
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'clubs', ClubViewSet, basename='club')
 router.register(r'exams', ExamViewSet, basename='exam')
- 
-urlpatterns = router.urls
+
+# Add custom URL patterns for student exams
+from django.urls import path
+
+urlpatterns = router.urls + [
+    path('students/<int:student_id>/exams/', get_student_exams, name='student-exams'),
+    path('student-exams/<int:student_exam_id>/', get_student_exam_detail, name='student-exam-detail'),
+]
 

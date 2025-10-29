@@ -1,0 +1,39 @@
+{
+  "id": "PRACTICE-EXAM-004",
+  "title": "General Knowledge Practice Test",
+  "subject": "General Knowledge",
+  "subject_code": "GK-BAS",
+  "difficulty": "easy",
+  "total_questions": 12,
+  "duration_minutes": 20,
+  "total_marks": 60,
+  "instructions": "This is a general knowledge practice test. Read each question carefully and select the best answer.",
+  "questions": [
+    {
+      "id": 1,
+      "question": "Which planet is closest to the Sun?",
+      "question_type": "multiple_choice",
+      "options": [
+        {"id": "a", "text": "Venus"},
+        {"id": "b", "text": "Mercury", "is_correct": true},
+        {"id": "c", "text": "Earth"},
+        {"id": "d", "text": "Mars"}
+      ],
+      "points": 5,
+      "explanation": "Mercury is the closest planet to the Sun in our solar system"
+    },
+    {
+      "id": 2,
+      "question": "What is the capital city of Nigeria?",
+      "question_type": "multiple_choice",
+      "options": [
+        {"id": "a", "text": "Lagos"},
+        {"id": "b", "text": "Abuja", "is_correct": true},
+        {"id": "c", "text": "Kano"},
+        {"id": "d", "text": "Ibadan"}
+      ],
+      "points": 5,
+      "explanation": "Abuja is the capital city of Nigeria"
+    }
+  ]
+}

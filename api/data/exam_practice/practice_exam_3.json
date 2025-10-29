@@ -1,0 +1,39 @@
+{
+  "id": "PRACTICE-EXAM-003",
+  "title": "English Language Practice Test",
+  "subject": "English Language",
+  "subject_code": "ENG-BAS",
+  "difficulty": "medium",
+  "total_questions": 15,
+  "duration_minutes": 30,
+  "total_marks": 75,
+  "instructions": "This is an English language practice test. Read each question carefully and select the best answer. You have 30 minutes to complete this test.",
+  "questions": [
+    {
+      "id": 1,
+      "question": "Choose the correct form: I ___ to school every day.",
+      "question_type": "multiple_choice",
+      "options": [
+        {"id": "a", "text": "go", "is_correct": true},
+        {"id": "b", "text": "goes"},
+        {"id": "c", "text": "going"},
+        {"id": "d", "text": "went"}
+      ],
+      "points": 5,
+      "explanation": "'go' is the correct present tense form for first person singular"
+    },
+    {
+      "id": 2,
+      "question": "What is the plural of 'child'?",
+      "question_type": "multiple_choice",
+      "options": [
+        {"id": "a", "text": "childs"},
+        {"id": "b", "text": "children", "is_correct": true},
+        {"id": "c", "text": "childes"},
+        {"id": "d", "text": "childen"}
+      ],
+      "points": 5,
+      "explanation": "'children' is the irregular plural form of 'child'"
+    }
+  ]
+}

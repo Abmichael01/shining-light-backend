@@ -280,15 +280,15 @@ class ExamSerializer(serializers.ModelSerializer):
     session_term_name = serializers.CharField(source='session_term.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     total_students = serializers.SerializerMethodField()
+    questions = serializers.SerializerMethodField()
     
     class Meta:
         model = Exam
         fields = [
             'id', 'title', 'subject', 'subject_name', 'subject_code', 'class_name', 'school_name',
-            'exam_type', 'session_term', 'session_term_name', 'start_date', 'start_time',
-            'end_date', 'end_time', 'duration_minutes', 'total_marks', 'pass_mark',
+            'exam_type', 'session_term', 'session_term_name', 'duration_minutes', 'total_marks', 'pass_mark',
             'total_questions', 'shuffle_questions', 'shuffle_options', 'show_results_immediately',
-            'allow_review', 'status', 'instructions', 'created_by', 'created_by_name',
+            'allow_review', 'status', 'instructions', 'questions', 'created_by', 'created_by_name',
             'total_students', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_students']
@@ -298,4 +298,37 @@ class ExamSerializer(serializers.ModelSerializer):
         # This would need to be calculated based on the subject's class
         # For now, return a mock value
         return 0
+    
+    def get_questions(self, obj):
+        """Format questions with options for CBT"""
+        questions = obj.questions.all()
+        formatted_questions = []
+        
+        for question in questions:
+            # Build options array from individual option fields
+            options = []
+            if question.option_a:
+                options.append({'id': 'a', 'text': question.option_a})
+            if question.option_b:
+                options.append({'id': 'b', 'text': question.option_b})
+            if question.option_c:
+                options.append({'id': 'c', 'text': question.option_c})
+            if question.option_d:
+                options.append({'id': 'd', 'text': question.option_d})
+            if question.option_e:
+                options.append({'id': 'e', 'text': question.option_e})
+            
+            formatted_question = {
+                'id': str(question.id),
+                'question_text': question.question_text,
+                'question_type': question.question_type,
+                'options': options,
+                'correct_answer': question.correct_answer,
+                'marks': question.marks,
+                'difficulty': question.difficulty,
+                'explanation': question.explanation
+            }
+            formatted_questions.append(formatted_question)
+        
+        return formatted_questions
 

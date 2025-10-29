@@ -31,5 +31,8 @@ urlpatterns = [
     
     # Fee endpoints (fee types, payments, etc.)
     path('', include('api.urls.fee')),
+    
+    # CBT endpoints (passcodes, exam access, etc.)
+    path('cbt/', include('api.urls.cbt')),
 ]
 
