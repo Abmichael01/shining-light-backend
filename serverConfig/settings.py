@@ -186,10 +186,10 @@ else:
 # https://docs.djangoproject.com/en/5.2/topics/cache/
 
 if ENV == 'production':
-    # Redis cache for production
+    # Redis cache for production using django-redis
     CACHES = {
         'default': {
-            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'BACKEND': 'django_redis.cache.RedisCache',
             'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
