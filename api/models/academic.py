@@ -1,4 +1,5 @@
 from django.db import models
+import re
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
@@ -427,13 +428,20 @@ class Subject(models.Model):
             # Generate base code
             base_code = self._generate_subject_code()
             self.code = base_code
-            
-            # Ensure uniqueness by adding counter if needed
-            counter = 1
-            original_code = self.code
-            while Subject.objects.filter(code=self.code).exists():
-                self.code = f"{base_code}-{counter}"
-                counter += 1
+        
+        # Normalize code regardless of source (admin/manual or auto-generated)
+        # - trim
+        # - collapse whitespace to single hyphen
+        # - uppercase for consistency
+        normalized = re.sub(r"\s+", "-", self.code.strip()).upper()
+        self.code = normalized
+
+        # Ensure uniqueness by adding counter if needed
+        counter = 1
+        base_code = self.code
+        while Subject.objects.filter(code=self.code).exclude(pk=self.pk).exists():
+            self.code = f"{base_code}-{counter}"
+            counter += 1
         
         # Set id to be the same as code
         if not self.id:
@@ -444,6 +452,9 @@ class Subject(models.Model):
     def clean(self):
         """Validate subject relationships"""
         super().clean()
+        # Enforce no spaces in code (should be hyphenated)
+        if self.code and (" " in self.code):
+            raise ValidationError(_('Subject code cannot contain spaces'))
         
         # Department should only be set for Senior Secondary School
         if self.department and self.school.school_type != 'Senior Secondary':

@@ -167,6 +167,7 @@ class SubjectAdmin(admin.ModelAdmin):
     list_filter = ['school', 'class_model', 'department', 'subject_group']
     search_fields = ['name', 'code']
     ordering = ['school', 'class_model', 'order', 'name']
+    readonly_fields = ['code']
     
     fieldsets = (
         (None, {
