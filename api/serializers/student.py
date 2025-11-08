@@ -89,13 +89,14 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     term_name = serializers.CharField(source='session_term.term_name', read_only=True, allow_null=True)
     grade_name = serializers.CharField(source='grade.grade_name', read_only=True, allow_null=True)
     grade_description = serializers.CharField(source='grade.grade_description', read_only=True, allow_null=True)
+    cleared_by_name = serializers.CharField(source='cleared_by.email', read_only=True, allow_null=True)
     
     class Meta:
         model = StudentSubject
         fields = [
             'id', 'student', 'subject', 'subject_name', 'subject_code',
             'session', 'session_name', 'session_term', 'term_name',
-            'is_active',
+            'is_active', 'cleared', 'cleared_at', 'cleared_by', 'cleared_by_name',
             # Result fields
             'ca_score', 'exam_score', 'total_score', 
             'grade', 'grade_name', 'grade_description',
@@ -106,7 +107,8 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
         read_only_fields = [
             'id', 'registered_at', 'updated_at', 'total_score',
             'subject_name', 'subject_code', 'session_name', 'term_name',
-            'grade', 'grade_name', 'grade_description'
+            'grade', 'grade_name', 'grade_description',
+            'cleared_at', 'cleared_by', 'cleared_by_name'
         ]
 
 
@@ -126,6 +128,7 @@ class StudentSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source='club.name', read_only=True, allow_null=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     full_name = serializers.SerializerMethodField()
+    all_subjects_cleared = serializers.SerializerMethodField()
     
     # Email field for updates
     email = serializers.EmailField(write_only=True, required=False)
@@ -142,13 +145,15 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_by', 'reviewed_by', 'rejection_reason',
             'created_at', 'updated_at',
             # Nested data
-            'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations'
+            'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
+            'all_subjects_cleared'
         ]
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name',
             'created_at', 'updated_at', 'created_by', 'reviewed_by',
             'school_name', 'school_type', 'class_name', 'department_name', 'club_name',
-            'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations'
+            'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
+            'all_subjects_cleared'
         ]
     
     def get_full_name(self, obj):
@@ -199,6 +204,17 @@ class StudentSerializer(serializers.ModelSerializer):
         
         # Update other fields
         return super().update(instance, validated_data)
+    
+    def get_all_subjects_cleared(self, obj):
+        prefetched = getattr(obj, '_prefetched_objects_cache', {})
+        registrations = prefetched.get('subject_registrations')
+        if registrations is None:
+            registrations = list(obj.subject_registrations.all())
+        else:
+            registrations = list(registrations)
+        if not registrations:
+            return False
+        return all(getattr(reg, 'cleared', False) for reg in registrations)
 
 
 class StudentListSerializer(serializers.ModelSerializer):

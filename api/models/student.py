@@ -3,6 +3,7 @@ from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from datetime import date
+from django.utils import timezone
 
 
 class Student(models.Model):
@@ -575,6 +576,16 @@ class StudentSubject(models.Model):
     
     # Registration Status
     is_active = models.BooleanField(_('active'), default=True)
+    cleared = models.BooleanField(_('cleared'), default=False)
+    cleared_at = models.DateTimeField(_('cleared at'), null=True, blank=True)
+    cleared_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='student_subjects_cleared',
+        verbose_name=_('cleared by')
+    )
     
     # Result/Assessment Scores
     ca_score = models.DecimalField(
@@ -680,6 +691,15 @@ class StudentSubject(models.Model):
             # Auto-determine grade based on total
             if self.total_score is not None:
                 self.grade = self.calculate_grade()
+        
+        # Manage cleared metadata
+        if self.cleared:
+            if self.cleared_at is None:
+                self.cleared_at = timezone.now()
+        else:
+            # Reset metadata when un-clearing
+            self.cleared_at = None
+            self.cleared_by = None
         
         super().save(*args, **kwargs)
     

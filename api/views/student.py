@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.shortcuts import get_object_or_404
 from django.db import transaction, models
+from django.utils import timezone
 
 from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject
 from api.serializers import (
@@ -292,7 +293,6 @@ class DocumentViewSet(viewsets.ModelViewSet):
         """Verify a document"""
         document = self.get_object()
         
-        from django.utils import timezone
         document.verified = True
         document.verified_by = request.user
         document.verified_at = timezone.now()
@@ -375,6 +375,28 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(session=session)
         
         return queryset
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrStaff])
+    def clear(self, request, pk=None):
+        """
+        Mark or unmark a student's subject as cleared by staff/admin.
+        """
+        student_subject = self.get_object()
+        cleared_value = request.data.get('cleared', True)
+        cleared = str(cleared_value).lower() not in ['false', '0', 'no']
+
+        if cleared:
+            student_subject.cleared = True
+            student_subject.cleared_by = request.user
+            student_subject.cleared_at = timezone.now()
+        else:
+            student_subject.cleared = False
+            student_subject.cleared_by = None
+            student_subject.cleared_at = None
+
+        student_subject.save(update_fields=['cleared', 'cleared_by', 'cleared_at', 'updated_at'])
+        serializer = self.get_serializer(student_subject)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
     @action(detail=False, methods=['post'])
     def bulk_register(self, request):
