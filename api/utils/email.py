@@ -94,6 +94,88 @@ Shining Light School Administration
         return False
 
 
+def send_staff_registration_email(staff, password, request=None):
+    """
+    Send welcome email to newly registered staff with login credentials.
+
+    Args:
+        staff: Staff model instance
+        password: Generated password (plain text)
+        request: HTTP request object (optional, for building portal URL)
+    """
+    try:
+        staff_email = staff.user.email if hasattr(staff, 'user') and staff.user else None
+
+        if not staff_email:
+            print(f"Warning: No email found for staff {staff.staff_id}")
+            return False
+
+        context = {
+            'staff_name': staff.get_full_name(),
+            'staff_id': staff.staff_id,
+            'staff_type': staff.get_staff_type_display(),
+            'zone': staff.get_zone_display(),
+            'email': staff_email,
+            'password': password,
+            'portal_url': request.build_absolute_uri('/portals/staff') if request else 'http://localhost:3000/portals/staff',
+            'year': datetime.datetime.now().year,
+        }
+
+        subject = 'Staff Portal Credentials - Shining Light School'
+        template_name = 'emails/staff_registration.html'
+        html_message = render_to_string(template_name, context) if template_exists(template_name) else None
+
+        plain_message = f"""
+Welcome to Shining Light School!
+
+Dear {context['staff_name']},
+
+Your staff portal account has been created.
+
+Staff Information:
+- Name: {context['staff_name']}
+- Staff ID: {context['staff_id']}
+- Staff Type: {context['staff_type']}
+- Zone: {context['zone']}
+
+Login Credentials:
+- Email/Username: {context['email']}
+- Temporary Password: {context['password']}
+
+Portal URL: {context['portal_url']}
+
+IMPORTANT: Change your password immediately after logging in.
+
+Best regards,
+Shining Light School Administration
+"""
+
+        if html_message:
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[staff_email],
+            )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send()
+        else:
+            send_mail(
+                subject=subject,
+                message=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[staff_email],
+                fail_silently=False,
+            )
+
+        print(f"Staff registration email sent to {staff_email} for staff {staff.staff_id}")
+        return True
+
+    except Exception as e:
+        print(f"Error sending staff registration email: {str(e)}")
+        return False
+
+
 def send_password_reset_email(user, reset_link):
     """
     Send password reset email to user

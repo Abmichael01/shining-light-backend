@@ -284,7 +284,7 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'staff_id', 'created_at']
         extra_kwargs = {
-            'passport_photo': {'required': False, 'allow_null': True}
+            'passport_photo': {'required': False, 'allow_null': True},
         }
     
     def validate(self, data):

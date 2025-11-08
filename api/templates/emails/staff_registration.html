@@ -1,0 +1,86 @@
+{% extends "emails/base.html" %}
+
+{% block title %}Staff Portal Credentials{% endblock %}
+
+{% block content %}
+<h2>Welcome to the Staff Portal!</h2>
+
+<p>Dear <strong>{{ staff_name }}</strong>,</p>
+
+<p>
+    Your staff portal account has been created for <strong>Shining Light Group of Schools</strong>.
+    Below are your credentials and key information.
+</p>
+
+<div class="divider"></div>
+
+<div class="info-box">
+    <h3 style="margin-top: 0; color: #111827;">Staff Information</h3>
+    <div class="detail-row">
+        <span><strong>Full Name:</strong></span>
+        <span>{{ staff_name }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>Staff ID:</strong></span>
+        <span>{{ staff_id }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>Staff Type:</strong></span>
+        <span>{{ staff_type }}</span>
+    </div>
+    <div class="detail-row">
+        <span><strong>Zone:</strong></span>
+        <span>{{ zone }}</span>
+    </div>
+</div>
+
+<h3>Your Login Credentials</h3>
+
+<p>Please keep your credentials safe and confidential.</p>
+
+<div class="credentials-box">
+    <p>STAFF PORTAL CREDENTIALS</p>
+    <div class="credential-item">
+        <div class="credential-label">Email / Username</div>
+        <div class="credential-value">{{ email }}</div>
+    </div>
+    <div class="credential-item">
+        <div class="credential-label">Temporary Password</div>
+        <div class="credential-value">{{ password }}</div>
+    </div>
+</div>
+
+<div style="text-align: center;">
+    <a href="{{ portal_url }}" class="button" style="color: white;">Access Staff Portal</a>
+</div>
+
+<div class="divider"></div>
+
+<div class="alert-box warning-box">
+    <h4>⚠️ Important Security Notice</h4>
+    <ul>
+        <li>Change your password immediately after your first login</li>
+        <li>Keep your credentials confidential</li>
+        <li>Contact IT support if you notice any suspicious activity</li>
+    </ul>
+</div>
+
+<div class="alert-box info-highlight">
+    <h4>Next Steps</h4>
+    <ul>
+        <li>Log in to the portal using the credentials above</li>
+        <li>Update your profile information</li>
+        <li>Review staff resources and announcements</li>
+        <li>Enable notifications for important updates</li>
+    </ul>
+</div>
+
+<p>If you have any questions or need assistance, please contact the administration office.</p>
+
+<p>
+    <strong>Best regards,</strong><br>
+    <strong>Shining Light School Administration</strong>
+</p>
+{% endblock %}
+
+

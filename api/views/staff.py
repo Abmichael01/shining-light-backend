@@ -34,6 +34,7 @@ from api.serializers import (
     StudentSerializer
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff
+from api.utils.email import generate_password, send_staff_registration_email
 
 
 class StaffViewSet(viewsets.ModelViewSet):
@@ -172,6 +173,43 @@ class StaffViewSet(viewsets.ModelViewSet):
             )
         print(f"Serializer errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=True, methods=['post'])
+    def send_credentials(self, request, *args, **kwargs):
+        """
+        Reset a staff member's password and email updated credentials.
+        """
+        staff = self.get_object()
+
+        if not staff.user or not staff.user.email:
+            return Response(
+                {'detail': 'Staff does not have an associated email account.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            new_password = generate_password()
+            staff.user.set_password(new_password)
+            staff.user.save(update_fields=['password'])
+
+            email_sent = send_staff_registration_email(staff, new_password, request)
+
+            if email_sent:
+                return Response({
+                    'detail': 'Credentials sent successfully.',
+                    'email': staff.user.email,
+                })
+
+            return Response(
+                {'detail': 'Password updated, but email delivery failed.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        except Exception as exc:
+            return Response(
+                {'detail': f'Error sending credentials: {str(exc)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
     
     @action(detail=True, methods=['patch'])
     def update_status(self, request, pk=None):
