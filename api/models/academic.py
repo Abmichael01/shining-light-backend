@@ -4,6 +4,8 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models.signals import m2m_changed, post_save
+from django.dispatch import receiver
 
 
 class School(models.Model):
@@ -265,6 +267,12 @@ class Class(models.Model):
         related_name='classes_assigned',
         verbose_name=_('class staff')
     )
+    assigned_teachers = models.ManyToManyField(
+        'Staff',
+        blank=True,
+        related_name='assigned_classes',
+        verbose_name=_('assigned teachers')
+    )
     order = models.PositiveSmallIntegerField(_('display order'), default=0)
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
@@ -282,6 +290,17 @@ class Class(models.Model):
         if self.class_code and not self.id:
             self.id = self.class_code
         super().save(*args, **kwargs)
+        # Propagate class_staff to subjects as assigned teacher when possible
+        try:
+            if self.class_staff:
+                from api.models import Staff as StaffModel, Subject as SubjectModel
+                staff = StaffModel.objects.filter(user=self.class_staff).first()
+                if staff:
+                    SubjectModel.objects.filter(class_model=self).update()
+                    for subj in SubjectModel.objects.filter(class_model=self):
+                        subj.assigned_teachers.add(staff)
+        except Exception:
+            pass
 
 
 class Department(models.Model):
@@ -382,6 +401,12 @@ class Subject(models.Model):
         verbose_name=_('subject group')
     )
     order = models.PositiveSmallIntegerField(_('display order'), default=0)
+    assigned_teachers = models.ManyToManyField(
+        'Staff',
+        blank=True,
+        related_name='assigned_subjects',
+        verbose_name=_('assigned teachers')
+    )
     
     # Assessment Configuration
     ca_max = models.DecimalField(
@@ -448,6 +473,22 @@ class Subject(models.Model):
             self.id = self.code
         
         super().save(*args, **kwargs)
+@receiver(m2m_changed, sender=Class.assigned_teachers.through)
+def propagate_class_assigned_teachers(sender, instance, action, pk_set, **kwargs):
+    """When class.assigned_teachers changes, sync to all subjects in the class."""
+    if action in ['post_add', 'post_remove', 'post_clear']:
+        from api.models import Subject as SubjectModel, Staff as StaffModel
+        subjects = SubjectModel.objects.filter(class_model=instance)
+        if action == 'post_clear':
+            for subj in subjects:
+                subj.assigned_teachers.clear()
+        elif action in ['post_add', 'post_remove'] and pk_set is not None:
+            staff_qs = StaffModel.objects.filter(id__in=list(pk_set))
+            for subj in subjects:
+                if action == 'post_add':
+                    subj.assigned_teachers.add(*staff_qs)
+                elif action == 'post_remove':
+                    subj.assigned_teachers.remove(*staff_qs)
     
     def clean(self):
         """Validate subject relationships"""
@@ -936,6 +977,68 @@ class Exam(models.Model):
         """Check if exam can be taken by students"""
         return self.status == 'active'
 
+
+class Assignment(models.Model):
+    """Teacher assignment configuration (simpler than exams)"""
+    id = models.CharField(
+        _('assignment ID'),
+        max_length=20,
+        primary_key=True,
+        help_text=_('Human-readable ID like ASM-IEE83U7')
+    )
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+        ('closed', 'Closed'),
+    ]
+    title = models.CharField(_('assignment title'), max_length=200)
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='assignments',
+        verbose_name=_('subject')
+    )
+    questions = models.ManyToManyField(
+        Question,
+        blank=True,
+        related_name='assignments',
+        verbose_name=_('questions'),
+        help_text=_('Select questions from the question bank')
+    )
+    due_date = models.DateField(_('due date'), null=True, blank=True)
+    instructions = models.TextField(_('instructions'), blank=True, null=True)
+    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='draft')
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_assignments',
+        verbose_name=_('created by')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Assignment')
+        verbose_name_plural = _('Assignments')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subject']),
+            models.Index(fields=['status', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} ({self.subject.name})"
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            from ..utils.id_generator import generate_assignment_id
+            self.id = generate_assignment_id()
+        super().save(*args, **kwargs)
+
+    @property
+    def question_count(self):
+        return self.questions.count()
 
 class StudentExam(models.Model):
     """Student exam attempt/session"""

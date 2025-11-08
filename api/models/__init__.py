@@ -11,6 +11,7 @@ from .academic import (
     Grade,
     Question,
     Exam,
+    Assignment,
     StudentExam,
     StudentAnswer,
     Club
@@ -51,6 +52,7 @@ __all__ = [
     'Grade',
     'Question',
     'Exam',
+    'Assignment',
     'StudentExam',
     'StudentAnswer',
     'Club',

@@ -52,6 +52,7 @@ class StaffListSerializer(serializers.ModelSerializer):
     staff_type_display = serializers.CharField(source='get_staff_type_display', read_only=True)
     zone_display = serializers.CharField(source='get_zone_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
+    id = serializers.CharField(source='staff_id', read_only=True)
     
     class Meta:
         model = Staff
@@ -74,6 +75,22 @@ class StaffListSerializer(serializers.ModelSerializer):
         """Return staff member's full name"""
         return obj.get_full_name()
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        passport_field = getattr(instance, 'passport_photo', None)
+        if passport_field:
+            if hasattr(passport_field, 'url'):
+                request = self.context.get('request') if hasattr(self, 'context') else None
+                url = passport_field.url
+                if request:
+                    url = request.build_absolute_uri(url)
+                data['passport_photo'] = url
+            else:
+                data['passport_photo'] = passport_field
+        else:
+            data['passport_photo'] = None
+        return data
+
 
 class StaffSerializer(serializers.ModelSerializer):
     """Full serializer for Staff model"""
@@ -88,6 +105,8 @@ class StaffSerializer(serializers.ModelSerializer):
     religion_display = serializers.CharField(source='get_religion_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     education_records = StaffEducationSerializer(many=True, read_only=True)
+    id = serializers.CharField(source='staff_id', read_only=True)
+    passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = Staff
@@ -136,6 +155,86 @@ class StaffSerializer(serializers.ModelSerializer):
         """Return staff member's full name"""
         return obj.get_full_name()
 
+    def update(self, instance, validated_data):
+        passport_photo_data = validated_data.pop('passport_photo', None)
+
+        if passport_photo_data is not None:
+            if passport_photo_data == "":
+                if instance.passport_photo:
+                    instance.passport_photo.delete(save=False)
+                instance.passport_photo = None
+            elif isinstance(passport_photo_data, str) and passport_photo_data.startswith('data:image'):
+                format, imgstr = passport_photo_data.split(';base64,')
+                ext = format.split('/')[-1]
+                passport_file = ContentFile(base64.b64decode(imgstr), name=f'staff_{uuid.uuid4()}.{ext}')
+                instance.passport_photo = passport_file
+            else:
+                # For actual InMemoryUploadedFile or similar, assign directly
+                instance.passport_photo = passport_photo_data
+
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        passport_field = getattr(instance, 'passport_photo', None)
+        if passport_field:
+            if hasattr(passport_field, 'url'):
+                request = self.context.get('request') if hasattr(self, 'context') else None
+                url = passport_field.url
+                if request:
+                    url = request.build_absolute_uri(url)
+                data['passport_photo'] = url
+            else:
+                data['passport_photo'] = passport_field
+        else:
+            data['passport_photo'] = None
+        return data
+
+
+class StaffPortalUpdateSerializer(serializers.ModelSerializer):
+    """Serializer for staff self-service updates"""
+
+    passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = Staff
+        fields = [
+            'title',
+            'surname',
+            'first_name',
+            'other_names',
+            'phone_number',
+            'permanent_address',
+            'marital_status',
+            'religion',
+            'number_of_children_in_school',
+            'account_name',
+            'account_number',
+            'bank_name',
+            'passport_photo'
+        ]
+
+    def update(self, instance, validated_data):
+        passport_photo_data = validated_data.pop('passport_photo', None)
+
+        if passport_photo_data is not None:
+            # Handle clearing
+            if passport_photo_data == "":
+                if instance.passport_photo:
+                    instance.passport_photo.delete(save=False)
+                instance.passport_photo = None
+            elif isinstance(passport_photo_data, str) and passport_photo_data.startswith('data:image'):
+                format, imgstr = passport_photo_data.split(';base64,')
+                ext = format.split('/')[-1]
+                passport_file = ContentFile(base64.b64decode(imgstr), name=f'staff_{uuid.uuid4()}.{ext}')
+                instance.passport_photo = passport_file
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        instance.save()
+        return instance
+
 
 class StaffRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for staff registration with user creation"""
@@ -149,6 +248,8 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
     
     # Education records (nested)
     education_records = StaffEducationSerializer(many=True, required=False)
+    id = serializers.CharField(source='staff_id', read_only=True)
+    id = serializers.CharField(source='staff_id', read_only=True)
     
     class Meta:
         model = Staff
@@ -194,7 +295,6 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'email': 'A user with this email already exists.'
             })
-        
         return data
     
     def create(self, validated_data):

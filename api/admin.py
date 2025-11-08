@@ -14,6 +14,7 @@ from .models import (
     Grade,
     Question,
     Exam,
+    Assignment,
     StudentExam,
     StudentAnswer,
     Student,
@@ -124,12 +125,13 @@ class ClassAdmin(admin.ModelAdmin):
             'fields': ('name', 'class_code', 'school')
         }),
         (_('Staff Assignment'), {
-            'fields': ('class_staff',)
+            'fields': ('class_staff', 'assigned_teachers')
         }),
         (_('Display'), {
             'fields': ('order',)
         }),
     )
+    filter_horizontal = ['assigned_teachers']
 
 
 @admin.register(Department)
@@ -176,6 +178,9 @@ class SubjectAdmin(admin.ModelAdmin):
         (_('Classification'), {
             'fields': ('department', 'subject_group')
         }),
+        (_('Staff Assignment'), {
+            'fields': ('assigned_teachers',)
+        }),
         (_('Assessment Configuration'), {
             'fields': ('ca_max', 'exam_max')
         }),
@@ -183,6 +188,7 @@ class SubjectAdmin(admin.ModelAdmin):
             'fields': ('order',)
         }),
     )
+    filter_horizontal = ['assigned_teachers']
 
 
 @admin.register(Question)
@@ -296,6 +302,44 @@ class ExamAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """Set created_by to current user if not set"""
         if not obj.pk:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Assignment)
+class AssignmentAdmin(admin.ModelAdmin):
+    """Admin interface for Assignment model"""
+    list_display = ['title', 'subject', 'status', 'question_count_display', 'due_date', 'created_by', 'created_at']
+    list_filter = ['status', 'subject__school', 'subject']
+    search_fields = ['title', 'subject__name', 'instructions']
+    ordering = ['-created_at']
+    readonly_fields = ['created_by', 'created_at', 'updated_at']
+
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': ('title', 'subject', 'status', 'due_date')
+        }),
+        (_('Questions'), {
+            'fields': ('questions',)
+        }),
+        (_('Instructions'), {
+            'fields': ('instructions',),
+            'classes': ('collapse',)
+        }),
+        (_('Metadata'), {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    filter_horizontal = ['questions']
+
+    def question_count_display(self, obj):
+        return obj.question_count
+    question_count_display.short_description = 'Questions'
+
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.created_by:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
 

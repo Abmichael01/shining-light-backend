@@ -13,7 +13,8 @@ from api.serializers import (
     StudentFeeStatusSerializer,
     RecordFeePaymentSerializer
 )
-from api.permissions import IsSchoolAdmin
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff
+from api.models import Class, Subject, Staff
 
 
 class FeeTypeViewSet(viewsets.ModelViewSet):
@@ -84,7 +85,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     """
     queryset = FeePayment.objects.all()
     serializer_class = FeePaymentSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter queryset based on request parameters"""
@@ -96,6 +97,20 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             'session_term',
             'processed_by'
         )
+        # Staff scoping: restrict to students in assigned classes/subjects
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            staff = Staff.objects.filter(user=user).first()
+            assigned_classes = Class.objects.filter(
+                models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+            ).distinct()
+            assigned_subjects = Subject.objects.none()
+            if staff:
+                assigned_subjects = Subject.objects.filter(assigned_teachers=staff)
+            queryset = queryset.filter(
+                models.Q(student__class_model__in=assigned_classes) |
+                models.Q(student__subject_registrations__subject__in=assigned_subjects)
+            ).distinct()
         
         # Filter by student
         student_id = self.request.query_params.get('student')

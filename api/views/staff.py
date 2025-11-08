@@ -2,10 +2,12 @@
 ViewSets for staff-related models
 """
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db import models
 from django.db.models import Q, Sum
+from django.http import Http404
+from rest_framework.permissions import IsAuthenticated
 from api.models import (
     Staff,
     StaffEducation,
@@ -13,20 +15,25 @@ from api.models import (
     StaffSalary,
     SalaryPayment,
     LoanApplication,
-    LoanPayment
+    LoanPayment,
+    Student,
+    Class
 )
 from api.serializers import (
     StaffSerializer,
     StaffListSerializer,
     StaffRegistrationSerializer,
+    StaffPortalUpdateSerializer,
     StaffEducationSerializer,
     SalaryGradeSerializer,
     StaffSalarySerializer,
     SalaryPaymentSerializer,
     LoanApplicationSerializer,
-    LoanPaymentSerializer
+    LoanPaymentSerializer,
+    StudentListSerializer,
+    StudentSerializer
 )
-from api.permissions import IsSchoolAdmin
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff
 
 
 class StaffViewSet(viewsets.ModelViewSet):
@@ -36,6 +43,37 @@ class StaffViewSet(viewsets.ModelViewSet):
     """
     queryset = Staff.objects.all()
     permission_classes = [IsSchoolAdmin]
+    lookup_field = 'staff_id'
+    lookup_value_regex = '[^/\s]+'
+
+    def get_object(self):
+        """Allow lookups by staff_id (default) or numeric primary key for backwards compatibility."""
+        queryset = self.filter_queryset(self.get_queryset())
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(self.lookup_field) or self.kwargs.get(lookup_url_kwarg)
+
+        print(f"[StaffViewSet.get_object] lookup_value raw: {lookup_value}")
+
+        if lookup_value is None:
+            print("[StaffViewSet.get_object] No lookup value provided; raising 404")
+            raise Http404
+
+        # Try staff_id lookup first
+        obj = queryset.filter(staff_id=lookup_value).first()
+        print(f"[StaffViewSet.get_object] Staff lookup by staff_id found: {bool(obj)}")
+
+        # Fallback to numeric primary key when applicable
+        if obj is None and lookup_value.isdigit():
+            print(f"[StaffViewSet.get_object] Falling back to numeric PK lookup for value: {lookup_value}")
+            obj = queryset.filter(pk=lookup_value).first()
+            print(f"[StaffViewSet.get_object] Staff lookup by pk found: {bool(obj)}")
+
+        if obj is None:
+            print("[StaffViewSet.get_object] No staff record found; raising 404")
+            raise Http404
+
+        self.check_object_permissions(self.request, obj)
+        return obj
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
@@ -169,6 +207,113 @@ class StaffViewSet(viewsets.ModelViewSet):
         payments = SalaryPayment.objects.filter(staff=staff).order_by('-year', '-month')
         serializer = SalaryPaymentSerializer(payments, many=True)
         return Response(serializer.data)
+
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def staff_me(request):
+    """
+    Get the authenticated user's staff profile (for staff portal)
+    """
+    try:
+        staff = Staff.objects.select_related('user', 'assigned_class').prefetch_related('education_records').filter(user=request.user).first()
+        if not staff:
+            return Response({
+                'error': 'Staff profile not found for current user'
+            }, status=status.HTTP_404_NOT_FOUND)
+        if request.method == 'GET':
+            serializer = StaffSerializer(staff, context={'request': request})
+            return Response(serializer.data)
+
+        update_serializer = StaffPortalUpdateSerializer(staff, data=request.data, partial=True, context={'request': request})
+        update_serializer.is_valid(raise_exception=True)
+        update_serializer.save()
+        return Response(StaffSerializer(staff, context={'request': request}).data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_students(request):
+    """
+    List students visible to the authenticated staff member:
+    - Students whose class_model.class_staff = current user
+    Optional query params: search, status
+    """
+    try:
+        from api.models import Staff as StaffModel, Subject as SubjectModel, StudentSubject as StudentSubjectModel
+        assigned_classes = Class.objects.filter(models.Q(class_staff=request.user) | models.Q(assigned_teachers__user=request.user)).distinct()
+        staff = StaffModel.objects.filter(user=request.user).first()
+        assigned_subjects = SubjectModel.objects.filter(assigned_teachers=staff) if staff else SubjectModel.objects.none()
+        queryset = Student.objects.select_related('user', 'class_model', 'school', 'biodata').filter(
+            models.Q(class_model__in=assigned_classes) |
+            models.Q(subject_registrations__subject__in=assigned_subjects)
+        ).distinct()
+
+        status_param = request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+
+        search = request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(admission_number__icontains=search) |
+                models.Q(application_number__icontains=search) |
+                models.Q(user__email__icontains=search) |
+                models.Q(biodata__surname__icontains=search) |
+                models.Q(biodata__first_name__icontains=search) |
+                models.Q(biodata__other_names__icontains=search)
+            )
+
+        queryset = queryset.order_by('class_model__order', 'class_model__name', 'admission_number')
+        serializer = StudentListSerializer(queryset, many=True)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def staff_student_detail_update(request, student_id):
+    """
+    Get or update a student if the authenticated staff is assigned to the student's class.
+    GET: returns student detail
+    PATCH: allows partial update of student (limited to safe fields)
+    """
+    try:
+        # Assignment check
+        from api.models import Staff as StaffModel, Subject as SubjectModel
+        assigned_classes = Class.objects.filter(models.Q(class_staff=request.user) | models.Q(assigned_teachers__user=request.user)).distinct()
+        staff = StaffModel.objects.filter(user=request.user).first()
+        assigned_subjects = SubjectModel.objects.filter(assigned_teachers=staff) if staff else SubjectModel.objects.none()
+        student = Student.objects.select_related('class_model', 'school', 'user').filter(
+            id=student_id
+        ).filter(
+            models.Q(class_model__in=assigned_classes) |
+            models.Q(subject_registrations__subject__in=assigned_subjects)
+        ).distinct().first()
+        if not student:
+            return Response({'error': 'Not permitted to access this student'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.method == 'GET':
+            serializer = StudentSerializer(student, context={'request': request})
+            return Response(serializer.data)
+
+        if request.method == 'PATCH':
+            # Allow full update with StudentSerializer when staff is assigned
+            serializer = StudentSerializer(student, data=request.data, partial=True, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
+
+        if request.method == 'DELETE':
+            student.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=True, methods=['get'])
     def loan_history(self, request, pk=None):
@@ -193,9 +338,12 @@ class StaffEducationViewSet(viewsets.ModelViewSet):
         """Filter by staff if provided"""
         queryset = StaffEducation.objects.select_related('staff')
         
-        staff_id = self.request.query_params.get('staff')
-        if staff_id:
-            queryset = queryset.filter(staff_id=staff_id)
+        staff_param = self.request.query_params.get('staff')
+        if staff_param:
+            if staff_param.isdigit():
+                queryset = queryset.filter(staff_id=staff_param)
+            else:
+                queryset = queryset.filter(staff__staff_id=staff_param)
         
         return queryset
 
@@ -250,9 +398,12 @@ class StaffSalaryViewSet(viewsets.ModelViewSet):
             'assigned_by'
         )
         
-        staff_id = self.request.query_params.get('staff')
-        if staff_id:
-            queryset = queryset.filter(staff_id=staff_id)
+        staff_param = self.request.query_params.get('staff')
+        if staff_param:
+            if staff_param.isdigit():
+                queryset = queryset.filter(staff_id=staff_param)
+            else:
+                queryset = queryset.filter(staff__staff_id=staff_param)
         
         return queryset
     
@@ -267,7 +418,7 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
     """
     queryset = SalaryPayment.objects.all()
     serializer_class = SalaryPaymentSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter by various parameters"""
@@ -277,6 +428,10 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
             'salary_grade',
             'processed_by'
         )
+        # If user is staff, restrict to their own payments only
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            queryset = queryset.filter(staff__user=user)
         
         # Filter by staff
         staff_id = self.request.query_params.get('staff')

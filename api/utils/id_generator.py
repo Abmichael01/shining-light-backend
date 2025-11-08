@@ -9,6 +9,7 @@ from django.db import models
 # Model prefixes for different entities
 MODEL_PREFIXES = {
     'EXAM': 'EXM',
+    'ASSIGNMENT': 'ASM',
     'STUDENT': 'STU',
     'TEACHER': 'TCH',
     'CLASS': 'CLS',
@@ -60,6 +61,10 @@ def generate_readable_id(model_type, instance_id=None):
 def generate_exam_id(exam_id=None):
     """Generate exam ID like EXM-IEE83U7"""
     return generate_readable_id('EXAM', exam_id)
+
+def generate_assignment_id(assignment_id=None):
+    """Generate assignment ID like ASM-IEE83U7"""
+    return generate_readable_id('ASSIGNMENT', assignment_id)
 
 
 def generate_student_id(student_id=None):

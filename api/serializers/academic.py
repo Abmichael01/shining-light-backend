@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Assignment, Staff
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -15,10 +15,11 @@ class ClassSerializer(serializers.ModelSerializer):
     """Serializer for Class model"""
     school_name = serializers.CharField(source='school.name', read_only=True)
     school = serializers.CharField()  # Accepts school code (string)
+    assigned_teachers = serializers.PrimaryKeyRelatedField(many=True, queryset=Staff.objects.all(), required=False)
     
     class Meta:
         model = Class
-        fields = ['id', 'name', 'class_code', 'school', 'school_name', 'class_staff', 'order', 'created_at']
+        fields = ['id', 'name', 'class_code', 'school', 'school_name', 'class_staff', 'assigned_teachers', 'order', 'created_at']
         read_only_fields = ['id', 'created_at']
     
     def to_representation(self, instance):
@@ -31,18 +32,26 @@ class ClassSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         """Handle school code to instance conversion"""
         from api.models import School
+        assigned = validated_data.pop('assigned_teachers', [])
         school_code = validated_data.pop('school')
         school = School.objects.get(pk=school_code)
         validated_data['school'] = school
-        return super().create(validated_data)
+        instance = super().create(validated_data)
+        if assigned:
+            instance.assigned_teachers.set(assigned)
+        return instance
     
     def update(self, instance, validated_data):
         """Handle school code to instance conversion"""
         from api.models import School
+        assigned = validated_data.pop('assigned_teachers', None)
         if 'school' in validated_data:
             school_code = validated_data.pop('school')
             validated_data['school'] = School.objects.get(pk=school_code)
-        return super().update(instance, validated_data)
+        instance = super().update(instance, validated_data)
+        if assigned is not None:
+            instance.assigned_teachers.set(assigned)
+        return instance
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -79,13 +88,14 @@ class SubjectSerializer(serializers.ModelSerializer):
     subject_group_name = serializers.CharField(source='subject_group.name', read_only=True, allow_null=True)
     school = serializers.CharField()  # Accepts school code (string)
     class_model = serializers.CharField()  # Accepts class code (string)
+    assigned_teachers = serializers.PrimaryKeyRelatedField(many=True, queryset=Staff.objects.all(), required=False)
     
     class Meta:
         model = Subject
         fields = [
             'id', 'name', 'code', 'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'subject_group', 'subject_group_name',
-            'order', 'ca_max', 'exam_max', 'created_at'
+            'order', 'ca_max', 'exam_max', 'assigned_teachers', 'created_at'
         ]
         read_only_fields = ['id', 'code', 'created_at']
     
@@ -112,7 +122,11 @@ class SubjectSerializer(serializers.ModelSerializer):
         validated_data['class_model'] = class_instance
         validated_data['school'] = class_instance.school
         
-        return super().create(validated_data)
+        assigned = validated_data.pop('assigned_teachers', [])
+        instance = super().create(validated_data)
+        if assigned:
+            instance.assigned_teachers.set(assigned)
+        return instance
     
     def update(self, instance, validated_data):
         """Handle code to instance conversions"""
@@ -127,8 +141,11 @@ class SubjectSerializer(serializers.ModelSerializer):
             class_instance = Class.objects.get(pk=class_code)
             validated_data['class_model'] = class_instance
             validated_data['school'] = class_instance.school
-        
-        return super().update(instance, validated_data)
+        assigned = validated_data.pop('assigned_teachers', None)
+        instance = super().update(instance, validated_data)
+        if assigned is not None:
+            instance.assigned_teachers.set(assigned)
+        return instance
     
     def get_class_name(self, obj):
         """Get class name"""
@@ -331,4 +348,25 @@ class ExamSerializer(serializers.ModelSerializer):
             formatted_questions.append(formatted_question)
         
         return formatted_questions
+
+
+class AssignmentSerializer(serializers.ModelSerializer):
+    """Serializer for Assignment model (simplified vs exams)"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    created_by_name = serializers.SerializerMethodField()
+    question_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Assignment
+        fields = [
+            'id', 'title', 'subject', 'subject_name', 'questions', 'due_date',
+            'instructions', 'status', 'question_count', 'created_by', 'created_by_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'question_count', 'created_by', 'created_at', 'updated_at']
+
+    def get_created_by_name(self, obj):
+        if obj.created_by:
+            return obj.created_by.email
+        return None
 

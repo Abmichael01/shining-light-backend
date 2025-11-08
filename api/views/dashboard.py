@@ -5,7 +5,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import Student, School, FeePayment
+from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff
+from django.db import models
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from datetime import datetime, timedelta
@@ -140,4 +141,103 @@ def payment_growth_chart(request):
         chart_data = result
     
     return Response(chart_data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_dashboard_stats(request):
+    """
+    Dashboard stats for staff - scoped to:
+    - Classes where the user is class_staff OR in Class.assigned_teachers
+    - Subjects directly assigned to the staff via Subject.assigned_teachers
+
+    Totals are computed over the UNION of:
+    - Students in assigned classes
+    - Students registered in assigned subjects
+    """
+    user = request.user
+
+    # Resolve staff profile (may be None if user has no Staff profile)
+    staff = Staff.objects.filter(user=user).first()
+
+    # Classes assigned either directly (class_staff) or via M2M assigned_teachers
+    assigned_classes = Class.objects.filter(
+        models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+    ).distinct()
+
+    # Subjects: all subjects in assigned classes OR directly assigned subjects
+    assigned_subjects = Subject.objects.filter(
+        models.Q(class_model__in=assigned_classes)
+    )
+    if staff is not None:
+        assigned_subjects = assigned_subjects | Subject.objects.filter(assigned_teachers=staff)
+    assigned_subjects = assigned_subjects.distinct()
+
+    # Students in assigned classes
+    students_in_classes = Student.objects.filter(
+        class_model__in=assigned_classes,
+    )
+
+    # Students in assigned subjects (via registration)
+    students_in_subjects = Student.objects.filter(
+        subject_registrations__subject__in=assigned_subjects,
+    )
+
+    # Union of both sets
+    visible_students = (students_in_classes | students_in_subjects).distinct()
+
+    total_students = visible_students.count()
+
+    # Subjects total across assigned scope
+    total_subjects = assigned_subjects.count()
+
+    today = datetime.now().date()
+    new_assignments = Assignment.objects.filter(
+        subject__in=assigned_subjects,
+        status='published',
+        due_date__isnull=False,
+        due_date__lte=today
+    ).count()
+
+    # Gender breakdown from biodata over visible students
+    total_female = visible_students.filter(biodata__gender='female').count()
+    total_male = visible_students.filter(biodata__gender='male').count()
+
+    return Response({
+        'total_students': total_students,
+        'total_subjects': total_subjects,
+        'new_assignments_to_check': new_assignments,
+        'classes_assigned': assigned_classes.count(),
+        'total_female': total_female,
+        'total_male': total_male,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_recent_assignments(request):
+    """
+    Recent assignments for staff (latest 5) scoped to:
+    - Subjects in assigned classes
+    - Subjects directly assigned to the staff
+    """
+    user = request.user
+    staff = Staff.objects.filter(user=user).first()
+    assigned_classes = Class.objects.filter(
+        models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+    ).distinct()
+    subjects_scope = Subject.objects.filter(class_model__in=assigned_classes)
+    if staff is not None:
+        subjects_scope = (subjects_scope | Subject.objects.filter(assigned_teachers=staff)).distinct()
+
+    assignments = (
+        Assignment.objects
+        .filter(subject__in=subjects_scope)
+        .select_related('subject')
+        .order_by('-created_at')[:5]
+    )
+
+    from api.serializers.academic import AssignmentSerializer
+    data = AssignmentSerializer(assignments, many=True).data
+    return Response(data)
 

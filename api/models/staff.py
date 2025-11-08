@@ -154,13 +154,6 @@ class Staff(models.Model):
         """Validate staff data"""
         super().clean()
         
-        # Validate assigned class belongs to school
-        if self.assigned_class:
-            if self.assigned_class.school != self.school:
-                raise ValidationError({
-                    'assigned_class': 'Assigned class must belong to the same school as the staff member.'
-                })
-        
         # Validate date of birth
         if self.date_of_birth:
             age = (timezone.now().date() - self.date_of_birth).days / 365.25
@@ -306,7 +299,9 @@ class StaffSalary(models.Model):
         super().clean()
         
         # Ensure salary grade belongs to the same school
-        if self.salary_grade.school != self.staff.school:
+        grade_school = getattr(self.salary_grade, 'school', None)
+        staff_school = getattr(self.staff, 'school', None)
+        if grade_school and staff_school and grade_school != staff_school:
             raise ValidationError({
                 'salary_grade': 'Salary grade must belong to the same school as the staff member.'
             })

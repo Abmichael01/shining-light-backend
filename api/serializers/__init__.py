@@ -12,7 +12,8 @@ from .academic import (
     QuestionSerializer,
     QuestionListSerializer,
     ClubSerializer,
-    ExamSerializer
+    ExamSerializer,
+    AssignmentSerializer
 )
 from .student import (
     StudentSerializer,
@@ -28,6 +29,7 @@ from .staff import (
     StaffSerializer,
     StaffListSerializer,
     StaffRegistrationSerializer,
+    StaffPortalUpdateSerializer,
     StaffEducationSerializer,
     SalaryGradeSerializer,
     StaffSalarySerializer,
@@ -58,6 +60,7 @@ __all__ = [
     'QuestionListSerializer',
     'ClubSerializer',
     'ExamSerializer',
+    'AssignmentSerializer',
     'StudentSerializer',
     'StudentListSerializer',
     'StudentRegistrationSerializer',
@@ -70,6 +73,7 @@ __all__ = [
     'StaffListSerializer',
     'StaffRegistrationSerializer',
     'StaffEducationSerializer',
+    'StaffPortalUpdateSerializer',
     'SalaryGradeSerializer',
     'StaffSalarySerializer',
     'SalaryPaymentSerializer',

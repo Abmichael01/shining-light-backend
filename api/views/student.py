@@ -16,7 +16,8 @@ from api.serializers import (
     BiometricSerializer,
     StudentSubjectSerializer
 )
-from api.permissions import IsSchoolAdmin
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff
+from api.models import Class as ClassModelAlias, Subject as SubjectModelAlias, Staff as StaffModelAlias
 
 
 class StudentViewSet(viewsets.ModelViewSet):
@@ -234,11 +235,24 @@ class GuardianViewSet(viewsets.ModelViewSet):
     """ViewSet for Guardian CRUD operations"""
     queryset = Guardian.objects.all().order_by('-is_primary_contact', 'guardian_type')
     serializer_class = GuardianSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter by student if provided"""
         queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            staff = StaffModelAlias.objects.filter(user=user).first()
+            assigned_classes = ClassModelAlias.objects.filter(
+                models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+            ).distinct()
+            assigned_subjects = SubjectModelAlias.objects.none()
+            if staff:
+                assigned_subjects = SubjectModelAlias.objects.filter(assigned_teachers=staff)
+            queryset = queryset.filter(
+                models.Q(student__class_model__in=assigned_classes) |
+                models.Q(student__subject_registrations__subject__in=assigned_subjects)
+            ).distinct()
         student = self.request.query_params.get('student', None)
         if student:
             queryset = queryset.filter(student=student)
@@ -249,12 +263,25 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """ViewSet for Document CRUD operations"""
     queryset = Document.objects.all().order_by('-uploaded_at')
     serializer_class = DocumentSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
         """Filter by student if provided"""
         queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            staff = StaffModelAlias.objects.filter(user=user).first()
+            assigned_classes = ClassModelAlias.objects.filter(
+                models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+            ).distinct()
+            assigned_subjects = SubjectModelAlias.objects.none()
+            if staff:
+                assigned_subjects = SubjectModelAlias.objects.filter(assigned_teachers=staff)
+            queryset = queryset.filter(
+                models.Q(student__class_model__in=assigned_classes) |
+                models.Q(student__subject_registrations__subject__in=assigned_subjects)
+            ).distinct()
         student = self.request.query_params.get('student', None)
         if student:
             queryset = queryset.filter(student=student)
@@ -281,12 +308,25 @@ class BiometricViewSet(viewsets.ModelViewSet):
     """ViewSet for Biometric CRUD operations"""
     queryset = Biometric.objects.all().order_by('-captured_at')
     serializer_class = BiometricSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
         """Filter by student if provided"""
         queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            staff = StaffModelAlias.objects.filter(user=user).first()
+            assigned_classes = ClassModelAlias.objects.filter(
+                models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+            ).distinct()
+            assigned_subjects = SubjectModelAlias.objects.none()
+            if staff:
+                assigned_subjects = SubjectModelAlias.objects.filter(assigned_teachers=staff)
+            queryset = queryset.filter(
+                models.Q(student__class_model__in=assigned_classes) |
+                models.Q(student__subject_registrations__subject__in=assigned_subjects)
+            ).distinct()
         student = self.request.query_params.get('student', None)
         if student:
             queryset = queryset.filter(student=student)
@@ -303,11 +343,24 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         'student', 'subject', 'session', 'session_term', 'grade'
     ).all().order_by('-registered_at')
     serializer_class = StudentSubjectSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter by student, subject, or session"""
         queryset = super().get_queryset()
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            staff = StaffModelAlias.objects.filter(user=user).first()
+            assigned_classes = ClassModelAlias.objects.filter(
+                models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
+            ).distinct()
+            assigned_subjects = SubjectModelAlias.objects.none()
+            if staff:
+                assigned_subjects = SubjectModelAlias.objects.filter(assigned_teachers=staff)
+            queryset = queryset.filter(
+                models.Q(student__class_model__in=assigned_classes) |
+                models.Q(student__subject_registrations__subject__in=assigned_subjects)
+            ).distinct()
         
         student = self.request.query_params.get('student', None)
         if student:

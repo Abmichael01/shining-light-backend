@@ -4,7 +4,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Student, StudentExam, StudentAnswer
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Assignment, Student, StudentExam, StudentAnswer
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -18,9 +18,10 @@ from api.serializers import (
     QuestionSerializer,
     QuestionListSerializer,
     ClubSerializer,
-    ExamSerializer
+    ExamSerializer,
+    AssignmentSerializer
 )
-from api.permissions import IsSchoolAdmin
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff
 from datetime import date
 
 
@@ -59,7 +60,8 @@ class SessionViewSet(viewsets.ModelViewSet):
     """
     queryset = Session.objects.all().order_by('-start_date')
     serializer_class = SessionSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         """Filter and search sessions"""
@@ -122,7 +124,8 @@ class SessionTermViewSet(viewsets.ModelViewSet):
     """
     queryset = SessionTerm.objects.all().order_by('-session__start_date', 'term_name')
     serializer_class = SessionTermSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         """Filter by session if provided"""
@@ -400,7 +403,8 @@ class ClubViewSet(viewsets.ModelViewSet):
     """
     queryset = Club.objects.all().order_by('name')
     serializer_class = ClubSerializer
-    permission_classes = [IsAuthenticated, IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsAuthenticated, IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         """Filter clubs by search parameter"""
@@ -497,6 +501,57 @@ class ExamViewSet(viewsets.ModelViewSet):
         # Update other fields
         self.perform_update(serializer)
         
+        return Response(serializer.data)
+
+
+class AssignmentViewSet(viewsets.ModelViewSet):
+    """ViewSet for Assignment CRUD operations (admin or staff)"""
+    queryset = Assignment.objects.select_related(
+        'subject', 'subject__school', 'subject__class_model', 'created_by'
+    ).prefetch_related('questions').all().order_by('-created_at')
+    serializer_class = AssignmentSerializer
+    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Filter by subject
+        subject = self.request.query_params.get('subject')
+        if subject:
+            queryset = queryset.filter(subject=subject)
+        # Filter by status
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        # Search
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                models.Q(title__icontains=search) |
+                models.Q(subject__name__icontains=search) |
+                models.Q(instructions__icontains=search)
+            )
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        questions_data = request.data.get('questions', [])
+        assignment = serializer.save(created_by=request.user)
+        if questions_data:
+            assignment.questions.set(questions_data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=kwargs.get('partial', False))
+        serializer.is_valid(raise_exception=True)
+        questions_data = request.data.get('questions', None)
+        if questions_data is not None:
+            instance.questions.set(questions_data)
+        self.perform_update(serializer)
         return Response(serializer.data)
 
 
