@@ -53,11 +53,13 @@ class StaffListSerializer(serializers.ModelSerializer):
     zone_display = serializers.CharField(source='get_zone_display', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     id = serializers.CharField(source='staff_id', read_only=True)
+    staff_pk = serializers.IntegerField(source='pk', read_only=True)
     
     class Meta:
         model = Staff
         fields = [
             'id',
+            'staff_pk',
             'staff_id',
             'full_name',
             'email',
@@ -106,12 +108,14 @@ class StaffSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     education_records = StaffEducationSerializer(many=True, read_only=True)
     id = serializers.CharField(source='staff_id', read_only=True)
+    staff_pk = serializers.IntegerField(source='pk', read_only=True)
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = Staff
         fields = [
             'id',
+            'staff_pk',
             'staff_id',
             'user',
             'title',

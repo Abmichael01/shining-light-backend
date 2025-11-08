@@ -16,10 +16,11 @@ class ClassSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.name', read_only=True)
     school = serializers.CharField()  # Accepts school code (string)
     assigned_teachers = serializers.PrimaryKeyRelatedField(many=True, queryset=Staff.objects.all(), required=False)
+    assigned_teachers_details = serializers.SerializerMethodField()
     
     class Meta:
         model = Class
-        fields = ['id', 'name', 'class_code', 'school', 'school_name', 'class_staff', 'assigned_teachers', 'order', 'created_at']
+        fields = ['id', 'name', 'class_code', 'school', 'school_name', 'class_staff', 'assigned_teachers', 'assigned_teachers_details', 'order', 'created_at']
         read_only_fields = ['id', 'created_at']
     
     def to_representation(self, instance):
@@ -52,6 +53,17 @@ class ClassSerializer(serializers.ModelSerializer):
         if assigned is not None:
             instance.assigned_teachers.set(assigned)
         return instance
+
+    def get_assigned_teachers_details(self, obj):
+        details = []
+        for teacher in obj.assigned_teachers.all():
+            details.append({
+                'staff_pk': teacher.pk,
+                'staff_id': teacher.staff_id,
+                'full_name': teacher.get_full_name(),
+                'email': teacher.user.email if teacher.user else None,
+            })
+        return details
 
 
 class DepartmentSerializer(serializers.ModelSerializer):
@@ -89,13 +101,14 @@ class SubjectSerializer(serializers.ModelSerializer):
     school = serializers.CharField()  # Accepts school code (string)
     class_model = serializers.CharField()  # Accepts class code (string)
     assigned_teachers = serializers.PrimaryKeyRelatedField(many=True, queryset=Staff.objects.all(), required=False)
+    assigned_teachers_details = serializers.SerializerMethodField()
     
     class Meta:
         model = Subject
         fields = [
             'id', 'name', 'code', 'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'subject_group', 'subject_group_name',
-            'order', 'ca_max', 'exam_max', 'assigned_teachers', 'created_at'
+            'order', 'ca_max', 'exam_max', 'assigned_teachers', 'assigned_teachers_details', 'created_at'
         ]
         read_only_fields = ['id', 'code', 'created_at']
     
@@ -150,6 +163,17 @@ class SubjectSerializer(serializers.ModelSerializer):
     def get_class_name(self, obj):
         """Get class name"""
         return obj.class_model.name
+
+    def get_assigned_teachers_details(self, obj):
+        details = []
+        for teacher in obj.assigned_teachers.all():
+            details.append({
+                'staff_pk': teacher.pk,
+                'staff_id': teacher.staff_id,
+                'full_name': teacher.get_full_name(),
+                'email': teacher.user.email if teacher.user else None,
+            })
+        return details
 
 
 class TopicSerializer(serializers.ModelSerializer):
