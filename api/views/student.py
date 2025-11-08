@@ -389,6 +389,65 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             raise PermissionDenied('Only administrators can remove subject registrations.')
         super().perform_destroy(instance)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsSchoolAdmin], url_path='bulk_register')
+    def bulk_register(self, request):
+        """
+        Bulk register multiple subjects for a student within a single session.
+        Expects payload with: student (id), session (id), optional session_term, and subjects (list of ids/codes).
+        """
+        student_id = request.data.get('student')
+        session_id = request.data.get('session')
+        session_term_id = request.data.get('session_term')
+        subjects = request.data.get('subjects', [])
+
+        if not student_id or not session_id:
+            return Response({
+                'detail': 'student and session are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not isinstance(subjects, (list, tuple)) or len(subjects) == 0:
+            return Response({
+                'detail': 'subjects must be a non-empty list.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        created_items = []
+        errors = []
+
+        with transaction.atomic():
+            for subject in subjects:
+                subject_id = subject
+                try:
+                    exists = StudentSubject.objects.filter(
+                        student_id=student_id,
+                        subject_id=subject_id,
+                        session_id=session_id
+                    ).exists()
+                    if exists:
+                        errors.append(f'Subject {subject_id} already registered for this session.')
+                        continue
+
+                    registration = StudentSubject.objects.create(
+                        student_id=student_id,
+                        subject_id=subject_id,
+                        session_id=session_id,
+                        session_term_id=session_term_id or None,
+                        is_active=True
+                    )
+                    created_items.append(registration)
+                except Exception as exc:
+                    errors.append(str(exc))
+
+        serializer = StudentSubjectSerializer(created_items, many=True, context={'request': request})
+
+        response_data = {
+            'registered': len(created_items),
+            'errors': errors,
+            'data': serializer.data
+        }
+
+        status_code = status.HTTP_201_CREATED if created_items else status.HTTP_400_BAD_REQUEST
+        return Response(response_data, status=status_code)
+
     @action(detail=True, methods=['post'], permission_classes=[IsSchoolAdmin])
     def mark_clear(self, request, pk=None):
         """Allow administrators to mark a subject registration as cleared/uncleared."""
