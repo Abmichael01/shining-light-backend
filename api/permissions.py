@@ -8,11 +8,14 @@ class IsSchoolAdmin(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return (
-            request.user and
-            request.user.is_authenticated and
-            request.user.user_type == 'admin'
-        )
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        if getattr(user, 'is_superuser', False):
+            return True
+
+        return getattr(user, 'user_type', None) == 'admin'
 
 
 class IsSchoolAdminOrReadOnly(permissions.BasePermission):

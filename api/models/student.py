@@ -586,6 +586,24 @@ class StudentSubject(models.Model):
         related_name='student_subjects_cleared',
         verbose_name=_('cleared by')
     )
+
+    # Open Day clearance (staff-facing)
+    openday_cleared = models.BooleanField(_('open day cleared'), default=False)
+    openday_cleared_at = models.DateTimeField(_('open day cleared at'), null=True, blank=True)
+    openday_cleared_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='open_day_cleared_subjects',
+        verbose_name=_('open day cleared by')
+    )
+    openday_clearance_notes = models.TextField(_('open day clearance notes'), blank=True)
+    openday_clearance_checklist = models.JSONField(
+        _('open day clearance checklist'),
+        blank=True,
+        default=dict
+    )
     
     # Result/Assessment Scores
     ca_score = models.DecimalField(
@@ -692,15 +710,28 @@ class StudentSubject(models.Model):
             if self.total_score is not None:
                 self.grade = self.calculate_grade()
         
-        # Manage cleared metadata
+        # Manage admin clearance metadata
         if self.cleared:
             if self.cleared_at is None:
                 self.cleared_at = timezone.now()
+            if self.cleared_by_id is None:
+                self.cleared_by = self.cleared_by or None
         else:
-            # Reset metadata when un-clearing
             self.cleared_at = None
             self.cleared_by = None
-        
+
+        # Manage open day clearance metadata
+        if self.openday_cleared:
+            if self.openday_cleared_at is None:
+                self.openday_cleared_at = timezone.now()
+            if self.openday_clearance_checklist is None:
+                self.openday_clearance_checklist = {}
+        else:
+            self.openday_cleared_at = None
+            self.openday_cleared_by = None
+            self.openday_clearance_notes = ''
+            self.openday_clearance_checklist = {}
+ 
         super().save(*args, **kwargs)
     
     def clean(self):

@@ -338,31 +338,11 @@ def staff_student_detail_update(request, student_id):
             serializer = StudentSerializer(student, context={'request': request})
             return Response(serializer.data)
 
-        if request.method == 'PATCH':
-            # Allow full update with StudentSerializer when staff is assigned
-            serializer = StudentSerializer(student, data=request.data, partial=True, context={'request': request})
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response(serializer.data)
-
-        if request.method == 'DELETE':
-            student.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
-        return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        # Staff portal is read-only for student details
+        return Response({'error': 'You are not permitted to modify student records.'}, status=status.HTTP_403_FORBIDDEN)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    @action(detail=True, methods=['get'])
-    def loan_history(self, request, pk=None):
-        """
-        Get loan application history for a staff member
-        """
-        staff = self.get_object()
-        loans = LoanApplication.objects.filter(staff=staff).order_by('-application_date')
-        serializer = LoanApplicationSerializer(loans, many=True)
-        return Response(serializer.data)
-
 
 class StaffEducationViewSet(viewsets.ModelViewSet):
     """

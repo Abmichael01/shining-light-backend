@@ -90,13 +90,17 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     grade_name = serializers.CharField(source='grade.grade_name', read_only=True, allow_null=True)
     grade_description = serializers.CharField(source='grade.grade_description', read_only=True, allow_null=True)
     cleared_by_name = serializers.CharField(source='cleared_by.email', read_only=True, allow_null=True)
+    openday_cleared_by_name = serializers.CharField(source='openday_cleared_by.email', read_only=True, allow_null=True)
     
     class Meta:
         model = StudentSubject
         fields = [
             'id', 'student', 'subject', 'subject_name', 'subject_code',
             'session', 'session_name', 'session_term', 'term_name',
-            'is_active', 'cleared', 'cleared_at', 'cleared_by', 'cleared_by_name',
+            'is_active',
+            'cleared', 'cleared_at', 'cleared_by', 'cleared_by_name',
+            'openday_cleared', 'openday_cleared_at', 'openday_cleared_by',
+            'openday_cleared_by_name', 'openday_clearance_notes', 'openday_clearance_checklist',
             # Result fields
             'ca_score', 'exam_score', 'total_score', 
             'grade', 'grade_name', 'grade_description',
@@ -108,7 +112,8 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             'id', 'registered_at', 'updated_at', 'total_score',
             'subject_name', 'subject_code', 'session_name', 'term_name',
             'grade', 'grade_name', 'grade_description',
-            'cleared_at', 'cleared_by', 'cleared_by_name'
+            'cleared_at', 'cleared_by', 'cleared_by_name',
+            'openday_cleared_at', 'openday_cleared_by', 'openday_cleared_by_name'
         ]
 
 

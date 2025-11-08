@@ -2,6 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404
 from django.db import transaction, models
 from django.utils import timezone
@@ -375,15 +376,25 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(session=session)
         
         return queryset
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminOrStaff])
-    def clear(self, request, pk=None):
-        """
-        Mark or unmark a student's subject as cleared by staff/admin.
-        """
+
+    def perform_update(self, serializer):
+        user = self.request.user
+        if getattr(user, 'user_type', None) != 'admin':
+            raise PermissionDenied('Only administrators can update results.')
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        user = self.request.user
+        if getattr(user, 'user_type', None) != 'admin':
+            raise PermissionDenied('Only administrators can remove subject registrations.')
+        super().perform_destroy(instance)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsSchoolAdmin])
+    def mark_clear(self, request, pk=None):
+        """Allow administrators to mark a subject registration as cleared/uncleared."""
         student_subject = self.get_object()
         cleared_value = request.data.get('cleared', True)
-        cleared = str(cleared_value).lower() not in ['false', '0', 'no']
+        cleared = str(cleared_value).lower() not in ['false', '0', 'no', 'none']
 
         if cleared:
             student_subject.cleared = True
@@ -394,65 +405,52 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             student_subject.cleared_by = None
             student_subject.cleared_at = None
 
-        student_subject.save(update_fields=['cleared', 'cleared_by', 'cleared_at', 'updated_at'])
+        student_subject.save(update_fields=[
+            'cleared',
+            'cleared_by',
+            'cleared_at',
+            'updated_at'
+        ])
+
         serializer = self.get_serializer(student_subject)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    @action(detail=False, methods=['post'])
-    def bulk_register(self, request):
-        """
-        Register a student for multiple subjects at once
-        Expects: { student: id, session: id, session_term: id (optional), subjects: [id1, id2, ...] }
-        """
-        student_id = request.data.get('student')
-        session_id = request.data.get('session')
-        session_term_id = request.data.get('session_term')
-        subject_ids = request.data.get('subjects', [])
-        
-        if not all([student_id, session_id, subject_ids]):
-            return Response(
-                {'detail': 'student, session, and subjects are required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        created_registrations = []
-        errors = []
-        
-        with transaction.atomic():
-            for subject_id in subject_ids:
-                try:
-                    # Check if already registered
-                    existing = StudentSubject.objects.filter(
-                        student_id=student_id,
-                        subject_id=subject_id,
-                        session_id=session_id
-                    ).first()
-                    
-                    if existing:
-                        errors.append(f"Already registered for {existing.subject.name}")
-                        continue
-                    
-                    # Create registration
-                    registration = StudentSubject.objects.create(
-                        student_id=student_id,
-                        subject_id=subject_id,
-                        session_id=session_id,
-                        session_term_id=session_term_id if session_term_id else None,
-                        is_active=True
-                    )
-                    created_registrations.append(registration)
-                except Exception as e:
-                    errors.append(str(e))
-        
-        # Return created registrations
-        serializer = StudentSubjectSerializer(created_registrations, many=True, context={'request': request})
-        
-        response_data = {
-            'registered': len(created_registrations),
-            'errors': errors,
-            'data': serializer.data
-        }
-        
-        return Response(response_data, status=status.HTTP_201_CREATED if created_registrations else status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], url_path='open-day-clear', permission_classes=[IsAdminOrStaff])
+    def open_day_clear(self, request, pk=None):
+        """Mark or unmark a student's subject as cleared for Open Day."""
+        student_subject = self.get_object()
+        data = request.data or {}
+
+        cleared_value = data.get('cleared', True)
+        cleared = str(cleared_value).lower() not in ['false', '0', 'no', 'none']
+        notes = data.get('notes', '') or ''
+        checklist = data.get('checklist') or {}
+        if not isinstance(checklist, dict):
+            checklist = {}
+
+        if cleared:
+            student_subject.openday_cleared = True
+            student_subject.openday_cleared_by = request.user
+            student_subject.openday_cleared_at = timezone.now()
+            student_subject.openday_clearance_notes = notes
+            student_subject.openday_clearance_checklist = checklist
+        else:
+            student_subject.openday_cleared = False
+            student_subject.openday_cleared_by = None
+            student_subject.openday_cleared_at = None
+            student_subject.openday_clearance_notes = ''
+            student_subject.openday_clearance_checklist = {}
+
+        student_subject.save(update_fields=[
+            'openday_cleared',
+            'openday_cleared_by',
+            'openday_cleared_at',
+            'openday_clearance_notes',
+            'openday_clearance_checklist',
+            'updated_at'
+        ])
+
+        serializer = self.get_serializer(student_subject)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
