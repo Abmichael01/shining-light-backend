@@ -204,6 +204,9 @@ class StaffPortalUpdateSerializer(serializers.ModelSerializer):
             'first_name',
             'other_names',
             'phone_number',
+            'nationality',
+            'state_of_origin',
+            'date_of_birth',
             'permanent_address',
             'marital_status',
             'religion',
@@ -342,7 +345,8 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(
             email=email,
             password=password,
-            user_type='staff'
+            user_type='staff',
+            is_staff=True
         )
         print(f"Created user: {user}")
         

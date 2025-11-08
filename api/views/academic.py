@@ -158,7 +158,7 @@ class ClassViewSet(viewsets.ModelViewSet):
     """ViewSet for Class CRUD operations"""
     queryset = Class.objects.all().order_by('school', 'order', 'name')
     serializer_class = ClassSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         queryset = super().get_queryset()

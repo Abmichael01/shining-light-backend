@@ -42,9 +42,12 @@ class IsAdminOrStaff(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        return (
-            request.user and
-            request.user.is_authenticated and
-            request.user.user_type in ['admin', 'staff']
-        )
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        
+        if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+            return True
+        
+        return getattr(user, 'user_type', None) in ['admin', 'staff']
 
