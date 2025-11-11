@@ -85,22 +85,24 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     """Serializer for StudentSubject model with results"""
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
+    subject_class_id = serializers.CharField(source='subject.class_model_id', read_only=True)
     session_name = serializers.CharField(source='session.name', read_only=True)
     term_name = serializers.CharField(source='session_term.term_name', read_only=True, allow_null=True)
     grade_name = serializers.CharField(source='grade.grade_name', read_only=True, allow_null=True)
     grade_description = serializers.CharField(source='grade.grade_description', read_only=True, allow_null=True)
     cleared_by_name = serializers.CharField(source='cleared_by.email', read_only=True, allow_null=True)
     openday_cleared_by_name = serializers.CharField(source='openday_cleared_by.email', read_only=True, allow_null=True)
+    can_open_day_clear = serializers.SerializerMethodField()
     
     class Meta:
         model = StudentSubject
         fields = [
-            'id', 'student', 'subject', 'subject_name', 'subject_code',
+            'id', 'student', 'subject', 'subject_name', 'subject_code', 'subject_class_id',
             'session', 'session_name', 'session_term', 'term_name',
             'is_active',
             'cleared', 'cleared_at', 'cleared_by', 'cleared_by_name',
             'openday_cleared', 'openday_cleared_at', 'openday_cleared_by',
-            'openday_cleared_by_name', 'openday_clearance_notes', 'openday_clearance_checklist',
+            'openday_cleared_by_name', 'openday_clearance_notes', 'openday_clearance_checklist', 'can_open_day_clear',
             # Result fields
             'ca_score', 'exam_score', 'total_score', 
             'grade', 'grade_name', 'grade_description',
@@ -113,12 +115,32 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             'subject_name', 'subject_code', 'session_name', 'term_name',
             'grade', 'grade_name', 'grade_description',
             'cleared_at', 'cleared_by', 'cleared_by_name',
-            'openday_cleared_at', 'openday_cleared_by', 'openday_cleared_by_name'
+            'openday_cleared_at', 'openday_cleared_by', 'openday_cleared_by_name', 'can_open_day_clear', 'subject_class_id'
         ]
+
+    def get_can_open_day_clear(self, obj):
+        """UI helper: whether current user can clear for Open Day for this subject."""
+        request = self.context.get('request')
+        if not request or not getattr(request, 'user', None):
+            return False
+        user = request.user
+        # Admins/superusers allowed
+        if getattr(user, 'is_superuser', False) or getattr(user, 'user_type', '') == 'admin':
+            return True
+        # Staff must be assigned
+        staff = getattr(user, 'staff_profile', None)
+        if not staff:
+            return False
+        subject = obj.subject
+        assigned_to_subject = subject.assigned_teachers.filter(pk=staff.pk).exists()
+        assigned_class_match = bool(staff.assigned_class_id) and (staff.assigned_class_id == subject.class_model_id)
+        in_class_assigned_teachers = subject.class_model.assigned_teachers.filter(pk=staff.pk).exists()
+        return assigned_to_subject or assigned_class_match or in_class_assigned_teachers
 
 
 class StudentSerializer(serializers.ModelSerializer):
     """Serializer for Student model with nested related data"""
+    student_id = serializers.CharField(source='id', read_only=True)
     biodata = BioDataSerializer(required=False)
     guardians = GuardianSerializer(many=True, read_only=True)
     documents = DocumentSerializer(many=True, read_only=True)
@@ -141,7 +163,7 @@ class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
-            'id', 'application_number', 'admission_number', 'user', 'user_email', 'email',
+            'id', 'student_id', 'application_number', 'admission_number', 'user', 'user_email', 'email',
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'former_school_attended', 'club', 'club_name',
             'status', 'source', 'full_name',
@@ -223,7 +245,8 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class StudentListSerializer(serializers.ModelSerializer):
-    """Lightweight serializer for student list view"""
+    """Condensed serializer for student lists"""
+    student_id = serializers.CharField(source='id', read_only=True)
     school_name = serializers.CharField(source='school.name', read_only=True)
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
@@ -233,7 +256,7 @@ class StudentListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
-            'id', 'application_number', 'admission_number', 'full_name',
+            'id', 'student_id', 'application_number', 'admission_number', 'full_name',
             'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
             'passport_photo',

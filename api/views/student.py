@@ -376,7 +376,7 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(session=session)
         
         return queryset
-
+    
     def perform_update(self, serializer):
         user = self.request.user
         if getattr(user, 'user_type', None) != 'admin':
@@ -412,7 +412,7 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
 
         created_items = []
         errors = []
-
+        
         with transaction.atomic():
             for subject in subjects:
                 subject_id = subject
@@ -425,7 +425,7 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                     if exists:
                         errors.append(f'Subject {subject_id} already registered for this session.')
                         continue
-
+                    
                     registration = StudentSubject.objects.create(
                         student_id=student_id,
                         subject_id=subject_id,
@@ -438,13 +438,13 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                     errors.append(str(exc))
 
         serializer = StudentSubjectSerializer(created_items, many=True, context={'request': request})
-
+        
         response_data = {
             'registered': len(created_items),
             'errors': errors,
             'data': serializer.data
         }
-
+        
         status_code = status.HTTP_201_CREATED if created_items else status.HTTP_400_BAD_REQUEST
         return Response(response_data, status=status_code)
 
@@ -478,6 +478,28 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
     def open_day_clear(self, request, pk=None):
         """Mark or unmark a student's subject as cleared for Open Day."""
         student_subject = self.get_object()
+
+        # Authorization: allow admins/superusers; staff must be assigned to the subject
+        user = request.user
+        is_admin_like = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', '') == 'admin'
+        if not is_admin_like:
+            # Staff-specific checks
+            staff_profile = getattr(user, 'staff_profile', None)
+            if staff_profile is None:
+                return Response({'detail': 'Only staff members can perform Open Day clearance.'}, status=status.HTTP_403_FORBIDDEN)
+
+            subject = student_subject.subject
+            # Conditions:
+            # 1) Staff is explicitly assigned to the subject
+            assigned_to_subject = subject.assigned_teachers.filter(pk=staff_profile.pk).exists()
+            # 2) Staff is assigned to the class of the subject (via FK)
+            assigned_class_match = bool(staff_profile.assigned_class_id) and (staff_profile.assigned_class_id == subject.class_model_id)
+            # 3) Staff is listed among the class assigned teachers (M2M)
+            in_class_assigned_teachers = subject.class_model.assigned_teachers.filter(pk=staff_profile.pk).exists()
+
+            if not (assigned_to_subject or assigned_class_match or in_class_assigned_teachers):
+                return Response({'detail': 'You are not permitted to clear this subject for Open Day.'}, status=status.HTTP_403_FORBIDDEN)
+
         data = request.data or {}
 
         cleared_value = data.get('cleared', True)

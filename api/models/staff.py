@@ -236,9 +236,9 @@ class StaffEducation(models.Model):
 
 class SalaryGrade(models.Model):
     """
-    Salary grade definitions - Grade 1 to Grade 8 (Global across all schools)
+    Salary grade definitions - Grade 1 to Grade 18 (Global across all schools)
     """
-    grade_number = models.PositiveIntegerField(unique=True, choices=[(i, f'Grade {i}') for i in range(1, 9)])
+    grade_number = models.PositiveIntegerField(unique=True, choices=[(i, f'Grade {i}') for i in range(1, 19)])
     monthly_amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True, help_text='Optional description of the grade')
     is_active = models.BooleanField(default=True)
