@@ -766,3 +766,5 @@ class StudentSubject(models.Model):
                     'exam_score': _(f'Exam score must be between 0 and {exam_max}')
                 })
 
+
+# Hello this is here to check if the code is working
