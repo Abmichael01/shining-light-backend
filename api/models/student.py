@@ -580,7 +580,7 @@ class StudentSubject(models.Model):
     cleared_at = models.DateTimeField(_('cleared at'), null=True, blank=True)
     cleared_by = models.ForeignKey(
         'User',
-        on_delete=models.SET_NULL,
+        on_delete=models.SET_NULL, 
         null=True,
         blank=True,
         related_name='student_subjects_cleared',
