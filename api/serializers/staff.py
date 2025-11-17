@@ -41,6 +41,23 @@ class StaffEducationSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'staff', 'created_at', 'updated_at']
+    
+    def to_representation(self, instance):
+        """Convert certificate FileField to full URL"""
+        data = super().to_representation(instance)
+        certificate_field = getattr(instance, 'certificate', None)
+        if certificate_field:
+            if hasattr(certificate_field, 'url'):
+                request = self.context.get('request') if hasattr(self, 'context') else None
+                url = certificate_field.url
+                if request:
+                    url = request.build_absolute_uri(url)
+                data['certificate'] = url
+            else:
+                data['certificate'] = certificate_field
+        else:
+            data['certificate'] = None
+        return data
 
 
 class StaffListSerializer(serializers.ModelSerializer):
@@ -368,14 +385,22 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             
             # Handle base64 certificate if present
             certificate_data = edu_data.pop('certificate', None)
-            if certificate_data and isinstance(certificate_data, str) and certificate_data.startswith('data:'):
-                # Extract base64 data
-                format, filestr = certificate_data.split(';base64,')
-                ext = format.split('/')[-1]
-                # Create file from base64
-                certificate_file = ContentFile(base64.b64decode(filestr), name=f'cert_{uuid.uuid4()}.{ext}')
-                edu_data['certificate'] = certificate_file
-                print(f"Created certificate file: {certificate_file}")
+            if certificate_data and isinstance(certificate_data, str) and certificate_data.strip() and certificate_data.startswith('data:'):
+                try:
+                    # Extract base64 data
+                    format, filestr = certificate_data.split(';base64,')
+                    ext = format.split('/')[-1]
+                    # Create file from base64
+                    certificate_file = ContentFile(base64.b64decode(filestr), name=f'cert_{uuid.uuid4()}.{ext}')
+                    edu_data['certificate'] = certificate_file
+                    print(f"Created certificate file: {certificate_file}")
+                except Exception as e:
+                    print(f"Error processing certificate for education record {i+1}: {e}")
+                    # Continue without certificate if there's an error
+                    edu_data['certificate'] = None
+            else:
+                # Explicitly set to None if no valid certificate
+                edu_data['certificate'] = None
             
             StaffEducation.objects.create(staff=staff, **edu_data)
             print(f"Created education record {i+1} for staff {staff.id}")
