@@ -321,6 +321,7 @@ class ExamSerializer(serializers.ModelSerializer):
     session_term_name = serializers.CharField(source='session_term.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     total_students = serializers.SerializerMethodField()
+    students_taken = serializers.SerializerMethodField()
     questions = serializers.SerializerMethodField()
     
     class Meta:
@@ -330,15 +331,21 @@ class ExamSerializer(serializers.ModelSerializer):
             'exam_type', 'session_term', 'session_term_name', 'duration_minutes', 'total_marks', 'pass_mark',
             'total_questions', 'shuffle_questions', 'shuffle_options', 'show_results_immediately',
             'allow_review', 'status', 'instructions', 'questions', 'created_by', 'created_by_name',
-            'total_students', 'created_at', 'updated_at'
+            'total_students', 'students_taken', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'total_students', 'students_taken']
     
     def get_total_students(self, obj):
         """Get total number of students eligible for this exam"""
         # This would need to be calculated based on the subject's class
         # For now, return a mock value
         return 0
+    
+    def get_students_taken(self, obj):
+        """Number of students who have started or completed this exam"""
+        return obj.student_attempts.filter(
+            status__in=['in_progress', 'submitted', 'graded']
+        ).count()
     
     def get_questions(self, obj):
         """Format questions with options for CBT"""
