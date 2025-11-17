@@ -237,12 +237,13 @@ class QuestionSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     school_name = serializers.CharField(source='subject.class_model.school.name', read_only=True)
     class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
+    class_id = serializers.CharField(source='subject.class_model.id', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     
     class Meta:
         model = Question
         fields = [
-            'id', 'subject', 'subject_name', 'school_name', 'class_name',
+            'id', 'subject', 'subject_name', 'school_name', 'class_name', 'class_id',
             'topic_model', 'question_text', 'question_type', 'difficulty',
             'option_a', 'option_b', 'option_c', 'option_d', 'option_e',
             'correct_answer', 'explanation', 'marks',
@@ -292,11 +293,12 @@ class QuestionListSerializer(serializers.ModelSerializer):
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     school_name = serializers.CharField(source='subject.class_model.school.name', read_only=True)
     class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
+    class_id = serializers.CharField(source='subject.class_model.id', read_only=True)
     
     class Meta:
         model = Question
         fields = [
-            'id', 'subject', 'subject_name', 'school_name', 'class_name',
+            'id', 'subject', 'subject_name', 'school_name', 'class_name', 'class_id',
             'topic_model', 'question_text', 'question_type', 'difficulty',
             'is_verified', 'usage_count', 'created_at'
         ]
