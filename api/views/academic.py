@@ -4,7 +4,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Assignment, Student, StudentExam, StudentAnswer
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, Exam, Assignment, Student, StudentExam, StudentAnswer
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -18,6 +18,7 @@ from api.serializers import (
     QuestionSerializer,
     QuestionListSerializer,
     ClubSerializer,
+    ExamHallSerializer,
     ExamSerializer,
     AssignmentSerializer
 )
@@ -415,6 +416,35 @@ class ClubViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(
                 models.Q(name__icontains=search) |
                 models.Q(description__icontains=search)
+            )
+        
+        return queryset
+
+
+class ExamHallViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for ExamHall CRUD operations
+    Only school admin users can manage exam halls
+    """
+    queryset = ExamHall.objects.all().order_by('name')
+    serializer_class = ExamHallSerializer
+    permission_classes = [IsAuthenticated, IsSchoolAdmin]
+    
+    def get_queryset(self):
+        """Filter exam halls by search and active status"""
+        queryset = super().get_queryset()
+        
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active', None)
+        if is_active is not None:
+            is_active_bool = is_active.lower() == 'true'
+            queryset = queryset.filter(is_active=is_active_bool)
+        
+        # Search
+        search = self.request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                models.Q(name__icontains=search)
             )
         
         return queryset

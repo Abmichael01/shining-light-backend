@@ -12,6 +12,8 @@ from .academic import (
     QuestionSerializer,
     QuestionListSerializer,
     ClubSerializer,
+    ExamHallSerializer,
+    CBTExamCodeSerializer,
     ExamSerializer,
     AssignmentSerializer
 )
@@ -59,6 +61,8 @@ __all__ = [
     'QuestionSerializer',
     'QuestionListSerializer',
     'ClubSerializer',
+    'ExamHallSerializer',
+    'CBTExamCodeSerializer',
     'ExamSerializer',
     'AssignmentSerializer',
     'StudentSerializer',

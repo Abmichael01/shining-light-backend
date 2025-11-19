@@ -17,6 +17,9 @@ from .models import (
     Assignment,
     StudentExam,
     StudentAnswer,
+    Club,
+    ExamHall,
+    CBTExamCode,
     Student,
     BioData,
     Guardian,
@@ -342,6 +345,90 @@ class AssignmentAdmin(admin.ModelAdmin):
         if not change and not obj.created_by:
             obj.created_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ExamHall)
+class ExamHallAdmin(admin.ModelAdmin):
+    """Admin interface for ExamHall model"""
+    
+    list_display = ['name', 'number_of_seats', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name']
+    ordering = ['name']
+    readonly_fields = ['id', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': ('name', 'number_of_seats', 'is_active')
+        }),
+        (_('Metadata'), {
+            'fields': ('id', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(CBTExamCode)
+class CBTExamCodeAdmin(admin.ModelAdmin):
+    """Admin interface for CBTExamCode model"""
+    
+    list_display = [
+        'code', 
+        'get_student_name', 
+        'exam_title_display',
+        'exam_hall_display',
+        'seat_number_display',
+        'is_used',
+        'expires_at',
+        'created_at'
+    ]
+    list_filter = ['is_used', 'exam', 'exam_hall', 'created_at', 'expires_at']
+    search_fields = [
+        'code',
+        'student__admission_number',
+        'student__biodata__surname',
+        'student__biodata__first_name',
+        'exam__title'
+    ]
+    ordering = ['-created_at']
+    readonly_fields = ['id', 'code', 'created_at', 'used_at']
+    
+    fieldsets = (
+        (_('Passcode Information'), {
+            'fields': ('code', 'student', 'exam')
+        }),
+        (_('Hall Assignment'), {
+            'fields': ('exam_hall', 'seat_number')
+        }),
+        (_('Status'), {
+            'fields': ('is_used', 'used_at', 'expires_at')
+        }),
+        (_('Metadata'), {
+            'fields': ('id', 'created_by', 'created_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_student_name(self, obj):
+        """Get student's full name"""
+        return obj.student.get_full_name() if hasattr(obj.student, 'get_full_name') else obj.student.admission_number
+    get_student_name.short_description = 'Student'
+    get_student_name.admin_order_field = 'student__biodata__surname'
+    
+    def exam_title_display(self, obj):
+        """Display exam title"""
+        return obj.exam.title if obj.exam else '-'
+    exam_title_display.short_description = 'Exam'
+    
+    def exam_hall_display(self, obj):
+        """Display exam hall"""
+        return obj.exam_hall.name if obj.exam_hall else '-'
+    exam_hall_display.short_description = 'Hall'
+    
+    def seat_number_display(self, obj):
+        """Display seat number"""
+        return f"Seat {obj.seat_number}" if obj.seat_number else '-'
+    seat_number_display.short_description = 'Seat'
 
 
 @admin.register(StudentExam)

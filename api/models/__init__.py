@@ -14,7 +14,9 @@ from .academic import (
     Assignment,
     StudentExam,
     StudentAnswer,
-    Club
+    Club,
+    ExamHall,
+    CBTExamCode
 )
 from .student import (
     Student,
@@ -56,6 +58,8 @@ __all__ = [
     'StudentExam',
     'StudentAnswer',
     'Club',
+    'ExamHall',
+    'CBTExamCode',
     'Student',
     'BioData',
     'Guardian',

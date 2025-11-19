@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, Exam, Assignment, Staff
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -312,6 +312,37 @@ class ClubSerializer(serializers.ModelSerializer):
         model = Club
         fields = ['id', 'name', 'description', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+class ExamHallSerializer(serializers.ModelSerializer):
+    """Serializer for ExamHall model"""
+    
+    class Meta:
+        model = ExamHall
+        fields = ['id', 'name', 'number_of_seats', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class CBTExamCodeSerializer(serializers.ModelSerializer):
+    """Serializer for CBTExamCode model"""
+    student_name = serializers.SerializerMethodField()
+    student_admission_number = serializers.CharField(source='student.admission_number', read_only=True)
+    exam_title = serializers.CharField(source='exam.title', read_only=True, allow_null=True)
+    exam_hall_name = serializers.CharField(source='exam_hall.name', read_only=True, allow_null=True)
+    created_by_name = serializers.CharField(source='created_by.email', read_only=True, allow_null=True)
+    
+    class Meta:
+        model = CBTExamCode
+        fields = [
+            'id', 'code', 'exam', 'exam_title', 'student', 'student_name', 'student_admission_number',
+            'exam_hall', 'exam_hall_name', 'seat_number', 'is_used', 'used_at', 'expires_at',
+            'created_by', 'created_by_name', 'created_at'
+        ]
+        read_only_fields = ['id', 'code', 'created_at']
+    
+    def get_student_name(self, obj):
+        """Get student's full name"""
+        return obj.student.get_full_name() if hasattr(obj.student, 'get_full_name') else ''
 
 
 class ExamSerializer(serializers.ModelSerializer):

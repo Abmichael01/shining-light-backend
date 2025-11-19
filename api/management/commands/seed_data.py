@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import date, timedelta
-from api.models.academic import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question
+from api.models.academic import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, ExamHall
 from api.models.user import User
 
 
@@ -224,7 +224,28 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write(self.style.SUCCESS(f'  ✓ Grade {grade.grade_name}'))
 
-        # 8. Create Questions for Question Bank
+        # 8. Create Exam Halls
+        self.stdout.write('Creating exam halls...')
+        exam_halls_data = [
+            {'name': 'Main Hall', 'number_of_seats': 150, 'is_active': True},
+            {'name': 'Block A Hall', 'number_of_seats': 80, 'is_active': True},
+            {'name': 'Library Hall', 'number_of_seats': 60, 'is_active': True},
+        ]
+        
+        for hall_data in exam_halls_data:
+            hall, created = ExamHall.objects.get_or_create(
+                name=hall_data['name'],
+                defaults={
+                    'number_of_seats': hall_data['number_of_seats'],
+                    'is_active': hall_data['is_active']
+                }
+            )
+            if created:
+                self.stdout.write(self.style.SUCCESS(f'  ✓ {hall}'))
+            else:
+                self.stdout.write(self.style.WARNING(f'  • Exists: {hall}'))
+
+        # 9. Create Questions for Question Bank
         self.stdout.write('Creating questions in question bank...')
         
         # Mathematics questions for different classes
@@ -239,6 +260,7 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'  • Schools: {len(schools)}'))
         self.stdout.write(self.style.SUCCESS(f'  • Classes: {len(classes)}'))
         self.stdout.write(self.style.SUCCESS(f'  • Subjects: {len(created_subjects)}'))
+        self.stdout.write(self.style.SUCCESS(f'  • Exam Halls: {len(exam_halls_data)}'))
         self.stdout.write(self.style.SUCCESS(f'  • Questions: {total_questions}'))
 
     def _create_math_questions(self, subjects, user):

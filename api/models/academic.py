@@ -1248,3 +1248,147 @@ class Club(models.Model):
         
         super().save(*args, **kwargs)
 
+
+class ExamHall(models.Model):
+    """Represents exam halls/rooms where examinations are conducted"""
+    
+    id = models.CharField(_('id'), max_length=15, primary_key=True, editable=False)
+    name = models.CharField(_('hall name'), max_length=100, unique=True)
+    number_of_seats = models.PositiveIntegerField(_('number of seats'), help_text=_('Total seating capacity of the exam hall'))
+    is_active = models.BooleanField(_('active'), default=True, help_text=_('Inactive halls won\'t be available for exam scheduling'))
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Exam Hall')
+        verbose_name_plural = _('Exam Halls')
+        ordering = ['name']
+    
+    def __str__(self):
+        status = 'Active' if self.is_active else 'Inactive'
+        return f"{self.name} ({self.number_of_seats} seats) - {status}"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate unique ID in format HALL-XXXXXX"""
+        if not self.id:
+            import random
+            import string
+            
+            # Generate random 6-character alphanumeric code
+            random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            self.id = f"HALL-{random_code}"
+            
+            # Ensure uniqueness
+            while ExamHall.objects.filter(id=self.id).exists():
+                random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+                self.id = f"HALL-{random_code}"
+        
+        super().save(*args, **kwargs)
+
+
+class CBTExamCode(models.Model):
+    """Stores CBT exam passcodes with exam hall and seat assignment"""
+    
+    id = models.CharField(_('id'), max_length=20, primary_key=True, editable=False)
+    code = models.CharField(_('passcode'), max_length=6, unique=True, help_text=_('6-digit passcode'))
+    exam = models.ForeignKey(
+        Exam,
+        on_delete=models.CASCADE,
+        related_name='cbt_codes',
+        verbose_name=_('exam'),
+        null=True,
+        blank=True,
+        help_text=_('Exam this code is for (if applicable)')
+    )
+    student = models.ForeignKey(
+        'Student',
+        on_delete=models.CASCADE,
+        related_name='cbt_exam_codes',
+        verbose_name=_('student'),
+        help_text=_('Student this code is assigned to')
+    )
+    exam_hall = models.ForeignKey(
+        ExamHall,
+        on_delete=models.SET_NULL,
+        related_name='cbt_codes',
+        verbose_name=_('exam hall'),
+        null=True,
+        blank=True,
+        help_text=_('Exam hall assigned to this student')
+    )
+    seat_number = models.PositiveIntegerField(
+        _('seat number'),
+        null=True,
+        blank=True,
+        help_text=_('Seat number in the exam hall')
+    )
+    is_used = models.BooleanField(_('used'), default=False, help_text=_('Whether this code has been used'))
+    used_at = models.DateTimeField(_('used at'), null=True, blank=True)
+    expires_at = models.DateTimeField(_('expires at'), help_text=_('When this passcode expires'))
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='created_cbt_codes',
+        verbose_name=_('created by')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    
+    class Meta:
+        verbose_name = _('CBT Exam Code')
+        verbose_name_plural = _('CBT Exam Codes')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['code']),
+            models.Index(fields=['student', 'is_used']),
+            models.Index(fields=['exam_hall', 'seat_number']),
+        ]
+    
+    def __str__(self):
+        status = "Used" if self.is_used else "Active"
+        hall_info = f" - {self.exam_hall.name}" if self.exam_hall else ""
+        seat_info = f" Seat {self.seat_number}" if self.seat_number else ""
+        return f"{self.code} ({self.student.admission_number}){hall_info}{seat_info} - {status}"
+    
+    def save(self, *args, **kwargs):
+        """Auto-generate unique ID if not set"""
+        if not self.id:
+            import random
+            import string
+            
+            # Generate random 8-character alphanumeric code
+            random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            self.id = f"CBTCODE-{random_code}"
+            
+            # Ensure uniqueness
+            while CBTExamCode.objects.filter(id=self.id).exists():
+                random_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+                self.id = f"CBTCODE-{random_code}"
+        
+        super().save(*args, **kwargs)
+    
+    def clean(self):
+        """Validate seat assignment"""
+        super().clean()
+        
+        # If seat number is provided, exam hall must be provided
+        if self.seat_number and not self.exam_hall:
+            raise ValidationError(_('Seat number requires an exam hall'))
+        
+        # If exam hall is provided, validate seat number doesn't exceed hall capacity
+        if self.exam_hall and self.seat_number:
+            if self.seat_number > self.exam_hall.number_of_seats:
+                raise ValidationError(
+                    _('Seat number %(seat)s exceeds hall capacity of %(capacity)s') % {
+                        'seat': self.seat_number,
+                        'capacity': self.exam_hall.number_of_seats
+                    }
+                )
+    
+    def mark_as_used(self):
+        """Mark this code as used"""
+        if not self.is_used:
+            self.is_used = True
+            self.used_at = timezone.now()
+            self.save(update_fields=['is_used', 'used_at'])
+

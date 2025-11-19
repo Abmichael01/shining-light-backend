@@ -11,6 +11,7 @@ from api.views.academic import (
     GradeViewSet,
     QuestionViewSet,
     ClubViewSet,
+    ExamHallViewSet,
     ExamViewSet,
     AssignmentViewSet,
     get_student_exams,
@@ -29,6 +30,7 @@ router.register(r'subjects', SubjectViewSet, basename='subject')
 router.register(r'topics', TopicViewSet, basename='topic')
 router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'clubs', ClubViewSet, basename='club')
+router.register(r'exam-halls', ExamHallViewSet, basename='exam-hall')
 router.register(r'exams', ExamViewSet, basename='exam')
 router.register(r'assignments', AssignmentViewSet, basename='assignment')
 

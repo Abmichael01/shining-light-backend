@@ -21,10 +21,12 @@ User = get_user_model()
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsAdminOrStaff])
 def generate_passcode(request):
-    """Generate a new CBT passcode"""
+    """Generate a new CBT passcode with optional exam and exam hall assignment"""
     try:
         student_id = request.data.get('student_id')
         expires_in_hours = request.data.get('expires_in_hours', 2)
+        exam_id = request.data.get('exam_id')
+        exam_hall_id = request.data.get('exam_hall_id')
         
         if not student_id:
             return Response(
@@ -43,11 +45,13 @@ def generate_passcode(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Generate passcode
+        # Generate passcode with exam and hall assignment
         passcode_data = CBTPasscodeService.generate_passcode(
             student_id=student_id,
             expires_in_hours=expires_in_hours,
-            created_by=request.user
+            created_by=request.user,
+            exam_id=exam_id,
+            exam_hall_id=exam_hall_id
         )
         
         return Response(passcode_data, status=status.HTTP_201_CREATED)
