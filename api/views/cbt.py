@@ -238,14 +238,31 @@ def get_passcode_stats(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminOrStaff])
 def get_all_active_passcodes(request):
-    """Get all active passcodes"""
+    """Get all active passcodes (deprecated - use get_all_passcodes)"""
     try:
-        active_passcodes = CBTPasscodeService.get_all_active_passcodes()
-        return Response(active_passcodes)
+        include_expired = request.query_params.get('include_expired', 'false').lower() == 'true'
+        passcodes = CBTPasscodeService.get_all_passcodes(include_expired=include_expired)
+        return Response(passcodes)
         
     except Exception as e:
         return Response(
-            {'error': f'Failed to get active passcodes: {str(e)}'}, 
+            {'error': f'Failed to get passcodes: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminOrStaff])
+def get_all_passcodes(request):
+    """Get all passcodes, optionally including expired ones"""
+    try:
+        include_expired = request.query_params.get('include_expired', 'true').lower() == 'true'
+        passcodes = CBTPasscodeService.get_all_passcodes(include_expired=include_expired)
+        return Response(passcodes)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get passcodes: {str(e)}'}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

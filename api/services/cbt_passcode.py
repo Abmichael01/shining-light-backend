@@ -436,22 +436,48 @@ class CBTPasscodeService:
             return None
     
     @classmethod
-    def get_all_active_passcodes(cls) -> list:
+    def get_all_passcodes(cls, include_expired: bool = False) -> list:
         """
-        Get all active passcodes (for admin view) - from database
+        Get all passcodes (for admin view) - from database
+        Can include expired passcodes if include_expired is True
+        
+        Args:
+            include_expired: If True, include expired and used passcodes
+            
+        Returns:
+            list: List of passcode dictionaries
         """
         now = timezone.now()
-        active_codes = CBTExamCode.objects.filter(
-            is_used=False,
-            expires_at__gt=now
-        ).select_related('student', 'exam', 'exam_hall', 'created_by').order_by('-created_at')
         
-        active_passcodes = []
-        for cbt_code in active_codes:
-            # Calculate time remaining
-            time_remaining = cbt_code.expires_at - now
-            hours, remainder = divmod(time_remaining.seconds, 3600)
-            minutes, _ = divmod(remainder, 60)
+        if include_expired:
+            # Get all passcodes
+            codes = CBTExamCode.objects.all()
+        else:
+            # Get only active passcodes
+            codes = CBTExamCode.objects.filter(
+                is_used=False,
+                expires_at__gt=now
+            )
+        
+        codes = codes.select_related('student', 'exam', 'exam_hall', 'created_by').order_by('-created_at')
+        
+        passcodes = []
+        for cbt_code in codes:
+            # Determine status
+            if cbt_code.is_used:
+                status = 'used'
+            elif cbt_code.expires_at <= now:
+                status = 'expired'
+            else:
+                status = 'active'
+            
+            # Calculate time remaining for active passcodes
+            time_remaining = None
+            if status == 'active':
+                time_remaining = cbt_code.expires_at - now
+                hours, remainder = divmod(time_remaining.seconds, 3600)
+                minutes, _ = divmod(remainder, 60)
+                time_remaining = f"{hours}h {minutes}m"
             
             passcode_data = {
                 'passcode': cbt_code.code,
@@ -464,6 +490,8 @@ class CBTPasscodeService:
                 'exam_hall_id': cbt_code.exam_hall.id if cbt_code.exam_hall else None,
                 'exam_hall_name': cbt_code.exam_hall.name if cbt_code.exam_hall else None,
                 'seat_number': cbt_code.seat_number,
+                'status': status,
+                'is_used': cbt_code.is_used,
                 'created_by_id': cbt_code.created_by.id if cbt_code.created_by else None,
                 'created_by_name': cbt_code.created_by.email if cbt_code.created_by else None,
                 'created_at': cbt_code.created_at.isoformat(),
