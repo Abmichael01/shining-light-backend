@@ -75,24 +75,34 @@ class CBTPasscodeService:
                         raise ValueError("Exam hall not found or inactive")
                     
                     # Find next available seat in the hall
-                    # Get all used seats for this exam and hall
+                    # Get today's date to check same-day seat assignments
+                    today = timezone.now().date()
+                    
+                    # Get all seats that are occupied on the same day (not used yet)
+                    # This ensures no two students get the same seat on the same day
+                    # Once a student finishes (is_used=True), the seat becomes available
+                    occupied_seats_today = CBTExamCode.objects.filter(
+                        exam_hall=exam_hall,
+                        created_at__date=today,
+                        is_used=False,
+                        seat_number__isnull=False
+                    ).values_list('seat_number', flat=True).distinct()
+                    
+                    # If exam is provided, also consider exam-specific seats
                     if exam:
-                        used_seats = CBTExamCode.objects.filter(
+                        exam_occupied_seats = CBTExamCode.objects.filter(
                             exam=exam,
                             exam_hall=exam_hall,
+                            created_at__date=today,
                             is_used=False,
-                            expires_at__gt=timezone.now(),
                             seat_number__isnull=False
-                        ).values_list('seat_number', flat=True)
+                        ).values_list('seat_number', flat=True).distinct()
+                        # Combine both sets
+                        used_seats = set(list(occupied_seats_today) + list(exam_occupied_seats))
                     else:
-                        used_seats = CBTExamCode.objects.filter(
-                            exam_hall=exam_hall,
-                            is_used=False,
-                            expires_at__gt=timezone.now(),
-                            seat_number__isnull=False
-                        ).values_list('seat_number', flat=True)
+                        used_seats = set(occupied_seats_today)
                     
-                    # Find first available seat
+                    # Find first available seat that is not occupied today
                     for seat in range(1, exam_hall.number_of_seats + 1):
                         if seat not in used_seats:
                             seat_number = seat
