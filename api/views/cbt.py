@@ -267,6 +267,22 @@ def get_all_passcodes(request):
         )
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsAdminOrStaff])
+def get_all_passcodes(request):
+    """Get all passcodes, optionally including expired ones"""
+    try:
+        include_expired = request.query_params.get('include_expired', 'true').lower() == 'true'
+        passcodes = CBTPasscodeService.get_all_passcodes(include_expired=include_expired)
+        return Response(passcodes)
+        
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to get passcodes: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 # CBT Session Management Endpoints
 
 @api_view(['GET'])

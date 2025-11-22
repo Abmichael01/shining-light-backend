@@ -496,13 +496,12 @@ class CBTPasscodeService:
                 'created_by_name': cbt_code.created_by.email if cbt_code.created_by else None,
                 'created_at': cbt_code.created_at.isoformat(),
                 'expires_at': cbt_code.expires_at.isoformat(),
-                'status': 'active',
-                'is_used': False,
-                'time_remaining': f"{hours}h {minutes}m"
+                'used_at': cbt_code.used_at.isoformat() if cbt_code.used_at else None,
+                'time_remaining': time_remaining
             }
-            active_passcodes.append(passcode_data)
+            passcodes.append(passcode_data)
         
-        return active_passcodes
+        return passcodes
     
     @classmethod
     def cleanup_expired_passcodes(cls):
