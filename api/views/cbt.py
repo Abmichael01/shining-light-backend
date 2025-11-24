@@ -148,12 +148,12 @@ def login_with_passcode(request):
         }, status=status.HTTP_200_OK)
         
         # Determine cookie settings based on environment
-        cookie_secure = not settings.DEBUG
+        cookie_secure = settings.ENV == 'production'
         cookie_samesite = 'None' if cookie_secure else 'Lax'
         
         # Set CBT session cookie
         response.set_cookie(
-            'cbt_session_token',
+            'cbt_session_token', 
             session_data['session_token'],
             max_age=7200,  # 2 hours
             httponly=True,
