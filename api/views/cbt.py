@@ -147,18 +147,22 @@ def login_with_passcode(request):
             }
         }, status=status.HTTP_200_OK)
         
-        # Determine cookie settings based on environment
-        cookie_secure = settings.ENV == 'production'
-        cookie_samesite = 'None' if cookie_secure else 'Lax'
+        # Determine cookie settings based on standard session config
+        cookie_kwargs = {
+            'max_age': 7200,  # 2 hours
+            'httponly': True,
+            'secure': getattr(settings, 'SESSION_COOKIE_SECURE', False),
+            'samesite': getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax'),
+        }
+        cookie_domain = getattr(settings, 'SESSION_COOKIE_DOMAIN', None)
+        if cookie_domain:
+            cookie_kwargs['domain'] = cookie_domain
         
         # Set CBT session cookie
         response.set_cookie(
-            'cbt_session_token', 
+            'cbt_session_token',
             session_data['session_token'],
-            max_age=7200,  # 2 hours
-            httponly=True,
-            secure=cookie_secure,  # HTTPS only in production
-            samesite=cookie_samesite
+            **cookie_kwargs
         )
         
         return response
@@ -355,17 +359,21 @@ def refresh_cbt_session(request):
             'session': session_data
         }, status=status.HTTP_200_OK)
         
-        cookie_secure = not settings.DEBUG
-        cookie_samesite = 'None' if cookie_secure else 'Lax'
+        cookie_kwargs = {
+            'max_age': 7200,  # 2 hours
+            'httponly': True,
+            'secure': getattr(settings, 'SESSION_COOKIE_SECURE', False),
+            'samesite': getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax'),
+        }
+        cookie_domain = getattr(settings, 'SESSION_COOKIE_DOMAIN', None)
+        if cookie_domain:
+            cookie_kwargs['domain'] = cookie_domain
         
         # Update cookie
         response.set_cookie(
             'cbt_session_token',
             session_data['session_token'],
-            max_age=7200,  # 2 hours
-            httponly=True,
-            secure=cookie_secure,
-            samesite=cookie_samesite
+            **cookie_kwargs
         )
         
         return response
@@ -402,8 +410,15 @@ def logout_cbt_session(request):
             'message': 'Session terminated successfully' if success else 'Session not found'
         }, status=status.HTTP_200_OK)
         
+        cookie_domain = getattr(settings, 'SESSION_COOKIE_DOMAIN', None)
+        cookie_samesite = getattr(settings, 'SESSION_COOKIE_SAMESITE', 'Lax')
+        
         # Clear cookie
-        response.delete_cookie('cbt_session_token')
+        response.delete_cookie(
+            'cbt_session_token',
+            domain=cookie_domain,
+            samesite=cookie_samesite
+        )
         
         return response
         
