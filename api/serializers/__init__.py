@@ -25,7 +25,8 @@ from .student import (
     GuardianSerializer,
     DocumentSerializer,
     BiometricSerializer,
-    StudentSubjectSerializer
+    StudentSubjectSerializer,
+    CBTStudentProfileSerializer
 )
 from .staff import (
     StaffSerializer,
@@ -73,6 +74,7 @@ __all__ = [
     'DocumentSerializer',
     'BiometricSerializer',
     'StudentSubjectSerializer',
+    'CBTStudentProfileSerializer',
     'StaffSerializer',
     'StaffListSerializer',
     'StaffRegistrationSerializer',

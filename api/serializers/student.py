@@ -244,6 +244,45 @@ class StudentSerializer(serializers.ModelSerializer):
         return all(getattr(reg, 'cleared', False) for reg in registrations)
 
 
+class CBTStudentProfileSerializer(serializers.ModelSerializer):
+    """Serializer for lightweight CBT student profile"""
+    student_id = serializers.CharField(source='id', read_only=True)
+    full_name = serializers.SerializerMethodField()
+    class_name = serializers.CharField(source='class_model.name', read_only=True)
+    school_name = serializers.CharField(source='school.name', read_only=True)
+    current_exam_seat = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Student
+        fields = [
+            'student_id',
+            'admission_number',
+            'full_name',
+            'class_name',
+            'school_name',
+            'current_exam_seat'
+        ]
+        read_only_fields = fields
+
+    def get_full_name(self, obj):
+        """Return student's full name"""
+        return obj.get_full_name()
+
+    def get_current_exam_seat(self, obj):
+        """Return latest CBT seat assignment if available"""
+        latest_code = obj.cbt_exam_codes.filter(is_used=True).order_by('-used_at').first()
+        if not latest_code:
+            return None
+        return {
+            'exam_id': latest_code.exam.id if latest_code.exam else None,
+            'exam_title': latest_code.exam.title if latest_code.exam else None,
+            'exam_hall_id': latest_code.exam_hall.id if latest_code.exam_hall else None,
+            'exam_hall_name': latest_code.exam_hall.name if latest_code.exam_hall else None,
+            'seat_number': latest_code.seat_number,
+            'used_at': latest_code.used_at.isoformat() if latest_code.used_at else None,
+        }
+
+
 class StudentListSerializer(serializers.ModelSerializer):
     """Condensed serializer for student lists"""
     student_id = serializers.CharField(source='id', read_only=True)

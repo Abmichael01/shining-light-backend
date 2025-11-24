@@ -9,6 +9,7 @@ from api.permissions import IsAdminOrStaff
 from api.authentication import CBTSessionAuthentication
 from api.models import Exam, Student, Subject, Question
 from api.serializers.academic import ExamSerializer, QuestionSerializer
+from api.serializers.student import CBTStudentProfileSerializer
 from django.utils import timezone
 from django.conf import settings
 import random
@@ -94,18 +95,28 @@ def login_with_passcode(request):
         
         # No password check needed - passcode is sufficient
         
-        # Validate passcode
-        passcode_data = CBTPasscodeService.validate_passcode(
-            passcode=passcode,
-            student_id=str(student.id)
-        )
+        try:
+            passcode_data = CBTPasscodeService.validate_passcode(
+                passcode=passcode,
+                student_id=str(student.id)
+            )
+        except ValueError:
+            return Response(
+                {'error': 'Invalid admission number or passcode'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # Use the passcode
-        CBTPasscodeService.use_passcode(
-            passcode=passcode,
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT', '')
-        )
+        try:
+            used_passcode_data = CBTPasscodeService.use_passcode(
+                passcode=passcode,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', '')
+            )
+        except ValueError:
+            return Response(
+                {'error': 'Invalid admission number or passcode'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Create CBT session
         session_data = CBTSessionService.create_session(
@@ -129,9 +140,16 @@ def login_with_passcode(request):
                 'created_at': session_data['created_at']
             },
             'passcode': {
-                'used_at': passcode_data['used_at'],
+                'used_at': used_passcode_data.get('used_at'),
+                'seat_number': used_passcode_data.get('seat_number'),
+                'exam_hall_id': used_passcode_data.get('exam_hall_id'),
+                'exam_id': used_passcode_data.get('exam_id'),
             }
         }, status=status.HTTP_200_OK)
+        
+        # Determine cookie settings based on environment
+        cookie_secure = not settings.DEBUG
+        cookie_samesite = 'None' if cookie_secure else 'Lax'
         
         # Set CBT session cookie
         response.set_cookie(
@@ -139,8 +157,8 @@ def login_with_passcode(request):
             session_data['session_token'],
             max_age=7200,  # 2 hours
             httponly=True,
-            secure=True,  # Only over HTTPS in production
-            samesite='Lax'
+            secure=cookie_secure,  # HTTPS only in production
+            samesite=cookie_samesite
         )
         
         return response
@@ -337,14 +355,17 @@ def refresh_cbt_session(request):
             'session': session_data
         }, status=status.HTTP_200_OK)
         
+        cookie_secure = not settings.DEBUG
+        cookie_samesite = 'None' if cookie_secure else 'Lax'
+        
         # Update cookie
         response.set_cookie(
             'cbt_session_token',
             session_data['session_token'],
             max_age=7200,  # 2 hours
             httponly=True,
-            secure=True,
-            samesite='Lax'
+            secure=cookie_secure,
+            samesite=cookie_samesite
         )
         
         return response
@@ -403,6 +424,35 @@ def get_cbt_session_stats(request):
     except Exception as e:
         return Response(
             {'error': f'Failed to get session stats: {str(e)}'}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+@authentication_classes([CBTSessionAuthentication])
+@permission_classes([AllowAny])
+def get_cbt_student_profile(request):
+    """Get minimal student profile for CBT portal"""
+    try:
+        session_student = request.user
+        
+        # Fetch actual student record
+        try:
+            student = Student.objects.select_related('school', 'class_model').get(
+                admission_number=session_student.admission_number
+            )
+        except Student.DoesNotExist:
+            return Response(
+                {'error': 'Student not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = CBTStudentProfileSerializer(student)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to fetch student profile: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 

@@ -11,6 +11,7 @@ from api.views.cbt import (
     refresh_cbt_session,
     logout_cbt_session,
     get_cbt_session_stats,
+    get_cbt_student_profile,
     get_cbt_exams,
     get_cbt_exam,
     submit_cbt_exam,
@@ -46,6 +47,9 @@ urlpatterns = [
     path('session/refresh/', refresh_cbt_session, name='refresh-cbt-session'),
     path('session/logout/', logout_cbt_session, name='logout-cbt-session'),
     path('session/stats/', get_cbt_session_stats, name='get-cbt-session-stats'),
+    
+    # CBT Student Profile
+    path('student/profile/', get_cbt_student_profile, name='get-cbt-student-profile'),
     
     # CBT Exam Management
     path('exams/', get_cbt_exams, name='get-cbt-exams'),
