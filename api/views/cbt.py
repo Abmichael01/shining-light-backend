@@ -289,6 +289,27 @@ def get_all_passcodes(request):
         )
 
 
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated, IsAdminOrStaff])
+def delete_all_passcodes(request):
+    """Delete all CBT passcodes"""
+    try:
+        deleted = CBTPasscodeService.delete_all_passcodes()
+        return Response(
+            {
+                'success': True,
+                'deleted_count': deleted,
+                'message': 'All passcodes deleted successfully'
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response(
+            {'error': f'Failed to delete passcodes: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsAdminOrStaff])
 def get_all_passcodes(request):

@@ -913,6 +913,11 @@ class Exam(models.Model):
         default=True,
         help_text=_('Allow students to review answers before submission')
     )
+    allow_calculator = models.BooleanField(
+        _('allow calculator'),
+        default=False,
+        help_text=_('Allow students to open the calculator tool during the exam')
+    )
     
     # Status
     status = models.CharField(

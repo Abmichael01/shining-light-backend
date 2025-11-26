@@ -545,3 +545,29 @@ class CBTPasscodeService:
         }
         
         return stats
+
+    @classmethod
+    def delete_all_passcodes(cls) -> int:
+        """
+        Delete all CBT passcodes and clear related cache entries
+
+        Returns:
+            int: Number of passcodes deleted
+        """
+        with transaction.atomic():
+            # Collect cache keys before deletion
+            codes = list(
+                CBTExamCode.objects.values_list('code', 'student_id')
+            )
+            
+            deleted_count, _ = CBTExamCode.objects.all().delete()
+            
+            # Clear cache entries for each passcode
+            for code, student_id in codes:
+                cache.delete(f"{cls.CACHE_PREFIX}:{code}")
+                cache.delete(f"{cls.CACHE_PREFIX}:student:{student_id}")
+            
+            # Clear active list cache
+            cache.delete(f"{cls.CACHE_PREFIX}:active_list")
+        
+        return deleted_count

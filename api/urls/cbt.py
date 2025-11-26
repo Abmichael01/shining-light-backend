@@ -7,6 +7,7 @@ from api.views.cbt import (
     get_passcode_stats,
     get_all_active_passcodes,
     get_all_passcodes,
+    delete_all_passcodes,
     validate_cbt_session,
     refresh_cbt_session,
     logout_cbt_session,
@@ -41,6 +42,7 @@ urlpatterns = [
     
     # Get all passcodes (admin only) - includes expired by default
     path('passcodes/', get_all_passcodes, name='get-all-passcodes'),
+    path('passcodes/delete-all/', delete_all_passcodes, name='delete-all-passcodes'),
     
     # CBT Session Management
     path('session/validate/', validate_cbt_session, name='validate-cbt-session'),

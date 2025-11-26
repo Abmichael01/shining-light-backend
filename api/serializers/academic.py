@@ -363,7 +363,7 @@ class ExamSerializer(serializers.ModelSerializer):
             'id', 'title', 'subject', 'subject_name', 'subject_code', 'class_name', 'school_name',
             'exam_type', 'session_term', 'session_term_name', 'duration_minutes', 'total_marks', 'pass_mark',
             'total_questions', 'shuffle_questions', 'shuffle_options', 'show_results_immediately',
-            'allow_review', 'status', 'instructions', 'questions', 'created_by', 'created_by_name',
+            'allow_review', 'allow_calculator', 'status', 'instructions', 'questions', 'created_by', 'created_by_name',
             'total_students', 'students_taken', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_students', 'students_taken']
