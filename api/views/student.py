@@ -1,13 +1,15 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db import transaction, models
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
-from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject
+from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject, Session, SessionTerm
 from api.serializers import (
     StudentSerializer,
     StudentListSerializer,
@@ -18,7 +20,7 @@ from api.serializers import (
     BiometricSerializer,
     StudentSubjectSerializer
 )
-from api.permissions import IsSchoolAdmin, IsAdminOrStaff
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
 from api.models import Class as ClassModelAlias, Subject as SubjectModelAlias, Staff as StaffModelAlias
 
 
@@ -344,12 +346,22 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         'student', 'subject', 'session', 'session_term', 'grade'
     ).all().order_by('-registered_at')
     serializer_class = StudentSubjectSerializer
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaffOrStudent]
     
     def get_queryset(self):
         """Filter by student, subject, or session"""
         queryset = super().get_queryset()
         user = self.request.user
+        
+        # Students can only see their own subjects
+        if getattr(user, 'user_type', None) == 'student':
+            try:
+                student = Student.objects.select_related('user').get(user=user)
+                queryset = queryset.filter(student=student)
+            except Student.DoesNotExist:
+                return StudentSubject.objects.none()
+        
+        # Staff can see subjects for their assigned classes/subjects
         if getattr(user, 'user_type', None) == 'staff':
             staff = StaffModelAlias.objects.filter(user=user).first()
             assigned_classes = ClassModelAlias.objects.filter(
@@ -363,6 +375,7 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                 models.Q(student__subject_registrations__subject__in=assigned_subjects)
             ).distinct()
         
+        # Filter by query parameters
         student = self.request.query_params.get('student', None)
         if student:
             queryset = queryset.filter(student=student)
@@ -375,6 +388,21 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         if session:
             queryset = queryset.filter(session=session)
         
+        session_term = self.request.query_params.get('session_term', None)
+        if session_term:
+            queryset = queryset.filter(session_term=session_term)
+        
+        # DEBUG: Print query parameters and results
+        print(f"\n=== GET STUDENT SUBJECTS DEBUG ===")
+        print(f"Query params - student: {student}, session: {session}, subject: {subject}, session_term: {session_term}")
+        print(f"User: {self.request.user} (type: {getattr(self.request.user, 'user_type', 'N/A')})")
+        count = queryset.count()
+        print(f"Total results: {count}")
+        if count > 0:
+            print("Sample results:")
+            for item in queryset[:5]:
+                print(f"  - ID: {item.id}, Subject ID: {item.subject_id} (type: {type(item.subject_id)}), Subject Code: {item.subject.code if item.subject else 'N/A'}, Term: {item.session_term_id}")
+        
         return queryset
     
     def perform_update(self, serializer):
@@ -385,20 +413,49 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
 
     def perform_destroy(self, instance):
         user = self.request.user
-        if getattr(user, 'user_type', None) != 'admin':
-            raise PermissionDenied('Only administrators can remove subject registrations.')
+        # Allow admin or the student who owns the record
+        is_admin = getattr(user, 'user_type', None) == 'admin'
+        is_owner = getattr(user, 'user_type', None) == 'student' and instance.student.user == user
+        
+        if not (is_admin or is_owner):
+            raise PermissionDenied('You do not have permission to remove this subject registration.')
+            
         super().perform_destroy(instance)
 
-    @action(detail=False, methods=['post'], permission_classes=[IsSchoolAdmin], url_path='bulk_register')
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='bulk_register')
     def bulk_register(self, request):
         """
         Bulk register multiple subjects for a student within a single session.
         Expects payload with: student (id), session (id), optional session_term, and subjects (list of ids/codes).
+        - Admin: Can register for any student
+        - Students: Can only register for themselves
         """
         student_id = request.data.get('student')
         session_id = request.data.get('session')
         session_term_id = request.data.get('session_term')
         subjects = request.data.get('subjects', [])
+        
+        user = request.user
+        user_type = getattr(user, 'user_type', None)
+        
+        # If student, ensure they can only register for themselves
+        if user_type == 'student':
+            try:
+                student = Student.objects.select_related('user').get(user=user)
+                if str(student.id) != str(student_id):
+                    return Response({
+                        'detail': 'You can only register subjects for yourself.'
+                    }, status=status.HTTP_403_FORBIDDEN)
+            except Student.DoesNotExist:
+                return Response({
+                    'detail': 'Student profile not found for current user.'
+                }, status=status.HTTP_404_NOT_FOUND)
+        
+        # Admin check for non-students
+        elif user_type != 'admin':
+            return Response({
+                'detail': 'Only administrators and students can register subjects.'
+            }, status=status.HTTP_403_FORBIDDEN)
 
         if not student_id or not session_id:
             return Response({
@@ -410,34 +467,120 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                 'detail': 'subjects must be a non-empty list.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
+        # Auto-get current term if not provided (before processing subjects)
+        if not session_term_id:
+            current_session = Session.objects.filter(is_current=True).first()
+            if current_session:
+                current_term = current_session.session_terms.filter(is_current=True).first()
+                session_term_id = current_term.id if current_term else None
+        
+        # DEBUG: Print incoming parameters
+        print(f"\n=== BULK REGISTER DEBUG ===")
+        print(f"student_id: {student_id} (type: {type(student_id)})")
+        print(f"session_id: {session_id} (type: {type(session_id)})")
+        print(f"session_term_id: {session_term_id} (type: {type(session_term_id)})")
+        print(f"subjects: {subjects} (type: {type(subjects)})")
+        print(f"subjects list: {list(subjects)}")
+        
+        # DEBUG: Check existing registrations for this student/session/term
+        existing_registrations = StudentSubject.objects.filter(
+            student_id=student_id,
+            session_id=session_id
+        )
+        if session_term_id:
+            existing_registrations = existing_registrations.filter(session_term_id=session_term_id)
+        
+        print(f"\nExisting registrations for student {student_id}, session {session_id}, term {session_term_id}:")
+        for reg in existing_registrations:
+            print(f"  - Subject ID: {reg.subject_id} (type: {type(reg.subject_id)}), Subject Code: {reg.subject.code if reg.subject else 'N/A'}")
+        print(f"Total existing: {existing_registrations.count()}")
+        
         created_items = []
         errors = []
         
         with transaction.atomic():
             for subject in subjects:
                 subject_id = subject
+                print(f"\n--- Processing subject: {subject_id} (type: {type(subject_id)}) ---")
                 try:
-                    exists = StudentSubject.objects.filter(
-                        student_id=student_id,
-                        subject_id=subject_id,
-                        session_id=session_id
-                    ).exists()
+                    # Check if subject is already registered for this session AND term
+                    # Registration is per term, so same subject can be registered for different terms
+                    filter_query = {
+                        'student_id': student_id,
+                        'subject_id': subject_id,
+                        'session_id': session_id
+                    }
+                    
+                    # Always check for session_term if we have one (required for per-term registration)
+                    if session_term_id:
+                        filter_query['session_term_id'] = session_term_id
+                    
+                    print(f"Filter query: {filter_query}")
+                    
+                    # DEBUG: Check what the query returns
+                    matching_registrations = StudentSubject.objects.filter(**filter_query)
+                    print(f"Matching registrations count: {matching_registrations.count()}")
+                    for match in matching_registrations:
+                        print(f"  Match - Subject ID: {match.subject_id} (type: {type(match.subject_id)}), Term: {match.session_term_id}")
+                    
+                    exists = matching_registrations.exists()
+                    print(f"Subject {subject_id} already exists: {exists}")
+                    
                     if exists:
-                        errors.append(f'Subject {subject_id} already registered for this session.')
+                        if session_term_id:
+                            errors.append(f'Subject {subject_id} already registered for this session and term.')
+                        else:
+                            errors.append(f'Subject {subject_id} already registered for this session.')
                         continue
                     
-                    registration = StudentSubject.objects.create(
+                    # Get the subject and student objects for validation
+                    from api.models import Subject
+                    subject_obj = Subject.objects.get(id=subject_id)
+                    student_obj = Student.objects.get(id=student_id)
+                    
+                    # Validate subject belongs to student's class and school
+                    if subject_obj.class_model != student_obj.class_model:
+                        errors.append(f'Subject {subject_obj.name} does not belong to your class ({student_obj.class_model.name}).')
+                        continue
+                    
+                    if subject_obj.school != student_obj.school:
+                        errors.append(f'Subject {subject_obj.name} does not belong to your school.')
+                        continue
+                    
+                    registration = StudentSubject(
                         student_id=student_id,
                         subject_id=subject_id,
                         session_id=session_id,
-                        session_term_id=session_term_id or None,
+                        session_term_id=session_term_id if session_term_id else None,
                         is_active=True
                     )
+                    # Validate before saving
+                    registration.full_clean()
+                    registration.save()
                     created_items.append(registration)
+                except Subject.DoesNotExist:
+                    errors.append(f'Subject with ID {subject_id} not found.')
+                except Student.DoesNotExist:
+                    errors.append(f'Student with ID {student_id} not found.')
+                except ValidationError as ve:
+                    # Handle Django validation errors
+                    error_msg = ve.message if hasattr(ve, 'message') else str(ve)
+                    if hasattr(ve, 'error_dict'):
+                        error_msg = ', '.join([f"{k}: {v[0]}" for k, v in ve.error_dict.items()])
+                    errors.append(f'Validation error for subject {subject_id}: {error_msg}')
                 except Exception as exc:
-                    errors.append(str(exc))
+                    errors.append(f'Error registering subject {subject_id}: {str(exc)}')
 
         serializer = StudentSubjectSerializer(created_items, many=True, context={'request': request})
+        
+        # DEBUG: Print final results
+        print(f"\n=== BULK REGISTER FINAL RESULTS ===")
+        print(f"Registered: {len(created_items)} subjects")
+        print(f"Errors: {len(errors)} errors")
+        if errors:
+            print(f"Error messages: {errors}")
+        print(f"Status code: {status.HTTP_201_CREATED if created_items else status.HTTP_400_BAD_REQUEST}")
+        print("=" * 40 + "\n")
         
         response_data = {
             'registered': len(created_items),
@@ -534,4 +677,35 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(student_subject)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+@api_view(['GET', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def student_me(request):
+    """
+    Get the authenticated user's student profile (for student portal)
+    """
+    try:
+        student = Student.objects.select_related(
+            'user', 'school', 'class_model', 'department', 'club', 'biodata'
+        ).prefetch_related(
+            'guardians', 'documents', 'subject_registrations'
+        ).filter(user=request.user).first()
+        
+        if not student:
+            return Response({
+                'error': 'Student profile not found for current user'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        if request.method == 'GET':
+            serializer = StudentSerializer(student, context={'request': request})
+            return Response(serializer.data)
+        
+        # For PATCH, we'll allow limited updates (similar to staff portal)
+        # For now, return read-only message - can be extended later
+        return Response({
+            'error': 'Student profile updates are not yet supported'
+        }, status=status.HTTP_400_BAD_REQUEST)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

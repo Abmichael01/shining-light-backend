@@ -109,9 +109,9 @@ CSRF_TRUSTED_ORIGINS = [
     'https://www.shininglightschoolsijebuode.com',
     'https://api.shininglightschoolsijebuode.com',
     'http://localhost:3000',
-    'http://localhost:3002',
+    'http://localhost:3001',
     'http://127.0.0.1:3000',
-    'http://127.0.0.1:3002',
+    'http://127.0.0.1:3001',
 ]
 
 # CORS Settings
@@ -121,9 +121,9 @@ CORS_ALLOWED_ORIGINS = [
     'https://www.shininglightschoolsijebuode.com',
     'https://api.shininglightschoolsijebuode.com',
     'http://localhost:3000',
-    'http://localhost:3002',
+    'http://localhost:3001',
     'http://127.0.0.1:3000',
-    'http://127.0.0.1:3002',
+    'http://127.0.0.1:3001',
 ]
 
 MIDDLEWARE = [

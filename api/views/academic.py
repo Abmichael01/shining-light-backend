@@ -219,7 +219,8 @@ class SubjectViewSet(viewsets.ModelViewSet):
         'school', 'class_model', 'department', 'subject_group'
     ).all().order_by('school', 'class_model', 'order', 'name')
     serializer_class = SubjectSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -247,6 +248,28 @@ class SubjectViewSet(viewsets.ModelViewSet):
                 models.Q(code__icontains=search)
             )
         
+        # Filter out subjects already registered by the student
+        exclude_registered = self.request.query_params.get('exclude_registered', None)
+        session_id = self.request.query_params.get('session', None)
+        term_id = self.request.query_params.get('term', None)
+        
+        if exclude_registered == 'true' and getattr(self.request.user, 'user_type', None) == 'student':
+             from api.models.student import Student, StudentSubject
+             try:
+                 student = Student.objects.get(user=self.request.user)
+                 
+                 # Build filter for registrations
+                 reg_filter = {'student': student}
+                 if session_id:
+                     reg_filter['session_id'] = session_id
+                 if term_id:
+                     reg_filter['session_term_id'] = term_id
+                     
+                 registered_subject_ids = StudentSubject.objects.filter(**reg_filter).values_list('subject_id', flat=True)
+                 queryset = queryset.exclude(id__in=registered_subject_ids)
+             except Student.DoesNotExist:
+                 pass
+
         return queryset
 
 

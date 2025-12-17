@@ -54,3 +54,50 @@ class IsAdminOrStaff(permissions.BasePermission):
         
         return getattr(user, 'user_type', None) in ['admin', 'staff']
 
+
+class IsAdminOrStaffOrStudent(permissions.BasePermission):
+    """
+    Permission check for Admin, Staff, or Student users.
+    - Admin/Staff: Full access
+    - Students: Read-only access to their own data only
+    """
+    
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+        
+        if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
+            return True
+        
+        user_type = getattr(user, 'user_type', None)
+        
+        # Admin and staff have full access
+        if user_type in ['admin', 'staff']:
+            return True
+        
+        # Students have read-only access (GET, HEAD, OPTIONS)
+        if user_type == 'student':
+            return request.method in permissions.SAFE_METHODS
+        
+        return False
+    
+    def has_object_permission(self, request, view, obj):
+        """
+        Students can only access their own student subjects
+        """
+        user = request.user
+        user_type = getattr(user, 'user_type', None)
+        
+        # Admin and staff have full access
+        if user_type in ['admin', 'staff']:
+            return True
+        
+        # Students can only access their own subjects
+        if user_type == 'student':
+            # Check if the student subject belongs to the logged-in student
+            if hasattr(obj, 'student') and hasattr(obj.student, 'user'):
+                return obj.student.user == user
+        
+        return False
+

@@ -681,7 +681,7 @@ class StudentSubject(models.Model):
         verbose_name = _('Student Subject')
         verbose_name_plural = _('Student Subjects')
         ordering = ['student', 'subject']
-        unique_together = [['student', 'subject', 'session']]
+        unique_together = [['student', 'subject', 'session', 'session_term']]
     
     def __str__(self):
         return f"{self.student} - {self.subject} ({self.session})"

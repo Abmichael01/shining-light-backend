@@ -5,7 +5,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff
+from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff, Session, SessionTerm, StudentSubject
 from django.db import models
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
@@ -240,4 +240,74 @@ def staff_recent_assignments(request):
     from api.serializers.academic import AssignmentSerializer
     data = AssignmentSerializer(assignments, many=True).data
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def student_dashboard_stats(request):
+    """
+    Dashboard stats for student portal
+    Returns current class, session, term, registered subjects count, etc.
+    """
+    user = request.user
+    
+    # Get student profile
+    student = Student.objects.select_related(
+        'school', 'class_model', 'department', 'biodata'
+    ).filter(user=user).first()
+    
+    if not student:
+        return Response({
+            'error': 'Student profile not found for current user'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    # Get current session and term
+    current_session = Session.objects.filter(is_current=True).first()
+    current_term = None
+    if current_session:
+        current_term = current_session.session_terms.filter(is_current=True).first()
+    
+    # Get registered subjects for current term
+    registered_subjects_count = 0
+    if current_session and current_term:
+        registered_subjects_count = StudentSubject.objects.filter(
+            student=student,
+            session=current_session,
+            session_term=current_term,
+            is_active=True
+        ).count()
+    
+    # Get pending assignments count (for current term)
+    pending_assignments = 0
+    if current_session and current_term:
+        # Get student's registered subjects for current term
+        student_subjects = StudentSubject.objects.filter(
+            student=student,
+            session=current_session,
+            session_term=current_term,
+            is_active=True
+        ).values_list('subject_id', flat=True)
+        
+        # Count published assignments that are not yet due or overdue
+        today = datetime.now().date()
+        pending_assignments = Assignment.objects.filter(
+            subject_id__in=student_subjects,
+            status='published',
+            due_date__gte=today
+        ).count()
+    
+    return Response({
+        'current_class': student.class_model.name if student.class_model else None,
+        'current_class_id': student.class_model.id if student.class_model else None,
+        'current_session': current_session.name if current_session else None,
+        'current_session_id': current_session.id if current_session else None,
+        'current_term': current_term.term_name if current_term else None,
+        'current_term_id': current_term.id if current_term else None,
+        'registered_subjects_count': registered_subjects_count,
+        'pending_assignments': pending_assignments,
+        'school_name': student.school.name if student.school else None,
+        'department_name': student.department.name if student.department else None,
+        'full_name': student.get_full_name(),
+        'admission_number': student.admission_number,
+    })
 

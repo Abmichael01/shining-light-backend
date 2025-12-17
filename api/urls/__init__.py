@@ -1,7 +1,8 @@
 from django.urls import path, include
 from api.views import LoginView
 from api.views.staff import staff_me, staff_students, staff_student_detail_update
-from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments
+from api.views.student import student_me
+from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
 from api.views.config import school_configs
 
 app_name = 'api'
@@ -20,6 +21,8 @@ urlpatterns = [
     # Staff dashboard
     path('staff-dashboard/stats/', staff_dashboard_stats, name='staff-dashboard-stats'),
     path('staff-dashboard/recent-assignments/', staff_recent_assignments, name='staff-recent-assignments'),
+    # Student dashboard
+    path('student-dashboard/stats/', student_dashboard_stats, name='student-dashboard-stats'),
     
     # Configs (centralized config data for caching)
     path('configs/', school_configs, name='school-configs'),
@@ -42,5 +45,7 @@ urlpatterns = [
     path('staff-portal/me/', staff_me, name='staff-me'),
     path('staff-portal/students/', staff_students, name='staff-students'),
     path('staff-portal/students/<str:student_id>/', staff_student_detail_update, name='staff-student-detail'),
+    # Student portal (self-service)
+    path('student-portal/me/', student_me, name='student-me'),
 ]
 
