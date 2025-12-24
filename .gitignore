@@ -47,3 +47,4 @@ db.sqlite3-journal
 Thumbs.db
       
 poetry.lock
+logs/

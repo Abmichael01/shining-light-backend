@@ -129,10 +129,20 @@ class Staff(models.Model):
         year = timezone.now().year
         
         # Get count of all staff (across all schools) for global incrementing
-        count = Staff.objects.count() + 1
+        # Use a loop to handle race conditions where multiple staff are created simultaneously
+        max_attempts = 1000
+        for attempt in range(max_attempts):
+            count = Staff.objects.count() + 1 + attempt
+            staff_id = f"STF{year}{count:03d}"
+            
+            # Check if this ID already exists
+            if not Staff.objects.filter(staff_id=staff_id).exists():
+                return staff_id
         
-        # Format: STF2025001
-        return f"STF{year}{count:03d}"
+        # Fallback: if we can't find a unique ID after many attempts, use timestamp
+        import time
+        timestamp = int(time.time() * 1000) % 1000000
+        return f"STF{year}{timestamp:06d}"
     
     def save(self, *args, **kwargs):
         """Override save to generate staff ID"""

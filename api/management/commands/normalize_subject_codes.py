@@ -96,7 +96,8 @@ class Command(BaseCommand):
                 # Update subject PK and code
                 s.id = new_code
                 s.code = new_code
-                s.save(update_fields=["id", "code"])
+                # Save without update_fields so the PK change is persisted
+                s.save()
 
                 self.stdout.write(
                     self.style.SUCCESS(
@@ -105,10 +106,56 @@ class Command(BaseCommand):
                     )
                 )
 
-            if changed == 0:
+            # Cleanup: delete subjects whose codes contain whitespace
+            spaced_subjects = list(Subject.objects.filter(code__regex=r"\s"))
+            deleted = 0
+            if spaced_subjects:
+                self.stdout.write(
+                    self.style.NOTICE(
+                        f"Cleaning up {len(spaced_subjects)} subjects with whitespace in code..."
+                    )
+                )
+            for spaced in spaced_subjects:
+                target_id = normalize_code(spaced.code or spaced.id)
+                target = None
+                try:
+                    target = Subject.objects.get(pk=target_id)
+                except Subject.DoesNotExist:
+                    try:
+                        target = Subject.objects.get(code=target_id)
+                    except Subject.DoesNotExist:
+                        target = None
+
+                if dry_run:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"[DRY][DELETE] Subject '{spaced.name}' ({spaced.pk} | code={spaced.code!r}) "
+                            + (f"-> reassign to {target.pk}" if target else "(no target)")
+                        )
+                    )
+                    continue
+
+                if target and target.pk != spaced.pk:
+                    Topic.objects.filter(subject_id=spaced.pk).update(subject_id=target.pk)
+                    Question.objects.filter(subject_id=spaced.pk).update(subject_id=target.pk)
+                    Exam.objects.filter(subject_id=spaced.pk).update(subject_id=target.pk)
+
+                spaced.delete()
+                deleted += 1
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"[DELETED] Subject '{spaced.name}' ({spaced.pk} | code={spaced.code!r})"
+                    )
+                )
+
+            if changed == 0 and deleted == 0:
                 self.stdout.write(self.style.SUCCESS("No changes needed. All subjects are normalized."))
             else:
                 summary_style = self.style.WARNING if dry_run else self.style.SUCCESS
-                self.stdout.write(summary_style(f"Done. Changes: {changed} (dry_run={dry_run})"))
+                self.stdout.write(
+                    summary_style(
+                        f"Done. Changes: {changed}, Deleted: {deleted} (dry_run={dry_run})"
+                    )
+                )
 
 
