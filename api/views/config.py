@@ -17,6 +17,8 @@ from api.serializers import (
 )
 
 
+from django.conf import settings
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def school_configs(request):
@@ -43,6 +45,7 @@ def school_configs(request):
         'sessions': SessionSerializer(sessions, many=True).data,
         'terms': SessionTermSerializer(terms, many=True).data,
         'salary_grades': SalaryGradeSerializer(salary_grades, many=True).data,
+        'system_email': settings.DEFAULT_FROM_EMAIL,
     }
     
     return Response(data)

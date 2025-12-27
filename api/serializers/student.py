@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject
+from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject, TermReport
 from django.core.files.base import ContentFile
 import base64
 import uuid
@@ -138,6 +138,13 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
         return assigned_to_subject or assigned_class_match or in_class_assigned_teachers
 
 
+class TermReportSerializer(serializers.ModelSerializer):
+    """Serializer for TermReport model"""
+    class Meta:
+        model = TermReport
+        fields = '__all__'
+
+
 class StudentSerializer(serializers.ModelSerializer):
     """Serializer for Student model with nested related data"""
     student_id = serializers.CharField(source='id', read_only=True)
@@ -155,6 +162,7 @@ class StudentSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source='club.name', read_only=True, allow_null=True)
     user_email = serializers.CharField(source='user.email', read_only=True)
     full_name = serializers.SerializerMethodField()
+    passport_photo = serializers.SerializerMethodField()
     all_subjects_cleared = serializers.SerializerMethodField()
     
     # Email field for updates
@@ -166,7 +174,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'id', 'student_id', 'application_number', 'admission_number', 'user', 'user_email', 'email',
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'former_school_attended', 'club', 'club_name',
-            'status', 'source', 'full_name',
+            'status', 'source', 'full_name', 'passport_photo',
             'application_date', 'review_date', 'acceptance_date',
             'enrollment_date', 'graduation_date',
             'created_by', 'reviewed_by', 'rejection_reason',
@@ -176,7 +184,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'all_subjects_cleared'
         ]
         read_only_fields = [
-            'id', 'application_number', 'admission_number', 'full_name',
+            'id', 'application_number', 'admission_number', 'full_name', 'passport_photo',
             'created_at', 'updated_at', 'created_by', 'reviewed_by',
             'school_name', 'school_type', 'class_name', 'department_name', 'club_name',
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
@@ -186,6 +194,18 @@ class StudentSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Get student's full name"""
         return obj.get_full_name()
+    
+    def get_passport_photo(self, obj):
+        """Return full URL for passport photo if available"""
+        try:
+            if obj.biodata and obj.biodata.passport_photo:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.biodata.passport_photo.url)
+                return obj.biodata.passport_photo.url
+        except:
+            pass
+        return None
     
     def to_representation(self, instance):
         """Custom representation to ensure club field returns ID"""

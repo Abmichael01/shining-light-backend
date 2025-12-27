@@ -33,7 +33,8 @@ class SchoolViewSet(viewsets.ModelViewSet):
     """
     queryset = School.objects.all().order_by('school_type', 'name')
     serializer_class = SchoolSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         """Filter schools - can add filters here if needed"""
@@ -159,7 +160,8 @@ class ClassViewSet(viewsets.ModelViewSet):
     """ViewSet for Class CRUD operations"""
     queryset = Class.objects.all().order_by('school', 'order', 'name')
     serializer_class = ClassSerializer
-    permission_classes = [IsAdminOrStaff]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -182,7 +184,8 @@ class DepartmentViewSet(viewsets.ModelViewSet):
     """ViewSet for Department CRUD operations"""
     queryset = Department.objects.all().order_by('school', 'name')
     serializer_class = DepartmentSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -196,7 +199,8 @@ class SubjectGroupViewSet(viewsets.ModelViewSet):
     """ViewSet for SubjectGroup CRUD operations"""
     queryset = SubjectGroup.objects.all().order_by('name')
     serializer_class = SubjectGroupSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         """Filter and search subject groups"""
@@ -277,7 +281,8 @@ class TopicViewSet(viewsets.ModelViewSet):
     """ViewSet for Topic CRUD operations"""
     queryset = Topic.objects.select_related('subject').prefetch_related('questions').all().order_by('subject', 'name')
     serializer_class = TopicSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -307,7 +312,8 @@ class GradeViewSet(viewsets.ModelViewSet):
     """ViewSet for Grade CRUD operations"""
     queryset = Grade.objects.all().order_by('order')
     serializer_class = GradeSerializer
-    permission_classes = [IsSchoolAdmin]
+    from api.permissions import IsSchoolAdminOrReadOnly
+    permission_classes = [IsSchoolAdminOrReadOnly]
 
 
 class QuestionViewSet(viewsets.ModelViewSet):

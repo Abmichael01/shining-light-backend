@@ -17,8 +17,10 @@ from .student import (
     GuardianViewSet,
     DocumentViewSet,
     BiometricViewSet,
-    StudentSubjectViewSet
+    StudentSubjectViewSet,
+    TermReportViewSet
 )
+from .reports import convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
 
 __all__ = [
     'LoginView', 
@@ -37,5 +39,10 @@ __all__ = [
     'GuardianViewSet',
     'DocumentViewSet',
     'BiometricViewSet',
-    'StudentSubjectViewSet'
+    'StudentSubjectViewSet',
+    'TermReportViewSet',
+    'convert_html_to_pdf',
+    'convert_html_to_image',
+    'convert_multiple_html_to_pdf',
+    'convert_multiple_html_to_images_zip'
 ]

@@ -1,5 +1,5 @@
 from django.urls import path, include
-from api.views import LoginView
+from api.views import LoginView, convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
 from api.views.staff import staff_me, staff_students, staff_student_detail_update
 from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
@@ -47,5 +47,10 @@ urlpatterns = [
     path('staff-portal/students/<str:student_id>/', staff_student_detail_update, name='staff-student-detail'),
     # Student portal (self-service)
     path('student-portal/me/', student_me, name='student-me'),
+    # Reports
+    path('reports/convert-pdf/', convert_html_to_pdf, name='convert-html-to-pdf'),
+    path('reports/convert-image/', convert_html_to_image, name='convert-html-to-image'),
+    path('reports/convert-multi-pdf/', convert_multiple_html_to_pdf, name='convert-multiple-html-to-pdf'),
+    path('reports/convert-multi-images-zip/', convert_multiple_html_to_images_zip, name='convert-multiple-html-to-images-zip'),
 ]
 

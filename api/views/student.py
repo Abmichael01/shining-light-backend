@@ -9,7 +9,7 @@ from django.db import transaction, models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 
-from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject, Session, SessionTerm
+from api.models import Student, BioData, Guardian, Document, Biometric, StudentSubject, Session, SessionTerm, TermReport
 from api.serializers import (
     StudentSerializer,
     StudentListSerializer,
@@ -18,7 +18,8 @@ from api.serializers import (
     GuardianSerializer,
     DocumentSerializer,
     BiometricSerializer,
-    StudentSubjectSerializer
+    StudentSubjectSerializer,
+    TermReportSerializer
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
 from api.models import Class as ClassModelAlias, Subject as SubjectModelAlias, Staff as StaffModelAlias
@@ -224,11 +225,20 @@ class BioDataViewSet(viewsets.ModelViewSet):
     """ViewSet for BioData CRUD operations"""
     queryset = BioData.objects.all().order_by('-created_at')
     serializer_class = BioDataSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaffOrStudent]
     
     def get_queryset(self):
-        """Filter by student if provided"""
+        """Filter by student if provided. Students can only see their own biodata."""
         queryset = super().get_queryset()
+        user = self.request.user
+        
+        if getattr(user, 'user_type', None) == 'student':
+            try:
+                student = Student.objects.get(user=user)
+                return queryset.filter(student=student)
+            except Student.DoesNotExist:
+                return queryset.none()
+                
         student = self.request.query_params.get('student', None)
         if student:
             queryset = queryset.filter(student=student)
@@ -239,12 +249,20 @@ class GuardianViewSet(viewsets.ModelViewSet):
     """ViewSet for Guardian CRUD operations"""
     queryset = Guardian.objects.all().order_by('-is_primary_contact', 'guardian_type')
     serializer_class = GuardianSerializer
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaffOrStudent]
     
     def get_queryset(self):
-        """Filter by student if provided"""
+        """Filter by student if provided. Students can only see their own guardians."""
         queryset = super().get_queryset()
         user = self.request.user
+        
+        if getattr(user, 'user_type', None) == 'student':
+            try:
+                student = Student.objects.get(user=user)
+                return queryset.filter(student=student)
+            except Student.DoesNotExist:
+                return queryset.none()
+                
         if getattr(user, 'user_type', None) == 'staff':
             staff = StaffModelAlias.objects.filter(user=user).first()
             assigned_classes = ClassModelAlias.objects.filter(
@@ -267,13 +285,21 @@ class DocumentViewSet(viewsets.ModelViewSet):
     """ViewSet for Document CRUD operations"""
     queryset = Document.objects.all().order_by('-uploaded_at')
     serializer_class = DocumentSerializer
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaffOrStudent]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def get_queryset(self):
-        """Filter by student if provided"""
+        """Filter by student if provided. Students can only see their own documents."""
         queryset = super().get_queryset()
         user = self.request.user
+        
+        if getattr(user, 'user_type', None) == 'student':
+            try:
+                student = Student.objects.get(user=user)
+                return queryset.filter(student=student)
+            except Student.DoesNotExist:
+                return queryset.none()
+                
         if getattr(user, 'user_type', None) == 'staff':
             staff = StaffModelAlias.objects.filter(user=user).first()
             assigned_classes = ClassModelAlias.objects.filter(
@@ -617,6 +643,43 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(student_subject)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsSchoolAdmin])
+    def bulk_mark_clear(self, request):
+        """Allow administrators to mark all subject registrations for a student as cleared/uncleared."""
+        student_id = request.data.get('student')
+        session_id = request.data.get('session')
+        session_term_id = request.data.get('session_term')
+        cleared_value = request.data.get('cleared', True)
+        cleared = str(cleared_value).lower() not in ['false', '0', 'no', 'none']
+
+        if not student_id or not session_id or not session_term_id:
+            return Response({'error': 'Student, session and term are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        queryset = self.get_queryset().filter(
+            student_id=student_id,
+            session_id=session_id,
+            session_term_id=session_term_id
+        )
+        
+        count = queryset.count()
+
+        if cleared:
+            queryset.update(
+                cleared=True,
+                cleared_by=request.user,
+                cleared_at=timezone.now(),
+                updated_at=timezone.now()
+            )
+        else:
+            queryset.update(
+                cleared=False,
+                cleared_by=None,
+                cleared_at=None,
+                updated_at=timezone.now()
+            )
+
+        return Response({'message': f'Updated {count} subjects', 'count': count}, status=status.HTTP_200_OK)
+
     @action(detail=True, methods=['post'], url_path='open-day-clear', permission_classes=[IsAdminOrStaff])
     def open_day_clear(self, request, pk=None):
         """Mark or unmark a student's subject as cleared for Open Day."""
@@ -677,6 +740,89 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(student_subject)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    @action(detail=False, methods=['post'], permission_classes=[IsSchoolAdmin])
+    def calculate_rankings(self, request):
+        """
+        Calculate subject positions for all students in a specific session and term.
+        """
+        session_id = request.data.get('session')
+        session_term_id = request.data.get('session_term')
+        
+        if not session_id or not session_term_id:
+            return Response({'error': 'Session and term are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        with transaction.atomic():
+            # 1. Subject Positions
+            # Get all subjects that have results in this term
+            subjects = SubjectModelAlias.objects.filter(
+                student_registrations__session_id=session_id,
+                student_registrations__session_term_id=session_term_id
+            ).distinct()
+            
+            for subject in subjects:
+                # Get all registrations for this subject, session, term, ordered by total_score desc
+                registrations = StudentSubject.objects.filter(
+                    subject=subject,
+                    session_id=session_id,
+                    session_term_id=session_term_id,
+                    total_score__isnull=False
+                ).order_by('-total_score')
+                
+                # Assign positions (handling ties)
+                current_pos = 1
+                last_score = None
+                for i, reg in enumerate(registrations):
+                    if last_score is not None and reg.total_score < last_score:
+                        current_pos = i + 1
+                    
+                    reg.position = current_pos
+                    reg.save(update_fields=['position'])
+                    last_score = reg.total_score
+
+            # 2. Overall Class Positions
+            # Get all students who have registrations in this term
+            student_ids = list(StudentSubject.objects.filter(
+                session_id=session_id,
+                session_term_id=session_term_id,
+                total_score__isnull=False
+            ).values_list('student_id', flat=True).distinct())
+            
+            student_averages = []
+            for st_id in student_ids:
+                regs = StudentSubject.objects.filter(
+                    student_id=st_id,
+                    session_id=session_id,
+                    session_term_id=session_term_id,
+                    total_score__isnull=False
+                )
+                avg = regs.aggregate(models.Avg('total_score'))['total_score__avg']
+                total = regs.aggregate(models.Sum('total_score'))['total_score__sum']
+                
+                if avg is not None:
+                    # Upsert TermReport
+                    report, created = TermReport.objects.get_or_create(
+                        student_id=st_id,
+                        session_id=session_id,
+                        session_term_id=session_term_id
+                    )
+                    report.average_score = avg
+                    report.total_score = total
+                    report.save()
+                    student_averages.append({'id': report.id, 'avg': avg})
+            
+            # Rank students by average score
+            student_averages.sort(key=lambda x: x['avg'], reverse=True)
+            current_pos = 1
+            last_avg = None
+            for i, item in enumerate(student_averages):
+                if last_avg is not None and item['avg'] < last_avg:
+                    current_pos = i + 1
+                
+                TermReport.objects.filter(pk=item['id']).update(class_position=current_pos)
+                last_avg = item['avg']
+
+        return Response({'message': 'Rankings calculated successfully'})
+
 
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
@@ -708,4 +854,34 @@ def student_me(request):
         
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TermReportViewSet(viewsets.ModelViewSet):
+    """ViewSet for TermReport CRUD operations"""
+    queryset = TermReport.objects.all()
+    serializer_class = TermReportSerializer
+    permission_classes = [IsAdminOrStaffOrStudent]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        student_id = self.request.query_params.get('student', None)
+        session_id = self.request.query_params.get('session', None)
+        session_term_id = self.request.query_params.get('session_term', None)
+        
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'student':
+            try:
+                student = Student.objects.get(user=user)
+                queryset = queryset.filter(student=student)
+            except Student.DoesNotExist:
+                return queryset.none()
+        elif student_id:
+            queryset = queryset.filter(student=student_id)
+            
+        if session_id:
+            queryset = queryset.filter(session=session_id)
+        if session_term_id:
+            queryset = queryset.filter(session_term=session_term_id)
+            
+        return queryset
 

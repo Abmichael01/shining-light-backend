@@ -6,7 +6,8 @@ from api.views import (
     GuardianViewSet,
     DocumentViewSet,
     BiometricViewSet,
-    StudentSubjectViewSet
+    StudentSubjectViewSet,
+    TermReportViewSet
 )
 
 router = DefaultRouter()
@@ -16,6 +17,7 @@ router.register(r'guardians', GuardianViewSet, basename='guardian')
 router.register(r'documents', DocumentViewSet, basename='document')
 router.register(r'biometrics', BiometricViewSet, basename='biometric')
 router.register(r'student-subjects', StudentSubjectViewSet, basename='studentsubject')
+router.register(r'term-reports', TermReportViewSet, basename='termreport')
 
 urlpatterns = router.urls
 

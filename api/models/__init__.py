@@ -24,7 +24,8 @@ from .student import (
     Guardian,
     Document,
     Biometric,
-    StudentSubject
+    StudentSubject,
+    TermReport
 )
 from .staff import (
     Staff,
@@ -66,6 +67,7 @@ __all__ = [
     'Document',
     'Biometric',
     'StudentSubject',
+    'TermReport',
     'Staff',
     'StaffEducation',
     'SalaryGrade',
