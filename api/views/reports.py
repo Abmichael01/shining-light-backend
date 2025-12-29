@@ -7,16 +7,49 @@ import time
 import zipfile
 from io import BytesIO
 from PIL import Image
+import bleach
+from bleach.css_sanitizer import CSSSanitizer
 
 logger = logging.getLogger(__name__)
 
-# Chrome launch args for stability
+# Sanitization configurations
+ALLOWED_TAGS = [
+    'a', 'abbr', 'acronym', 'b', 'blockquote', 'br', 'code', 'div', 'em', 
+    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'ol', 'p', 
+    'span', 'strong', 'table', 'tbody', 'td', 'th', 'thead', 'tr', 'ul',
+    'font', 'style'
+]
+ALLOWED_ATTRIBUTES = {
+    '*': ['class', 'style', 'id'],
+    'a': ['href', 'title'],
+    'img': ['src', 'alt', 'width', 'height'],
+}
+ALLOWED_STYLES = [
+    'color', 'font-family', 'font-size', 'font-weight', 'text-align', 
+    'background-color', 'border', 'padding', 'margin', 'width', 'height', 'display'
+]
+
+css_sanitizer = CSSSanitizer(allowed_css_properties=ALLOWED_STYLES)
+
+def sanitize_html(html_content):
+    """
+    Sanitize HTML to prevent XSS/SSRF/LFI.
+    """
+    if not html_content:
+        return ""
+    return bleach.clean(
+        html_content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        css_sanitizer=css_sanitizer,
+        strip=True
+    )
+
+# Chrome launch args - HARDENED
 CHROME_ARGS = [
-    '--disable-dev-shm-usage',  # Use /tmp instead of /dev/shm (fixes memory issues)
-    '--no-sandbox',             # Required in Docker/restricted environments
-    '--disable-setuid-sandbox',
-    '--disable-gpu',            # Reduce memory usage
-    '--disable-web-security',   # Allow cross-origin fonts
+    '--disable-gpu',
+    # '--no-sandbox' # REMOVED: Potentially unsafe. Only re-enable if absolutely necessary in container.
+    # '--disable-web-security' # REMOVED: Prevents bypassing CORS/Same-origin policy
 ]
 
 def retry_with_backoff(func, max_retries=3, initial_delay=1):
@@ -58,7 +91,9 @@ def convert_html_to_pdf(request):
             page.set_default_timeout(90000)
             
             logger.info("Setting HTML content for PDF generation (via screenshot)")
-            page.set_content(html_content)
+            logger.info("Setting HTML content for PDF generation (via screenshot)")
+            safe_content = sanitize_html(html_content)
+            page.set_content(safe_content)
             
             # Wait for network idle with longer timeout
             try:
@@ -156,7 +191,9 @@ def convert_html_to_image(request):
             page.set_default_timeout(90000)  # 90 second page timeout
             
             logger.info("Setting HTML content for image generation")
-            page.set_content(html_content)
+            logger.info("Setting HTML content for image generation")
+            safe_content = sanitize_html(html_content)
+            page.set_content(safe_content)
             
             # Wait for network idle with longer timeout
             try:
@@ -224,7 +261,7 @@ def convert_multiple_html_to_pdf(request):
                 page = context.new_page()
                 page.set_default_timeout(90000)  # 90 second page timeout
                 
-                page.set_content(html_content)
+                page.set_content(sanitize_html(html_content))
                 
                 try:
                     logger.info(f"Page {idx + 1}: Waiting for network idle...")
@@ -318,7 +355,7 @@ def convert_multiple_html_to_images_zip(request):
                 page = context.new_page()
                 page.set_default_timeout(90000)
                 
-                page.set_content(html_content)
+                page.set_content(sanitize_html(html_content))
                 
                 try:
                     logger.info(f"Image {idx + 1}: Waiting for network idle...")

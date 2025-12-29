@@ -27,10 +27,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 ENV = os.getenv('ENV', 'development')
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-+5plz)e584@+t(w$r=h!v1^8k#(zjv%pk=&@qhy(w#yu8v+wyn')
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+if ENV == 'production' and not SECRET_KEY:
+    raise ValueError("SECRET_KEY must be set in production environment!")
+
+if not SECRET_KEY:
+    SECRET_KEY = 'django-insecure-dev-key-do-not-use-in-production'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
 
