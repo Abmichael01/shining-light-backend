@@ -40,6 +40,9 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
 
+# Allow ngrok URLs for testing webhooks
+ALLOWED_HOSTS.extend(['.ngrok-free.dev', '.ngrok.io'])
+
 
 # Application definition
 
@@ -278,3 +281,12 @@ SERVER_EMAIL = os.getenv('SERVER_EMAIL', 'admin@shininglightschools.com')
 # Media files configuration
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Frontend URL Configuration
+if ENV == 'production':
+    FRONTEND_URL = 'https://shininglightschoolsijebuode.com'
+else:
+    FRONTEND_URL = 'http://localhost:3000'
+
+# Contact Email
+CONTACT_EMAIL = 'ict@shininglightschoolsijebuode.com'

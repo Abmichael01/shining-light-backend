@@ -28,6 +28,6 @@ class LoginView(DjRestAuthLoginView):
             'detail': 'Login successful',
             'user': user_serializer.data
         }
-        
+         
         response = Response(data, status=200)
         return response

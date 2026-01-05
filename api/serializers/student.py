@@ -18,7 +18,7 @@ class BioDataSerializer(serializers.ModelSerializer):
             'lin', 'has_medical_condition', 'medical_condition_details', 'blood_group',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'age']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'age', 'student']
     
     def get_age(self, obj):
         """Calculate and return age"""
@@ -47,7 +47,7 @@ class GuardianSerializer(serializers.ModelSerializer):
             'phone_number', 'email', 'occupation', 'place_of_employment',
             'is_primary_contact', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at', 'full_name']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'full_name', 'student']
     
     def get_full_name(self, obj):
         """Return full name"""
@@ -65,7 +65,7 @@ class DocumentSerializer(serializers.ModelSerializer):
             'verified', 'verified_by', 'verified_by_name', 'verified_at', 'notes',
             'uploaded_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'uploaded_at', 'updated_at', 'verified_by', 'verified_at', 'verified_by_name']
+        read_only_fields = ['id', 'uploaded_at', 'updated_at', 'verified_by', 'verified_at', 'verified_by_name', 'student']
 
 
 class BiometricSerializer(serializers.ModelSerializer):

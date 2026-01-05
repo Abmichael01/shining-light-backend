@@ -41,6 +41,10 @@ urlpatterns = [
     
     # CBT endpoints (passcodes, exam access, etc.)
     path('cbt/', include('api.urls.cbt')),
+    
+    # Admission endpoints (applicant portal)
+    path('admission/', include('api.urls.admission')),
+    
     # Staff portal (self-service)
     path('staff-portal/me/', staff_me, name='staff-me'),
     path('staff-portal/students/', staff_students, name='staff-students'),

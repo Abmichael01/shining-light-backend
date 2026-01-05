@@ -37,14 +37,17 @@ class CBTPasscodeService:
         """
         try:
             with transaction.atomic():
-                # Find student
+                # Find student - try admission number, application number, then ID
                 try:
                     student = Student.objects.get(admission_number=student_id)
                 except Student.DoesNotExist:
                     try:
-                        student = Student.objects.get(id=student_id)
+                        student = Student.objects.get(application_number=student_id)
                     except Student.DoesNotExist:
-                        raise ValueError("Student not found")
+                        try:
+                            student = Student.objects.get(id=student_id)
+                        except Student.DoesNotExist:
+                            raise ValueError("Student not found")
                 
                 # Check for existing active passcode for this student
                 existing_code = CBTExamCode.objects.filter(
@@ -202,6 +205,14 @@ class CBTPasscodeService:
                 # Check expiration
                 if timezone.now() > cbt_code.expires_at:
                     raise ValueError("Passcode has expired")
+                
+                # Check time-bound access (if configured)
+                current_time = timezone.now()
+                if cbt_code.access_start_datetime and current_time < cbt_code.access_start_datetime:
+                    raise ValueError(f"Exam hasn't started yet. Access begins at {cbt_code.access_start_datetime.strftime('%Y-%m-%d %H:%M')}")
+                
+                if cbt_code.access_end_datetime and current_time > cbt_code.access_end_datetime:
+                    raise ValueError(f"Exam has ended. Access ended at {cbt_code.access_end_datetime.strftime('%Y-%m-%d %H:%M')}")
                 
                 # Build passcode data from database record
                 passcode_data = {
@@ -363,14 +374,17 @@ class CBTPasscodeService:
             dict: Active passcode data or None
         """
         try:
-            # Find student
+            # Find student - try admission number, application number, then ID
             try:
                 student = Student.objects.get(admission_number=student_id)
             except Student.DoesNotExist:
                 try:
-                    student = Student.objects.get(id=student_id)
+                    student = Student.objects.get(application_number=student_id)
                 except Student.DoesNotExist:
-                    return None
+                    try:
+                        student = Student.objects.get(id=student_id)
+                    except Student.DoesNotExist:
+                        return None
             
             # Get passcode from student cache first
             student_cache_key = f"{cls.CACHE_PREFIX}:student:{student.id}"

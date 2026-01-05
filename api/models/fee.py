@@ -11,6 +11,48 @@ from api.models.academic import School, Class, Session, SessionTerm
 from api.models.student import Student
 
 
+class PaymentPurpose(models.Model):
+    """
+    Categorizes payments by functionality
+    Allows linking payments to specific features (admission, exams, tuition, etc.)
+    """
+    
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text='Purpose name (e.g., "Application Fee", "Exam Fee", "Tuition")'
+    )
+    code = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text='Unique code (e.g., "admission", "cbt_exam", "school_fees")'
+    )
+    description = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'payment_purposes'
+        ordering = ['name']
+        verbose_name = 'Payment Purpose'
+        verbose_name_plural = 'Payment Purposes'
+    
+    def __str__(self):
+        return f"{self.name} ({self.code})"
+    
+    def clean(self):
+        """Validate payment purpose"""
+        super().clean()
+        
+        # Code should be lowercase with underscores
+        if self.code and not self.code.islower():
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                'code': 'Code must be lowercase with underscores (e.g., "admission", "cbt_exam")'
+            })
+
+
 class FeeType(models.Model):
     """
     Fee Type - Define different types of fees (Admission, Tuition, etc.)
@@ -159,6 +201,16 @@ class FeePayment(models.Model):
         help_text='Which installment is this (1, 2, 3, etc.)'
     )
     
+    # Payment Purpose (categorization)
+    payment_purpose = models.ForeignKey(
+        PaymentPurpose,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='payments',
+        help_text='Purpose of this payment (admission, exam, tuition, etc.)'
+    )
+    
     # Session/Term Tracking (for recurring fees)
     session = models.ForeignKey(
         Session,
@@ -293,3 +345,54 @@ class FeePayment(models.Model):
                 })
 
 
+class ApplicationSlip(models.Model):
+    """
+    Stores generated application slips for applicants
+    Generated upon application submission
+    """
+    
+    student = models.OneToOneField(
+        Student,
+        on_delete=models.CASCADE,
+        related_name='application_slip',
+        verbose_name='student'
+    )
+    application_number = models.CharField(
+        max_length=20,
+        help_text='Application number from student record'
+    )
+    screening_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Scheduled date for screening/interview'
+    )
+    pdf_file = models.FileField(
+        upload_to='application_slips/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        help_text='Generated application slip PDF'
+    )
+    generated_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'application_slips'
+        ordering = ['-generated_at']
+        verbose_name = 'Application Slip'
+        verbose_name_plural = 'Application Slips'
+    
+    def __str__(self):
+        return f"Application Slip - {self.application_number}"
+    
+    def __str__(self):
+        return f"Application Slip - {self.application_number} (Seat: {self.seat_number})"
+
+
+class Anything :
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+    
+    def __str__(self):
+        return str(self.kwargs)
+    def doSomething(self):
+        print("hey how far now,  imiss u so much")
+        print(self.kwargs)

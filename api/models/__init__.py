@@ -16,7 +16,8 @@ from .academic import (
     StudentAnswer,
     Club,
     ExamHall,
-    CBTExamCode
+    CBTExamCode,
+    AdmissionSettings
 )
 from .student import (
     Student,
@@ -38,7 +39,9 @@ from .staff import (
 )
 from .fee import (
     FeeType,
-    FeePayment
+    FeePayment,
+    PaymentPurpose,
+    ApplicationSlip
 )
 
 __all__ = [
@@ -61,6 +64,7 @@ __all__ = [
     'Club',
     'ExamHall',
     'CBTExamCode',
+    'AdmissionSettings',
     'Student',
     'BioData',
     'Guardian',
@@ -76,6 +80,8 @@ __all__ = [
     'LoanApplication',
     'LoanPayment',
     'FeeType',
-    'FeePayment'
+    'FeePayment',
+    'PaymentPurpose',
+    'ApplicationSlip'
 ]
 

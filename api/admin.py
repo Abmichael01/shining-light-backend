@@ -20,6 +20,7 @@ from .models import (
     Club,
     ExamHall,
     CBTExamCode,
+    AdmissionSettings,
     Student,
     BioData,
     Guardian,
@@ -34,7 +35,9 @@ from .models import (
     LoanApplication,
     LoanPayment,
     FeeType,
-    FeePayment
+    FeePayment,
+    PaymentPurpose,
+    ApplicationSlip
 )
 
 
@@ -1323,4 +1326,114 @@ class FeePaymentAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+
+# ===== Admission Management =====
+
+@admin.register(AdmissionSettings)
+class AdmissionSettingsAdmin(admin.ModelAdmin):
+    """Admin interface for AdmissionSettings model"""
+    
+    list_display = [
+        'school',
+        'is_admission_open',
+        'admission_start_datetime',
+        'admission_end_datetime',
+        'application_fee_amount',
+        'created_by',
+        'updated_at'
+    ]
+    list_filter = ['is_admission_open', 'school', 'admission_start_datetime']
+    search_fields = ['school__name']
+    ordering = ['-updated_at']
+    readonly_fields = ['created_by', 'created_at', 'updated_at']
+    
+    fieldsets = (
+        (_('School'), {
+            'fields': ('school',)
+        }),
+        (_('Admission Status'), {
+            'fields': ('is_admission_open',)
+        }),
+        (_('Admission Period'), {
+            'fields': ('admission_start_datetime', 'admission_end_datetime')
+        }),
+        (_('Fee'), {
+            'fields': ('application_fee_amount',)
+        }),
+        (_('Tracking'), {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by to current user"""
+        if not obj.pk:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(PaymentPurpose)
+class PaymentPurposeAdmin(admin.ModelAdmin):
+    """Admin interface for PaymentPurpose model"""
+    
+    list_display = ['name', 'code', 'is_active', 'created_at']
+    list_filter = ['is_active', 'created_at']
+    search_fields = ['name', 'code', 'description']
+    ordering = ['name']
+    readonly_fields = ['created_at', 'updated_at']
+    
+    fieldsets = (
+        (_('Purpose Information'), {
+            'fields': ('name', 'code', 'description', 'is_active')
+        }),
+        (_('Timestamps'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(ApplicationSlip)
+class ApplicationSlipAdmin(admin.ModelAdmin):
+    """Admin interface for ApplicationSlip model"""
+    
+    list_display = [
+        'get_student_name',
+        'application_number',
+        'screening_date',
+        'get_school_name',
+        'generated_at'
+    ]
+    list_filter = ['student__school', 'generated_at', 'screening_date']
+    search_fields = [
+        'application_number',
+        'student__biodata__surname',
+        'student__biodata__first_name'
+    ]
+    ordering = ['-generated_at']
+    readonly_fields = ['generated_at']
+    
+    fieldsets = (
+        (_('Student Information'), {
+            'fields': ('student', 'application_number')
+        }),
+        (_('Screening Details'), {
+            'fields': ('screening_date',)
+        }),
+        (_('Application Slip'), {
+            'fields': ('pdf_file', 'generated_at')
+        }),
+    )
+    
+    def get_student_name(self, obj):
+        """Display student name"""
+        return obj.student.get_full_name()
+    get_student_name.short_description = 'Student Name'
+    
+    def get_school_name(self, obj):
+        """Display school name"""
+        return obj.student.school.name
+    get_school_name.short_description = 'School'
 

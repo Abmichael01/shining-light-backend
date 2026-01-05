@@ -66,6 +66,80 @@ class School(models.Model):
         super().save(*args, **kwargs)
 
 
+class AdmissionSettings(models.Model):
+    """
+    Controls admission portal availability and configuration
+    One active settings per school
+    """
+    
+    school = models.ForeignKey(
+        School,
+        on_delete=models.CASCADE,
+        related_name='admission_settings',
+        verbose_name=_('school')
+    )
+    is_admission_open = models.BooleanField(
+        _('admission open'),
+        default=False,
+        help_text=_('Toggle to open/close admission portal')
+    )
+    admission_start_datetime = models.DateTimeField(
+        _('admission start datetime'),
+        null=True,
+        blank=True,
+        help_text=_('When admission opens')
+    )
+    admission_end_datetime = models.DateTimeField(
+        _('admission end datetime'),
+        null=True,
+        blank=True,
+        help_text=_('When admission closes')
+    )
+    application_fee_amount = models.DecimalField(
+        _('application fee amount'),
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text=_('Application fee amount')
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admission_settings_created',
+        verbose_name=_('created by')
+    )
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Admission Settings')
+        verbose_name_plural = _('Admission Settings')
+        ordering = ['-updated_at']
+        unique_together = [['school']]
+    
+    def __str__(self):
+        status = "Open" if self.is_admission_open else "Closed"
+        return f"{self.school.name} - Admission {status}"
+    
+    def clean(self):
+        """Validate admission settings"""
+        super().clean()
+        
+        # If admission is open, dates should be provided
+        if self.is_admission_open:
+            if not self.admission_start_datetime or not self.admission_end_datetime:
+                raise ValidationError(_('Start and end datetime required when admission is open'))
+            
+            if self.admission_end_datetime <= self.admission_start_datetime:
+                raise ValidationError(_('End datetime must be after start datetime'))
+        
+        # Application fee must be non-negative
+        if self.application_fee_amount < 0:
+            raise ValidationError(_('Application fee cannot be negative'))
+
+
 # Term model removed - SessionTerm handles everything directly
 
 
@@ -1331,6 +1405,21 @@ class CBTExamCode(models.Model):
     is_used = models.BooleanField(_('used'), default=False, help_text=_('Whether this code has been used'))
     used_at = models.DateTimeField(_('used at'), null=True, blank=True)
     expires_at = models.DateTimeField(_('expires at'), help_text=_('When this passcode expires'))
+    
+    # Time-bound access control
+    access_start_datetime = models.DateTimeField(
+        _('access start datetime'),
+        null=True,
+        blank=True,
+        help_text=_('Code cannot be used before this datetime (for scheduled exams)')
+    )
+    access_end_datetime = models.DateTimeField(
+        _('access end datetime'),
+        null=True,
+        blank=True,
+        help_text=_('Code cannot be used after this datetime (for scheduled exams)')
+    )
+    
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

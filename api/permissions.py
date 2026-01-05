@@ -101,3 +101,20 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         
         return False
 
+
+class IsApplicant(permissions.BasePermission):
+    """
+    Permission check for applicant users.
+    Allows authenticated users with user_type='applicant'.
+    """
+    
+    def has_permission(self, request, view):
+        user = request.user
+        if not user or not user.is_authenticated:
+            print(f"❌ IsApplicant: User not authenticated")
+            return False
+        
+        user_type = getattr(user, 'user_type', None)
+        print(f"🔍 IsApplicant check: user={user.email}, user_type={user_type}")
+        
+        return user_type == 'applicant'

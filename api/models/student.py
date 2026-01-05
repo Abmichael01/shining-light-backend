@@ -137,6 +137,27 @@ class Student(models.Model):
         related_name='students_reviewed',
         verbose_name=_('reviewed by')
     )
+    
+    # Application checklist (for online applicants)
+    application_checklist = models.JSONField(
+        _('application checklist'),
+        blank=True,
+        default=dict,
+        help_text=_('Tracks completion of application steps: biodata, guardians, documents, payment')
+    )
+    seat_number = models.CharField(
+        _('seat number'),
+        max_length=20,
+        blank=True,
+        help_text=_('Assigned when application is submitted')
+    )
+    application_submitted_at = models.DateTimeField(
+        _('application submitted at'),
+        null=True,
+        blank=True,
+        help_text=_('When the online application was submitted')
+    )
+    
     rejection_reason = models.TextField(_('rejection reason'), blank=True)
     
     # Timestamps

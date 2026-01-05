@@ -33,14 +33,17 @@ class CBTSessionService:
             dict: Session information
         """
         try:
-            # Find student
+            # Find student - try admission number, application number, then ID
             try:
                 student = Student.objects.get(admission_number=student_id)
             except Student.DoesNotExist:
                 try:
-                    student = Student.objects.get(id=student_id)
+                    student = Student.objects.get(application_number=student_id)
                 except Student.DoesNotExist:
-                    raise ValueError("Student not found")
+                    try:
+                        student = Student.objects.get(id=student_id)
+                    except Student.DoesNotExist:
+                        raise ValueError("Student not found")
             
             # Generate session token
             session_token = cls._generate_session_token()
@@ -181,14 +184,17 @@ class CBTSessionService:
             dict: Session data or None
         """
         try:
-            # Find student
+            # Find student - try admission number, application number, then ID
             try:
                 student = Student.objects.get(admission_number=student_id)
             except Student.DoesNotExist:
                 try:
-                    student = Student.objects.get(id=student_id)
+                    student = Student.objects.get(application_number=student_id)
                 except Student.DoesNotExist:
-                    return None
+                    try:
+                        student = Student.objects.get(id=student_id)
+                    except Student.DoesNotExist:
+                        return None
             
             # Get session token
             student_session_key = f"{cls.CACHE_PREFIX}:student:{student.id}"
