@@ -9,7 +9,7 @@ from reportlab.lib.units import cm, inch
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.platypus import Table, TableStyle
-import qrcode
+import qrcode 
 from django.conf import settings
 from django.core.files.base import ContentFile
 import os
