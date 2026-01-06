@@ -7,7 +7,7 @@ from io import BytesIO
 from reportlab.lib.pagesizes import A4 
 from reportlab.lib.units import cm, inch
 from reportlab.pdfgen import canvas
-from reportlab.lib import colors
+from reportlab.lib import colors 
 from reportlab.platypus import Table, TableStyle
 import qrcode 
 from django.conf import settings
