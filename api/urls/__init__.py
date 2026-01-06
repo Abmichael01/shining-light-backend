@@ -45,6 +45,9 @@ urlpatterns = [
     # Admission endpoints (applicant portal)
     path('admission/', include('api.urls.admission')),
     
+    # Scheduling endpoints (Timetable, Attendance)
+    path('scheduling/', include('api.urls.scheduling')),
+    
     # Staff portal (self-service)
     path('staff-portal/me/', staff_me, name='staff-me'),
     path('staff-portal/students/', staff_students, name='staff-students'),

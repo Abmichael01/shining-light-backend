@@ -915,7 +915,19 @@ class Exam(models.Model):
         Subject,
         on_delete=models.CASCADE,
         related_name='exams',
-        verbose_name=_('subject')
+        verbose_name=_('subject'),
+        null=True,
+        blank=True,
+        help_text=_('Subject for academic exams (leave blank for general admission exams)')
+    )
+    exam_class = models.ForeignKey(
+        'Class',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='admission_exams',
+        verbose_name=_('exam class'),
+        help_text=_('Target class for admission exams (e.g., JSS1)')
     )
     topics = models.ManyToManyField(
         Topic,
@@ -991,6 +1003,19 @@ class Exam(models.Model):
         _('allow calculator'),
         default=False,
         help_text=_('Allow students to open the calculator tool during the exam')
+    )
+    
+    # Applicant/Admission Specifics
+    is_applicant_exam = models.BooleanField(
+        _('is applicant exam'),
+        default=False,
+        help_text=_('Is this an admission exam for new applicants?')
+    )
+    question_selection_count = models.PositiveIntegerField(
+        _('question selection count'),
+        null=True,
+        blank=True,
+        help_text=_('Number of questions to randomly select from the bank (e.g., 50)')
     )
     
     # Status

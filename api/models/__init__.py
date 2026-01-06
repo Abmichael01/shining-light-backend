@@ -43,6 +43,12 @@ from .fee import (
     PaymentPurpose,
     ApplicationSlip
 )
+from .scheduling import (
+    Period,
+    TimetableEntry,
+    AttendanceRecord,
+    StudentAttendance
+)
 
 __all__ = [
     'User',
@@ -82,6 +88,10 @@ __all__ = [
     'FeeType',
     'FeePayment',
     'PaymentPurpose',
-    'ApplicationSlip'
+    'ApplicationSlip',
+    'Period',
+    'TimetableEntry',
+    'AttendanceRecord',
+    'StudentAttendance'
 ]
 

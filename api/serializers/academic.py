@@ -382,7 +382,24 @@ class ExamSerializer(serializers.ModelSerializer):
     
     def get_questions(self, obj):
         """Format questions with options for CBT"""
-        questions = obj.questions.all()
+        # Check if specific question IDs are provided in context (from randomized selection)
+        specific_question_ids = self.context.get('specific_question_ids')
+        
+        if specific_question_ids:
+            # Preserve the order from specific_question_ids
+            # Fetch all questions first
+            from api.models import Question
+            all_questions = {q.id: q for q in Question.objects.filter(id__in=specific_question_ids)}
+            
+            # Reconstruct list in the correct order
+            questions = []
+            for q_id in specific_question_ids:
+                if q_id in all_questions:
+                    questions.append(all_questions[q_id])
+        else:
+            # Default behavior: return all assigned questions
+            questions = obj.questions.all()
+            
         formatted_questions = []
         
         for question in questions:

@@ -12,6 +12,7 @@ from api.serializers.academic import ExamSerializer, QuestionSerializer
 from api.serializers.student import CBTStudentProfileSerializer
 from django.utils import timezone
 from django.conf import settings
+from api.utils.exam_generator import generate_applicant_exam
 import random
 import json
 import os
@@ -570,7 +571,26 @@ def get_cbt_exam(request, exam_id):
             )
         
         # Serialize exam
-        serializer = ExamSerializer(exam)
+        context = {'request': request}
+        
+        # If it's an applicant exam, ensure we have a generated set of questions
+        if exam.is_applicant_exam:
+            # We need the real Student object
+            from api.models import Student
+            try:
+                student_obj = Student.objects.get(admission_number=student.admission_number)
+                
+                # Generate or get existing exam session with randomized questions
+                student_exam = generate_applicant_exam(student_obj, exam)
+                
+                # If we have a question order, pass it to the serializer
+                if student_exam and student_exam.question_order:
+                    context['specific_question_ids'] = student_exam.question_order
+                    print(f"DEBUG: Serving specific questions for applicant: {len(student_exam.question_order)}")
+            except Student.DoesNotExist:
+                pass  # Fallback to default behavior if student not found (shouldn't happen)
+                
+        serializer = ExamSerializer(exam, context=context)
         return Response(serializer.data, status=status.HTTP_200_OK)
         
     except Exception as e:
