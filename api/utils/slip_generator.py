@@ -14,7 +14,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 import os
 from datetime import datetime
-
+ 
 
 class SlipPDFGenerator:
     """Generate application slip PDFs"""
