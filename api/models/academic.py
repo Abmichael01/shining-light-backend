@@ -24,6 +24,19 @@ class School(models.Model):
     school_type = models.CharField(_('school type'), max_length=20, choices=SCHOOL_TYPE_CHOICES, unique=True)
     code = models.CharField(_('school code'), max_length=10, unique=True, editable=False)
     is_active = models.BooleanField(_('active'), default=True)
+    
+    # Assessment Configuration
+    ca_max_score = models.PositiveIntegerField(
+        _('CA max score'),
+        default=40,
+        help_text=_('Maximum score for Continuous Assessment (e.g., 40)')
+    )
+    exam_max_score = models.PositiveIntegerField(
+        _('Exam max score'),
+        default=60,
+        help_text=_('Maximum score for Examination (e.g., 60)')
+    )
+    
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
     class Meta:
@@ -327,6 +340,12 @@ class Class(models.Model):
         max_length=10,
         unique=True,
         help_text=_('Short code for class, e.g., SS1, JSS2, PRI1, NUR1')
+    )
+    grade_level = models.CharField(
+        _('grade level'),
+        max_length=50,
+        blank=True,
+        help_text=_('Grouping for arms (e.g. "JSS 1" for JSS 1A, JSS 1B)')
     )
     school = models.ForeignKey(
         School,
@@ -674,6 +693,21 @@ class Grade(models.Model):
         editable=False,
         help_text=_('Auto-generated from grade letter (A=1, B=2, etc.)')
     )
+    
+    # Default Remarks
+    teacher_remark = models.CharField(
+        _('teacher remark'),
+        max_length=255,
+        blank=True,
+        help_text=_('Default remark for class teacher if average falls in this range')
+    )
+    principal_remark = models.CharField(
+        _('principal remark'),
+        max_length=255,
+        blank=True,
+        help_text=_('Default remark for principal if average falls in this range')
+    )
+    
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
     class Meta:

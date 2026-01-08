@@ -121,6 +121,8 @@ CSRF_TRUSTED_ORIGINS = [
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
+    'http://localhost:3050',
+    'http://127.0.0.1:3050',
 ]
 
 # CORS Settings
@@ -133,6 +135,8 @@ CORS_ALLOWED_ORIGINS = [
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'http://127.0.0.1:3001',
+    'http://localhost:3050',
+    'http://127.0.0.1:3050',
 ]
 
 MIDDLEWARE = [
@@ -286,7 +290,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 if ENV == 'production':
     FRONTEND_URL = 'https://shininglightschoolsijebuode.com'
 else:
-    FRONTEND_URL = 'http://localhost:3000'
+    FRONTEND_URL = 'http://localhost:3050'
 
 # Contact Email
 CONTACT_EMAIL = 'ict@shininglightschoolsijebuode.com'

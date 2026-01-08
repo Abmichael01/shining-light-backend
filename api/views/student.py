@@ -768,7 +768,14 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                     total_score__isnull=False
                 ).order_by('-total_score')
                 
-                # Assign positions (handling ties)
+                # Calculate class statistics for this subject
+                stats = registrations.aggregate(
+                    max_score=models.Max('total_score'),
+                    min_score=models.Min('total_score'),
+                    avg_score=models.Avg('total_score')
+                )
+                
+                # Assign positions (handling ties) and save statistics
                 current_pos = 1
                 last_score = None
                 for i, reg in enumerate(registrations):
@@ -776,7 +783,10 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                         current_pos = i + 1
                     
                     reg.position = current_pos
-                    reg.save(update_fields=['position'])
+                    reg.highest_score = stats['max_score']
+                    reg.lowest_score = stats['min_score']
+                    reg.subject_average = stats['avg_score']
+                    reg.save(update_fields=['position', 'highest_score', 'lowest_score', 'subject_average'])
                     last_score = reg.total_score
 
             # 2. Overall Class Positions
@@ -807,19 +817,114 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                     )
                     report.average_score = avg
                     report.total_score = total
+                    
+                    # CUMULATIVE AVERAGE CALCULATION (3rd Term Logic)
+                    # Check if this is the 3rd term (assuming term_order=3 or term_name contains "3rd" or "Third")
+                    # Ideally SessionTerm should have an 'order' field or similar. 
+                    # We'll check the SessionTerm object associated with the ID.
+                    current_term = SessionTerm.objects.get(id=session_term_id)
+                    is_third_term = '3rd' in current_term.term_name or 'Third' in current_term.term_name or current_term.term_order == 3
+                    
+                    if is_third_term:
+                        # Fetch all reports for this student in this session
+                        all_terms_reports = TermReport.objects.filter(
+                            student_id=st_id,
+                            session_id=session_id
+                        ).exclude(id=report.id) # Exclude current one to avoid double counting if it was already saved
+                        
+                        # Sum up previous averages + current average
+                        total_avg_sum = avg
+                        term_count = 1
+                        
+                        for prev_report in all_terms_reports:
+                            if prev_report.average_score:
+                                total_avg_sum += prev_report.average_score
+                                term_count += 1
+                        
+                        cumulative_avg = total_avg_sum / term_count
+                        report.cumulative_average = cumulative_avg
+                    else:
+                        # Ensure cumulative_average is None for 1st and 2nd terms
+                        report.cumulative_average = None
+                    
+                    # AUTOMATED REMARKS (Teacher & Principal)
+                    # Based on the average_score, find the corresponding Grade and use its remarks
+                    from api.models import Grade
+                    grade_obj = Grade.get_grade_for_score(float(avg))
+                    
+                    if grade_obj:
+                        # Only set if currently empty to allow for manual overrides
+                        if not report.class_teacher_report and grade_obj.teacher_remark:
+                            report.class_teacher_report = grade_obj.teacher_remark
+                            
+                        if not report.principal_report and grade_obj.principal_remark:
+                            report.principal_report = grade_obj.principal_remark
+                        
                     report.save()
                     student_averages.append({'id': report.id, 'avg': avg})
             
             # Rank students by average score
-            student_averages.sort(key=lambda x: x['avg'], reverse=True)
-            current_pos = 1
-            last_avg = None
-            for i, item in enumerate(student_averages):
-                if last_avg is not None and item['avg'] < last_avg:
-                    current_pos = i + 1
+            # 2. Ranking Logic (Arm vs Set)
+            # Fetch all generated reports
+            all_reports = TermReport.objects.filter(
+                session_id=session_id,
+                session_term_id=session_term_id,
+                average_score__isnull=False
+            ).select_related('student__class_model')
+            
+            # --- A. Arm Ranking (Position in Class Arm) ---
+            # Group reports by class_model (e.g. JSS 1A, JSS 1B)
+            from collections import defaultdict
+            reports_by_arm = defaultdict(list)
+            for rep in all_reports:
+                reports_by_arm[rep.student.class_model_id].append(rep)
+            
+            for arm_code, arm_reports in reports_by_arm.items():
+                # Sort descending by average
+                arm_reports.sort(key=lambda x: x.average_score, reverse=True)
                 
-                TermReport.objects.filter(pk=item['id']).update(class_position=current_pos)
-                last_avg = item['avg']
+                total_in_arm = len(arm_reports)
+                current_pos = 1
+                last_avg = None
+                
+                for i, rep in enumerate(arm_reports):
+                    if last_avg is not None and rep.average_score < last_avg:
+                        current_pos = i + 1
+                    
+                    # Update DB directly
+                    TermReport.objects.filter(pk=rep.id).update(
+                        class_position=current_pos,
+                        total_students=total_in_arm
+                    )
+                    last_avg = rep.average_score
+
+            # --- B. Set Ranking (Position in Grade Level) ---
+            # Group reports by grade_level (e.g. JSS 1)
+            # If grade_level is not set, we can fallback to grouping by None, or just skip
+            reports_by_set = defaultdict(list)
+            for rep in all_reports:
+                g_level = rep.student.class_model.grade_level
+                if g_level: # Only rank if categorized
+                    reports_by_set[g_level].append(rep)
+            
+            for set_name, set_reports in reports_by_set.items():
+                # Sort descending by average
+                set_reports.sort(key=lambda x: x.average_score, reverse=True)
+                
+                total_in_set = len(set_reports)
+                current_pos = 1
+                last_avg = None
+                
+                for i, rep in enumerate(set_reports):
+                    if last_avg is not None and rep.average_score < last_avg:
+                        current_pos = i + 1
+                    
+                    # Update DB directly
+                    TermReport.objects.filter(pk=rep.id).update(
+                        grade_position=current_pos,
+                        total_students_grade=total_in_set
+                    )
+                    last_avg = rep.average_score
 
         return Response({'message': 'Rankings calculated successfully'})
 

@@ -51,9 +51,9 @@ class Command(BaseCommand):
             schools[school_data['school_type']] = school
             self.stdout.write(self.style.SUCCESS(f'  ✓ {school}'))
 
-        # 2. Create Session
-        self.stdout.write('Creating academic session...')
-        session, _ = Session.objects.get_or_create(
+        # 2. Create Session and SessionTerm
+        self.stdout.write('Creating academic session and session term...')
+        session, session_created = Session.objects.get_or_create(
             name='2024/2025',
             defaults={
                 'start_date': date(2024, 9, 1),
@@ -61,29 +61,44 @@ class Command(BaseCommand):
                 'is_current': True
             }
         )
-        self.stdout.write(self.style.SUCCESS(f'  ✓ {session}'))
+        self.stdout.write(self.style.SUCCESS(f'  ✓ Session: {session}'))
+        
+        # Get the automatically created 1st Term (created by Session save method)
+        session_term = session.session_terms.filter(term_name='1st Term').first()
+        if session_term:
+            self.stdout.write(self.style.SUCCESS(f'  ✓ Session Term: {session_term}'))
+        else:
+            # Fallback: manually create if auto-creation failed
+            session_term = SessionTerm.objects.create(
+                session=session,
+                term_name='1st Term',
+                start_date=date(2024, 9, 1),
+                end_date=date(2024, 12, 15),
+                is_current=True
+            )
+            self.stdout.write(self.style.SUCCESS(f'  ✓ Created Session Term: {session_term}'))
 
         # 3. Create Classes
         self.stdout.write('Creating classes...')
         classes_data = [
             # Nursery
-            {'name': 'Nursery 1', 'code': 'NUR1', 'school': 'Nursery', 'order': 1},
-            {'name': 'Nursery 2', 'code': 'NUR2', 'school': 'Nursery', 'order': 2},
+            {'name': 'Nursery 1', 'code': 'NUR1', 'school': 'Nursery', 'grade_level': 'Nursery 1', 'order': 1},
+            {'name': 'Nursery 2', 'code': 'NUR2', 'school': 'Nursery', 'grade_level': 'Nursery 2', 'order': 2},
             # Primary
-            {'name': 'Primary 1', 'code': 'PRI1', 'school': 'Primary', 'order': 3},
-            {'name': 'Primary 2', 'code': 'PRI2', 'school': 'Primary', 'order': 4},
-            {'name': 'Primary 3', 'code': 'PRI3', 'school': 'Primary', 'order': 5},
-            {'name': 'Primary 4', 'code': 'PRI4', 'school': 'Primary', 'order': 6},
-            {'name': 'Primary 5', 'code': 'PRI5', 'school': 'Primary', 'order': 7},
-            {'name': 'Primary 6', 'code': 'PRI6', 'school': 'Primary', 'order': 8},
+            {'name': 'Primary 1', 'code': 'PRI1', 'school': 'Primary', 'grade_level': 'Primary 1', 'order': 3},
+            {'name': 'Primary 2', 'code': 'PRI2', 'school': 'Primary', 'grade_level': 'Primary 2', 'order': 4},
+            {'name': 'Primary 3', 'code': 'PRI3', 'school': 'Primary', 'grade_level': 'Primary 3', 'order': 5},
+            {'name': 'Primary 4', 'code': 'PRI4', 'school': 'Primary', 'grade_level': 'Primary 4', 'order': 6},
+            {'name': 'Primary 5', 'code': 'PRI5', 'school': 'Primary', 'grade_level': 'Primary 5', 'order': 7},
+            {'name': 'Primary 6', 'code': 'PRI6', 'school': 'Primary', 'grade_level': 'Primary 6', 'order': 8},
             # JSS
-            {'name': 'JSS 1', 'code': 'JSS1', 'school': 'Junior Secondary', 'order': 9},
-            {'name': 'JSS 2', 'code': 'JSS2', 'school': 'Junior Secondary', 'order': 10},
-            {'name': 'JSS 3', 'code': 'JSS3', 'school': 'Junior Secondary', 'order': 11},
+            {'name': 'JSS 1', 'code': 'JSS1', 'school': 'Junior Secondary', 'grade_level': 'JSS 1', 'order': 9},
+            {'name': 'JSS 2', 'code': 'JSS2', 'school': 'Junior Secondary', 'grade_level': 'JSS 2', 'order': 10},
+            {'name': 'JSS 3', 'code': 'JSS3', 'school': 'Junior Secondary', 'grade_level': 'JSS 3', 'order': 11},
             # SSS
-            {'name': 'SSS 1', 'code': 'SS1', 'school': 'Senior Secondary', 'order': 12},
-            {'name': 'SSS 2', 'code': 'SS2', 'school': 'Senior Secondary', 'order': 13},
-            {'name': 'SSS 3', 'code': 'SS3', 'school': 'Senior Secondary', 'order': 14},
+            {'name': 'SSS 1', 'code': 'SS1', 'school': 'Senior Secondary', 'grade_level': 'SSS 1', 'order': 12},
+            {'name': 'SSS 2', 'code': 'SS2', 'school': 'Senior Secondary', 'grade_level': 'SSS 2', 'order': 13},
+            {'name': 'SSS 3', 'code': 'SS3', 'school': 'Senior Secondary', 'grade_level': 'SSS 3', 'order': 14},
         ]
 
         classes = {}
@@ -104,6 +119,7 @@ class Command(BaseCommand):
                 class_obj = Class(
                     name=class_data['name'],
                     class_code=class_data['code'],
+                    grade_level=class_data.get('grade_level', class_data['name']),
                     school=school_obj,
                     order=class_data['order']
                 )
@@ -205,15 +221,63 @@ class Command(BaseCommand):
                 if created:
                     self.stdout.write(self.style.SUCCESS(f'  ✓ {subj}'))
 
-        # 7. Create Grades
+        # 7. Create Grades with Remarks
         self.stdout.write('Creating grades...')
         grades_data = [
-            {'grade_letter': 'A', 'grade_name': 'A', 'min_score': 70, 'max_score': 100, 'grade_description': 'Excellent'},
-            {'grade_letter': 'B', 'grade_name': 'B', 'min_score': 60, 'max_score': 69, 'grade_description': 'Very Good'},
-            {'grade_letter': 'C', 'grade_name': 'C', 'min_score': 50, 'max_score': 59, 'grade_description': 'Good'},
-            {'grade_letter': 'D', 'grade_name': 'D', 'min_score': 45, 'max_score': 49, 'grade_description': 'Pass'},
-            {'grade_letter': 'E', 'grade_name': 'E', 'min_score': 40, 'max_score': 44, 'grade_description': 'Pass'},
-            {'grade_letter': 'F', 'grade_name': 'F', 'min_score': 0, 'max_score': 39, 'grade_description': 'Fail'},
+            {
+                'grade_letter': 'A',
+                'grade_name': 'A',
+                'min_score': 70,
+                'max_score': 100,
+                'grade_description': 'Excellent',
+                'teacher_remark': 'Excellent performance! Keep up the outstanding work.',
+                'principal_remark': 'Exemplary achievement. Well done!'
+            },
+            {
+                'grade_letter': 'B',
+                'grade_name': 'B',
+                'min_score': 60,
+                'max_score': 69,
+                'grade_description': 'Very Good',
+                'teacher_remark': 'Very good effort. You can do even better.',
+                'principal_remark': 'Commendable performance. Keep striving for excellence.'
+            },
+            {
+                'grade_letter': 'C',
+                'grade_name': 'C',
+                'min_score': 50,
+                'max_score': 59,
+                'grade_description': 'Good',
+                'teacher_remark': 'Good work. Put in more effort to improve.',
+                'principal_remark': 'Satisfactory. More concentration required.'
+            },
+            {
+                'grade_letter': 'D',
+                'grade_name': 'D',
+                'min_score': 45,
+                'max_score': 49,
+                'grade_description': 'Pass',
+                'teacher_remark': 'Fair performance. You need to work harder.',
+                'principal_remark': 'Below average. Significant improvement needed.'
+            },
+            {
+                'grade_letter': 'E',
+                'grade_name': 'E',
+                'min_score': 40,
+                'max_score': 44,
+                'grade_description': 'Pass',
+                'teacher_remark': 'Weak performance. Requires urgent attention.',
+                'principal_remark': 'Poor performance. Extra coaching recommended.'
+            },
+            {
+                'grade_letter': 'F',
+                'grade_name': 'F',
+                'min_score': 0,
+                'max_score': 39,
+                'grade_description': 'Fail',
+                'teacher_remark': 'Failed. Serious effort needed to improve.',
+                'principal_remark': 'Unsatisfactory. Requires immediate intervention.'
+            },
         ]
 
         for grade_data in grades_data:
@@ -223,6 +287,14 @@ class Command(BaseCommand):
             )
             if created:
                 self.stdout.write(self.style.SUCCESS(f'  ✓ Grade {grade.grade_name}'))
+            else:
+                # Update existing grades with new remarks if they don't have them
+                if not grade.teacher_remark:
+                    grade.teacher_remark = grade_data.get('teacher_remark', '')
+                if not grade.principal_remark:
+                    grade.principal_remark = grade_data.get('principal_remark', '')
+                grade.save()
+                self.stdout.write(self.style.WARNING(f'  • Updated: Grade {grade.grade_name}'))
 
         # 8. Create Exam Halls
         self.stdout.write('Creating exam halls...')

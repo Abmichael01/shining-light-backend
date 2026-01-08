@@ -47,7 +47,9 @@ class Student(models.Model):
         _('admission number'),
         max_length=20,
         unique=True,
+        null=True,
         blank=True,
+        default=None,
         help_text=_('Auto-generated on acceptance (Format: YYYYMMDD + Serial)')
     )
     
@@ -679,6 +681,32 @@ class StudentSubject(models.Model):
         help_text=_('Subject teacher\'s remark')
     )
     
+    # Class Performance Analytics (Cached for reports)
+    highest_score = models.DecimalField(
+        _('highest score in class'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('Highest score achieved in this class for this subject')
+    )
+    lowest_score = models.DecimalField(
+        _('lowest score in class'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('Lowest score achieved in this class for this subject')
+    )
+    subject_average = models.DecimalField(
+        _('class average'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('Average score of students in this class for this subject')
+    )
+    
     # Result Entry Tracking
     result_entered_by = models.ForeignKey(
         'User',
@@ -771,17 +799,19 @@ class StudentSubject(models.Model):
                 _('Subject must belong to the student\'s school')
             )
         
-        # Validate CA score against subject's ca_max
+        # Validate CA score against School's ca_max_score
         if self.ca_score is not None:
-            ca_max = float(self.subject.ca_max)
+            # Fallback to subject defaults if school config not set (though defaults are provided)
+            # We access the school through the student
+            ca_max = float(self.student.school.ca_max_score)
             if self.ca_score < 0 or self.ca_score > ca_max:
                 raise ValidationError({
                     'ca_score': _(f'CA score must be between 0 and {ca_max}')
                 })
         
-        # Validate exam score against subject's exam_max
+        # Validate exam score against School's exam_max_score
         if self.exam_score is not None:
-            exam_max = float(self.subject.exam_max)
+            exam_max = float(self.student.school.exam_max_score)
             if self.exam_score < 0 or self.exam_score > exam_max:
                 raise ValidationError({
                     'exam_score': _(f'Exam score must be between 0 and {exam_max}')
@@ -852,7 +882,19 @@ class TermReport(models.Model):
     # Performance summary (Calculated or cached)
     total_score = models.DecimalField(_('overall total score'), max_digits=10, decimal_places=2, null=True, blank=True)
     average_score = models.DecimalField(_('average score'), max_digits=5, decimal_places=2, null=True, blank=True)
-    class_position = models.PositiveIntegerField(_('class position'), null=True, blank=True)
+    cumulative_average = models.DecimalField(
+        _('cumulative average'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text=_('Average of all term averages for the session (only for 3rd term)')
+    )
+    class_position = models.PositiveIntegerField(_('position in arm'), null=True, blank=True) # Renamed in logic, kept field name for backward compat? Or just use as arm position
+    grade_position = models.PositiveIntegerField(_('position in set'), null=True, blank=True) # Rank across all arms (JSS 1A, 1B, etc)
+    
+    total_students = models.PositiveIntegerField(_('total students in arm'), null=True, blank=True)
+    total_students_grade = models.PositiveIntegerField(_('total students in set'), null=True, blank=True)
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

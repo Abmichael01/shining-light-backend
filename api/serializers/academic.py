@@ -7,7 +7,7 @@ class SchoolSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = School
-        fields = ['id', 'name', 'school_type', 'code', 'is_active', 'created_at']
+        fields = ['id', 'name', 'school_type', 'code', 'is_active', 'ca_max_score', 'exam_max_score', 'created_at']
         read_only_fields = ['id', 'code', 'created_at']
 
 
@@ -227,7 +227,7 @@ class GradeSerializer(serializers.ModelSerializer):
         model = Grade
         fields = [
             'id', 'grade_letter', 'grade_name', 'grade_description',
-            'min_score', 'max_score', 'order', 'created_at'
+            'min_score', 'max_score', 'teacher_remark', 'principal_remark', 'order', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 
