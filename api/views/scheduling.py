@@ -8,7 +8,7 @@ from api.serializers.scheduling import (
     AttendanceRecordSerializer, StudentAttendanceSerializer
 )
 from django.utils import timezone
-from api.permissions import IsAdminOrStaff
+from api.permissions import IsAdminOrStaff, IsSchoolAdminOrReadOnly
 
 class PeriodViewSet(viewsets.ModelViewSet):
     """
@@ -16,7 +16,7 @@ class PeriodViewSet(viewsets.ModelViewSet):
     """
     queryset = Period.objects.all()
     serializer_class = PeriodSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [IsAuthenticated, IsSchoolAdminOrReadOnly]
     
     def get_queryset(self):
         # Filter by school if possible/needed
@@ -72,7 +72,7 @@ class TimetableViewSet(viewsets.ModelViewSet):
     """
     queryset = TimetableEntry.objects.all()
     serializer_class = TimetableEntrySerializer
-    permission_classes = [IsAuthenticated] # Staff needs to view
+    permission_classes = [IsAuthenticated, IsSchoolAdminOrReadOnly]
 
     def get_queryset(self):
         queryset = TimetableEntry.objects.all()
