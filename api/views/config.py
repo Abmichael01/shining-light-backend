@@ -36,6 +36,11 @@ def school_configs(request):
     terms = SessionTerm.objects.all()
     salary_grades = SalaryGrade.objects.all()
     
+    print(f"[DEBUG] school_configs: schools={schools.count()}, classes={classes.count()}, subjects={subjects.count()}")
+    if subjects.exists():
+        print(f"[DEBUG] Sample subject school IDs: {list(subjects.values_list('school_id', flat=True).distinct())}")
+        print(f"[DEBUG] Sample subject class IDs: {list(subjects.values_list('class_model_id', flat=True).distinct())}")
+    
     # Serialize all data
     data = {
         'schools': SchoolSerializer(schools, many=True).data,

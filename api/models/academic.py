@@ -707,6 +707,12 @@ class Grade(models.Model):
         blank=True,
         help_text=_('Default remark for principal if average falls in this range')
     )
+    ict_remark = models.CharField(
+        _('ICT remark'),
+        max_length=255,
+        blank=True,
+        help_text=_('Default remark for ICT department if average falls in this range')
+    )
     
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     

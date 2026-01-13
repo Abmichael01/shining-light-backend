@@ -769,6 +769,13 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                 ).order_by('-total_score')
                 
                 # Calculate class statistics for this subject
+                # CHECK: Are all students in this class graded for this subject?
+                class_student_count = Student.objects.filter(class_model=subject.class_model, status='active').count()
+                if registrations.count() < class_student_count:
+                    # Class result incomplete - Clear existing positions
+                    registrations.update(position=None, highest_score=None, lowest_score=None, subject_average=None)
+                    continue
+
                 stats = registrations.aggregate(
                     max_score=models.Max('total_score'),
                     min_score=models.Min('total_score'),
@@ -880,10 +887,18 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                 reports_by_arm[rep.student.class_model_id].append(rep)
             
             for arm_code, arm_reports in reports_by_arm.items():
+                # CHECK: Are all students in this arm graded?
+                total_in_arm = Student.objects.filter(class_model_id=arm_code, status='active').count()
+                if len(arm_reports) < total_in_arm:
+                    # Incomplete class results - Clear existing positions
+                    # Get IDs to update from the list of objects
+                    report_ids = [r.id for r in arm_reports]
+                    TermReport.objects.filter(pk__in=report_ids).update(class_position=None, total_students=None)
+                    continue
+
                 # Sort descending by average
                 arm_reports.sort(key=lambda x: x.average_score, reverse=True)
                 
-                total_in_arm = len(arm_reports)
                 current_pos = 1
                 last_avg = None
                 
@@ -908,10 +923,17 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                     reports_by_set[g_level].append(rep)
             
             for set_name, set_reports in reports_by_set.items():
+                # CHECK: Are all students in this grade level graded?
+                total_in_set = Student.objects.filter(class_model__grade_level=set_name, status='active').count()
+                if len(set_reports) < total_in_set:
+                     # Incomplete grade results - Clear existing positions
+                     report_ids = [r.id for r in set_reports]
+                     TermReport.objects.filter(pk__in=report_ids).update(grade_position=None, total_students_grade=None)
+                     continue
+
                 # Sort descending by average
                 set_reports.sort(key=lambda x: x.average_score, reverse=True)
                 
-                total_in_set = len(set_reports)
                 current_pos = 1
                 last_avg = None
                 

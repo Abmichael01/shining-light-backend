@@ -227,7 +227,7 @@ class GradeSerializer(serializers.ModelSerializer):
         model = Grade
         fields = [
             'id', 'grade_letter', 'grade_name', 'grade_description',
-            'min_score', 'max_score', 'teacher_remark', 'principal_remark', 'order', 'created_at'
+            'min_score', 'max_score', 'teacher_remark', 'principal_remark', 'ict_remark', 'order', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
 

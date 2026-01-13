@@ -14,10 +14,14 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv()
+
+HCTI_USER_ID = os.getenv('HCTI_USER_ID')
+HCTI_API_KEY = os.getenv('HCTI_API_KEY')
+EXTERNAL_RENDER_API_KEY = os.getenv('EXTERNAL_RENDER_API_KEY')
 
 
 # Quick-start development settings - unsuitable for production
@@ -294,3 +298,6 @@ else:
 
 # Contact Email
 CONTACT_EMAIL = 'ict@shininglightschoolsijebuode.com'
+
+# External Rendering API (Urlbox, etc)
+EXTERNAL_RENDER_API_KEY = os.getenv('EXTERNAL_RENDER_API_KEY')
