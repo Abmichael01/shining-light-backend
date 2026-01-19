@@ -290,6 +290,44 @@ SERVER_EMAIL = os.getenv('SERVER_EMAIL', 'admin@shininglightschools.com')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Backblaze B2 Storage Configuration
+# If AWS_ACCESS_KEY_ID is set in env, use B2
+if os.getenv('AWS_ACCESS_KEY_ID'):
+    INSTALLED_APPS += ['storages']
+    
+    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL = os.getenv('AWS_S3_ENDPOINT_URL')
+    
+    # B2/S3 Settings
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    AWS_LOCATION = 'media'
+    AWS_DEFAULT_ACL = None # Backblaze B2 buckets are private by default
+    
+    # Explicitly set Region and Signature Version for B2
+    AWS_S3_REGION_NAME = 'us-east-005' 
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    
+    # Use B2 for Media, keep local for Static (unless configured otherwise)
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+            "OPTIONS": {
+                "bucket_name": AWS_STORAGE_BUCKET_NAME,
+                "location": "media",
+            },
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+    
+    # Override MEDIA_URL to point to B2
+    MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
+
 # Frontend URL Configuration
 if ENV == 'production':
     FRONTEND_URL = 'https://shininglightschoolsijebuode.com'

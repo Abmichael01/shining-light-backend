@@ -1,5 +1,8 @@
 from rest_framework import serializers
 from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff
+from django.core.files.base import ContentFile
+import base64
+import uuid
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -240,17 +243,76 @@ class QuestionSerializer(serializers.ModelSerializer):
     class_id = serializers.CharField(source='subject.class_model.id', read_only=True)
     created_by_name = serializers.SerializerMethodField()
     
+    question_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    option_a_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    option_b_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    option_c_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    option_d_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    option_e_image = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Question
         fields = [
             'id', 'subject', 'subject_name', 'school_name', 'class_name', 'class_id',
-            'topic_model', 'question_text', 'question_type', 'difficulty',
-            'option_a', 'option_b', 'option_c', 'option_d', 'option_e',
+            'topic_model', 'question_text', 'question_image', 'question_type', 'difficulty',
+            'option_a', 'option_a_image',
+            'option_b', 'option_b_image',
+            'option_c', 'option_c_image',
+            'option_d', 'option_d_image',
+            'option_e', 'option_e_image',
             'correct_answer', 'explanation', 'marks',
             'is_verified', 'usage_count', 'created_by', 'created_by_name',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'usage_count', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        return self._save_with_base64(None, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._save_with_base64(instance, validated_data)
+
+    def _save_with_base64(self, instance, validated_data):
+        image_fields = [
+            'question_image', 'option_a_image', 'option_b_image', 
+            'option_c_image', 'option_d_image', 'option_e_image'
+        ]
+        
+        for field in image_fields:
+            image_data = validated_data.pop(field, None)
+            if image_data:
+                if isinstance(image_data, str) and image_data.startswith('data:'):
+                    try:
+                        format, imgstr = image_data.split(';base64,')
+                        ext = format.split('/')[-1]
+                        validated_data[field] = ContentFile(base64.b64decode(imgstr), name=f'q_{uuid.uuid4()}.{ext}')
+                    except Exception:
+                        pass
+            elif image_data == "":
+                validated_data[field] = None
+        
+        if instance:
+            return super().update(instance, validated_data)
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        image_fields = [
+            'question_image', 'option_a_image', 'option_b_image', 
+            'option_c_image', 'option_d_image', 'option_e_image'
+        ]
+        
+        for field in image_fields:
+            image_obj = getattr(instance, field, None)
+            if image_obj and hasattr(image_obj, 'url'):
+                request = self.context.get('request')
+                if request:
+                    data[field] = request.build_absolute_uri(image_obj.url)
+                else:
+                    data[field] = image_obj.url
+            else:
+                data[field] = None
+        return data
     
     def get_created_by_name(self, obj):
         """Get creator's email (custom User model only has email field)"""

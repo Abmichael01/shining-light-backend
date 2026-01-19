@@ -268,6 +268,16 @@ def staff_me(request):
         update_serializer.save()
         return Response(StaffSerializer(staff, context={'request': request}).data)
     except Exception as e:
+        import traceback
+        import sys
+        
+        print("\n\n" + "="*50)
+        print("ERROR IN STAFF_ME VIEW:")
+        print(f"Exception: {e}")
+        print("Traceback:")
+        traceback.print_exc()
+        print("="*50 + "\n\n")
+        
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

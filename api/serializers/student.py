@@ -8,7 +8,7 @@ import uuid
 class BioDataSerializer(serializers.ModelSerializer):
     """Serializer for BioData model"""
     age = serializers.SerializerMethodField()
-    passport_photo = serializers.SerializerMethodField()
+    passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = BioData
@@ -24,14 +24,22 @@ class BioDataSerializer(serializers.ModelSerializer):
         """Calculate and return age"""
         return obj.get_age()
     
-    def get_passport_photo(self, obj):
-        """Return full URL for passport photo"""
-        if obj.passport_photo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.passport_photo.url)
-            return obj.passport_photo.url
-        return None
+    def to_representation(self, instance):
+        """Convert passport_photo FileField to full URL"""
+        data = super().to_representation(instance)
+        passport_field = getattr(instance, 'passport_photo', None)
+        if passport_field:
+            if hasattr(passport_field, 'url'):
+                request = self.context.get('request')
+                if request:
+                    data['passport_photo'] = request.build_absolute_uri(passport_field.url)
+                else:
+                    data['passport_photo'] = passport_field.url
+            else:
+                data['passport_photo'] = str(passport_field) if passport_field else None
+        else:
+            data['passport_photo'] = None
+        return data
     
 
 
@@ -57,6 +65,7 @@ class GuardianSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     """Serializer for Document model"""
     verified_by_name = serializers.CharField(source='verified_by.email', read_only=True, allow_null=True)
+    document_file = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = Document
@@ -67,10 +76,49 @@ class DocumentSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'uploaded_at', 'updated_at', 'verified_by', 'verified_at', 'verified_by_name', 'student']
 
+    def create(self, validated_data):
+        return self._save_with_base64(None, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._save_with_base64(instance, validated_data)
+
+    def _save_with_base64(self, instance, validated_data):
+        file_data = validated_data.pop('document_file', None)
+        
+        if file_data:
+            if isinstance(file_data, str) and file_data.startswith('data:'):
+                try:
+                    format, filestr = file_data.split(';base64,')
+                    ext = format.split('/')[-1]
+                    if ext == 'plain': # Fix for some data URLs
+                        ext = 'txt'
+                    validated_data['document_file'] = ContentFile(base64.b64decode(filestr), name=f'doc_{uuid.uuid4()}.{ext}')
+                except Exception:
+                    pass
+        elif file_data == "":
+            validated_data['document_file'] = None
+        
+        if instance:
+            return super().update(instance, validated_data)
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        file_field = getattr(instance, 'document_file', None)
+        if file_field and hasattr(file_field, 'url'):
+            request = self.context.get('request')
+            if request:
+                data['document_file'] = request.build_absolute_uri(file_field.url)
+            else:
+                data['document_file'] = file_field.url
+        return data
+
 
 class BiometricSerializer(serializers.ModelSerializer):
     """Serializer for Biometric model"""
     captured_by_name = serializers.CharField(source='captured_by.email', read_only=True, allow_null=True)
+    left_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    right_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = Biometric
@@ -79,6 +127,42 @@ class BiometricSerializer(serializers.ModelSerializer):
             'captured_at', 'captured_by', 'captured_by_name', 'notes', 'updated_at'
         ]
         read_only_fields = ['id', 'captured_at', 'updated_at', 'captured_by', 'captured_by_name']
+
+    def create(self, validated_data):
+        return self._save_with_base64(None, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._save_with_base64(instance, validated_data)
+
+    def _save_with_base64(self, instance, validated_data):
+        for field in ['left_thumb', 'right_thumb']:
+            file_data = validated_data.pop(field, None)
+            if file_data:
+                if isinstance(file_data, str) and file_data.startswith('data:'):
+                    try:
+                        format, filestr = file_data.split(';base64,')
+                        ext = format.split('/')[-1]
+                        validated_data[field] = ContentFile(base64.b64decode(filestr), name=f'thumb_{uuid.uuid4()}.{ext}')
+                    except Exception:
+                        pass
+            elif file_data == "":
+                validated_data[field] = None
+        
+        if instance:
+            return super().update(instance, validated_data)
+        return super().create(validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        for field in ['left_thumb', 'right_thumb']:
+            file_obj = getattr(instance, field, None)
+            if file_obj and hasattr(file_obj, 'url'):
+                request = self.context.get('request')
+                if request:
+                    data[field] = request.build_absolute_uri(file_obj.url)
+                else:
+                    data[field] = file_obj.url
+        return data
 
 
 class StudentSubjectSerializer(serializers.ModelSerializer):
@@ -278,8 +362,25 @@ class StudentSerializer(serializers.ModelSerializer):
         biodata_data = validated_data.pop('biodata', None)
         if biodata_data and instance.biodata:
             # Update biodata fields
+            # Update biodata fields
             for attr, value in biodata_data.items():
-                setattr(instance.biodata, attr, value)
+                if attr == 'passport_photo':
+                    if value == "":
+                        # Clear photo
+                        if instance.biodata.passport_photo:
+                            instance.biodata.passport_photo.delete(save=False)
+                        instance.biodata.passport_photo = None
+                    elif isinstance(value, str) and value.startswith('data:image'):
+                        # Handle base64
+                        format, imgstr = value.split(';base64,')
+                        ext = format.split('/')[-1]
+                        passport_file = ContentFile(base64.b64decode(imgstr), name=f'student_{uuid.uuid4()}.{ext}')
+                        instance.biodata.passport_photo = passport_file
+                    else:
+                        # Standard file or unchanged
+                        setattr(instance.biodata, attr, value)
+                else:
+                    setattr(instance.biodata, attr, value)
             instance.biodata.save()
         
         # Update other fields

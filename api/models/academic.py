@@ -856,6 +856,20 @@ class Question(models.Model):
         default=0,
         help_text=_('Number of times this question has been used in exams')
     )
+
+    # Images for Question and Options
+    question_image = models.ImageField(
+        _('question image'),
+        upload_to='cbt/questions/',
+        blank=True,
+        null=True,
+        help_text=_('Optional image for the question')
+    )
+    option_a_image = models.ImageField(upload_to='cbt/options/', blank=True, null=True)
+    option_b_image = models.ImageField(upload_to='cbt/options/', blank=True, null=True)
+    option_c_image = models.ImageField(upload_to='cbt/options/', blank=True, null=True)
+    option_d_image = models.ImageField(upload_to='cbt/options/', blank=True, null=True)
+    option_e_image = models.ImageField(upload_to='cbt/options/', blank=True, null=True)
     
     # Metadata
     created_by = models.ForeignKey(

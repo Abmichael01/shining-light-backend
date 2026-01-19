@@ -25,6 +25,8 @@ class StaffEducationSerializer(serializers.ModelSerializer):
     level_display = serializers.CharField(source='get_level_display', read_only=True)
     degree_display = serializers.CharField(source='get_degree_display', read_only=True)
     
+    certificate = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = StaffEducation
         fields = [
@@ -41,7 +43,32 @@ class StaffEducationSerializer(serializers.ModelSerializer):
             'updated_at'
         ]
         read_only_fields = ['id', 'staff', 'created_at', 'updated_at']
-    
+
+    def create(self, validated_data):
+        return self._save_with_base64(None, validated_data)
+
+    def update(self, instance, validated_data):
+        return self._save_with_base64(instance, validated_data)
+
+    def _save_with_base64(self, instance, validated_data):
+        certificate_data = validated_data.pop('certificate', None)
+        
+        if certificate_data:
+            if isinstance(certificate_data, str) and certificate_data.startswith('data:'):
+                try:
+                    format, filestr = certificate_data.split(';base64,')
+                    ext = format.split('/')[-1]
+                    validated_data['certificate'] = ContentFile(base64.b64decode(filestr), name=f'cert_{uuid.uuid4()}.{ext}')
+                except Exception:
+                    # Fallback or invalid format
+                    pass
+        elif certificate_data == "":
+            validated_data['certificate'] = None
+        
+        if instance:
+            return super().update(instance, validated_data)
+        return super().create(validated_data)
+
     def to_representation(self, instance):
         """Convert certificate FileField to full URL"""
         data = super().to_representation(instance)

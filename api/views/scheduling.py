@@ -8,6 +8,7 @@ from api.serializers.scheduling import (
     AttendanceRecordSerializer, StudentAttendanceSerializer
 )
 from django.utils import timezone
+from django.db import models
 from api.permissions import IsAdminOrStaff, IsSchoolAdminOrReadOnly
 
 class PeriodViewSet(viewsets.ModelViewSet):
@@ -112,6 +113,32 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = AttendanceRecord.objects.all()
     serializer_class = AttendanceRecordSerializer
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = AttendanceRecord.objects.all()
+        
+        # Filter by class
+        class_id = self.request.query_params.get('class_id')
+        if class_id:
+            queryset = queryset.filter(class_model_id=class_id)
+            
+        # Filter by date
+        date_str = self.request.query_params.get('date')
+        if date_str:
+            queryset = queryset.filter(date=date_str)
+            
+        # Filter by teacher/staff
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id:
+            # Join with timetable_entry to filter by teacher
+            queryset = queryset.filter(timetable_entry__teacher_id=teacher_id)
+            
+        # Filter by user who marked it
+        taken_by_id = self.request.query_params.get('taken_by')
+        if taken_by_id:
+            queryset = queryset.filter(taken_by_id=taken_by_id)
+            
+        return queryset.order_by('-date', '-marked_at')
 
     def perform_create(self, serializer):
         serializer.save(taken_by=self.request.user)
@@ -148,6 +175,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             session_term=current_term,
             defaults={'taken_by': request.user}
         )
+        
+        # Ensure taken_by is set if record already existed (from auto-generation)
+        if not created and not record.taken_by:
+            record.taken_by = request.user
+            record.save(update_fields=['taken_by'])
         
         # Process individual student entries
         created_count = 0
@@ -206,4 +238,148 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 "remark": entry.remark
             })
             
-        return Response(data)
+    @action(detail=False, methods=['get'])
+    def pending_marking(self, request):
+        """
+        Get list of past lessons that haven't been marked by the teacher.
+        Logic:
+        1. Get current term and teacher profile.
+        2. Get all timetable entries for this teacher.
+        3. Iterate date range (Term Start -> Today).
+        4. For each day, check if lessons were scheduled but not marked.
+        """
+        try:
+            # 1. Identify Teacher
+            from api.models import Staff
+            teacher = Staff.objects.filter(user=request.user).first()
+            if not teacher:
+                return Response({"error": "Teacher profile not found"}, status=status.HTTP_404_NOT_FOUND)
+
+            # 2. Get Current Term
+            current_term = Session.get_current_session_term()
+            if not current_term:
+                return Response([], status=status.HTTP_200_OK)
+
+            # 3. Get Teacher's Timetable
+            # This part is no longer strictly needed for the direct query, but keeping the comment for context.
+            # entries = TimetableEntry.objects.filter(
+            #     session_term=current_term,
+            #     teacher=teacher
+            # ).select_related('period', 'class_model', 'subject')
+
+            # 4. Get Pending Records (Auto-generated but not taken)
+            today = timezone.localdate() # Use timezone.localdate() for consistency
+            
+            # Find AttendanceRecords that:
+            # - Are for this term
+            # - Are on/before today
+            # - Have NOT been taken (taken_by is Null)
+            # - Belong to this teacher's classes/subjects
+            
+            pending_records = AttendanceRecord.objects.filter(
+                session_term=current_term,
+                date__lte=today,
+                taken_by__isnull=True
+            ).filter(
+                models.Q(timetable_entry__teacher=teacher) | # Changed 'staff' to 'teacher'
+                models.Q(timetable_entry__subject__assigned_teachers=teacher) # Changed 'staff' to 'teacher'
+            ).select_related(
+                'timetable_entry', 
+                'class_model', 
+                'timetable_entry__period', 
+                'timetable_entry__subject'
+            ).order_by('-date', 'timetable_entry__period__start_time').distinct()
+
+            pending = []
+            for record in pending_records:
+                lesson = record.timetable_entry
+                if not lesson: continue
+                
+                pending.append({
+                    "date": record.date,
+                    "timetable_entry_id": lesson.id,
+                    "class_id": lesson.class_model_id,
+                    "class_name": lesson.class_model.name,
+                    "subject_name": lesson.subject.name if lesson.subject else "No Subject",
+                    "period_name": lesson.period.name,
+                    "start_time": lesson.period.start_time,
+                    "end_time": lesson.period.end_time
+                })
+            
+            return Response(pending)
+
+        except Exception as e:
+            print(f"Error fetching pending attendance: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=False, methods=['post'])
+    def mark_all_present(self, request):
+        """
+        Quickly mark all students in a class as Present for a specific lesson.
+        """
+        try:
+            class_id = request.data.get('class_id')
+            date_str = request.data.get('date')
+            timetable_entry_id = request.data.get('timetable_entry_id')
+            
+            if not class_id or not date_str:
+                 return Response({"error": "Class ID and Date are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+            current_term = Session.get_current_session_term()
+            if not current_term:
+                 return Response({"error": "No active session term found"}, status=status.HTTP_400_BAD_REQUEST)
+                 
+            # 1. Get/Create Header
+            record, created = AttendanceRecord.objects.get_or_create(
+                class_model_id=class_id,
+                date=date_str,
+                timetable_entry_id=timetable_entry_id,
+                session_term=current_term,
+                defaults={'taken_by': request.user}
+            )
+            
+            # Ensure taken_by is set if record already existed (from auto-generation)
+            if not created and not record.taken_by:
+                record.taken_by = request.user
+                record.save(update_fields=['taken_by'])
+
+            # 2. Get Students
+            # Only enrolled/active students
+            # 2. Get Students
+            # Only enrolled students
+            students = Student.objects.filter(
+                class_model_id=class_id,
+                status='enrolled'
+            )
+            
+            if not students.exists():
+                 return Response({"message": "No active students found in this class"}, status=status.HTTP_404_NOT_FOUND)
+
+            # 3. Bulk Create Entries
+            entries_to_create = []
+            
+            # Check existing to avoid duplication errors
+            existing_student_ids = set(StudentAttendance.objects.filter(attendance_record=record).values_list('student_id', flat=True))
+            
+            for student in students:
+                if student.id not in existing_student_ids:
+                    entries_to_create.append(StudentAttendance(
+                        attendance_record=record,
+                        student=student,
+                        status='present',
+                        remark=''
+                    ))
+            
+            if entries_to_create:
+                StudentAttendance.objects.bulk_create(entries_to_create)
+                
+            return Response({
+                "message": "All students marked as Present",
+                "record_id": record.id,
+                "added": len(entries_to_create)
+            })
+
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

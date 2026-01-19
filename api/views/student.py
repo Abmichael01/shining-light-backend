@@ -35,7 +35,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     ).prefetch_related(
         'guardians', 'documents', 'subject_registrations'
     ).all().order_by('-created_at')
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
     
     def get_serializer_class(self):
