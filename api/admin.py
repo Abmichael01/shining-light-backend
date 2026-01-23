@@ -37,7 +37,9 @@ from .models import (
     FeeType,
     FeePayment,
     PaymentPurpose,
-    ApplicationSlip
+    ApplicationSlip,
+    Schedule,
+    ScheduleEntry
 )
 
 
@@ -1324,6 +1326,65 @@ class FeePaymentAdmin(admin.ModelAdmin):
         (_('Tracking'), {
             'fields': ('processed_by', 'created_at'),
             'classes': ('collapse',)
+        }),
+    )
+
+
+# ===== Schedule Management =====
+
+class ScheduleEntryInline(admin.TabularInline):
+    """Inline for ScheduleEntry in Schedule admin"""
+    model = ScheduleEntry
+    extra = 0
+    fields = ['date', 'start_time', 'end_time', 'title', 'linked_exam', 'target_classes']
+    filter_horizontal = ['target_classes']
+    fk_name = 'schedule'
+
+@admin.register(Schedule)
+class ScheduleAdmin(admin.ModelAdmin):
+    """Admin interface for Schedule model"""
+    list_display = ['name', 'session_term', 'schedule_type', 'start_date', 'end_date', 'is_active', 'created_at']
+    list_filter = ['schedule_type', 'session_term', 'is_active', 'start_date']
+    search_fields = ['name', 'description']
+    ordering = ['-start_date', 'name']
+    
+    inlines = [ScheduleEntryInline]
+    
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'session_term', 'schedule_type', 'description')
+        }),
+        (_('Duration'), {
+            'fields': ('start_date', 'end_date', 'is_active')
+        }),
+        (_('Metadata'), {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    readonly_fields = ['created_at', 'updated_at']
+
+@admin.register(ScheduleEntry)
+class ScheduleEntryAdmin(admin.ModelAdmin):
+    """Admin interface for ScheduleEntry model"""
+    list_display = ['title', 'schedule', 'date', 'start_time', 'end_time', 'linked_exam', 'supervisor']
+    list_filter = ['schedule', 'date', 'target_classes']
+    search_fields = ['title', 'schedule__name']
+    ordering = ['date', 'start_time']
+    filter_horizontal = ['target_classes']
+    
+    fieldsets = (
+        (None, {
+            'fields': ('schedule', 'title', 'date')
+        }),
+        (_('Time Slot'), {
+            'fields': ('start_time', 'end_time')
+        }),
+        (_('Targets & Supervision'), {
+            'fields': ('target_classes', 'supervisor')
+        }),
+        (_('Links'), {
+            'fields': ('linked_exam', 'linked_subject')
         }),
     )
 

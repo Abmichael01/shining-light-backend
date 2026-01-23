@@ -2,10 +2,11 @@ from rest_framework import viewsets, status, generics
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from api.models import Period, TimetableEntry, AttendanceRecord, StudentAttendance, Session, Student
+from api.models import Period, TimetableEntry, AttendanceRecord, StudentAttendance, Session, Student, Schedule, ScheduleEntry
 from api.serializers.scheduling import (
     PeriodSerializer, TimetableEntrySerializer, 
-    AttendanceRecordSerializer, StudentAttendanceSerializer
+    AttendanceRecordSerializer, StudentAttendanceSerializer,
+    ScheduleSerializer, ScheduleEntrySerializer
 )
 from django.utils import timezone
 from django.db import models
@@ -383,3 +384,68 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             import traceback
             traceback.print_exc()
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ScheduleViewSet(viewsets.ModelViewSet):
+    """
+    Manage Schedules (Exam Timetables, Event Schedules)
+    """
+    queryset = Schedule.objects.all()
+    serializer_class = ScheduleSerializer
+    permission_classes = [IsAuthenticated, IsSchoolAdminOrReadOnly]
+
+    def get_queryset(self):
+        queryset = Schedule.objects.all().prefetch_related('entries')
+        
+        # Filter by session_term
+        session_term_id = self.request.query_params.get('session_term')
+        if session_term_id:
+            queryset = queryset.filter(session_term_id=session_term_id)
+        else:
+            current_term = Session.get_current_session_term()
+            if current_term:
+                queryset = queryset.filter(session_term=current_term)
+        
+        # Filter by type
+        schedule_type = self.request.query_params.get('type')
+        if schedule_type:
+            queryset = queryset.filter(schedule_type=schedule_type)
+        
+        # Filter by active status
+        is_active = self.request.query_params.get('is_active')
+        if is_active is not None:
+            queryset = queryset.filter(is_active=is_active.lower() == 'true')
+        
+        return queryset.order_by('-start_date', 'name')
+
+
+class ScheduleEntryViewSet(viewsets.ModelViewSet):
+    """
+    Manage Schedule Entries (individual slots)
+    """
+    queryset = ScheduleEntry.objects.all()
+    serializer_class = ScheduleEntrySerializer
+    permission_classes = [IsAuthenticated, IsSchoolAdminOrReadOnly]
+
+    def get_queryset(self):
+        queryset = ScheduleEntry.objects.all().select_related(
+            'schedule', 'linked_exam', 'linked_subject', 'supervisor'
+        ).prefetch_related('target_classes')
+        
+        # Filter by schedule
+        schedule_id = self.request.query_params.get('schedule')
+        if schedule_id:
+            queryset = queryset.filter(schedule_id=schedule_id)
+        
+        # Filter by date
+        date_str = self.request.query_params.get('date')
+        if date_str:
+            queryset = queryset.filter(date=date_str)
+        
+        # Filter by class
+        class_id = self.request.query_params.get('class_id')
+        if class_id:
+            queryset = queryset.filter(target_classes__id=class_id)
+        
+        return queryset.order_by('date', 'start_time')
+

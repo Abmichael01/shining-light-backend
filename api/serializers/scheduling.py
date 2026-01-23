@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import Period, TimetableEntry, AttendanceRecord, StudentAttendance, Staff
+from api.models import Period, TimetableEntry, AttendanceRecord, StudentAttendance, Staff, Schedule, ScheduleEntry
 from .student import StudentSerializer
 from .academic import ClassSerializer, SubjectSerializer
 
@@ -63,3 +63,46 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
 
     def get_total_absent(self, obj):
         return obj.entries.filter(status='absent').count()
+
+
+class ScheduleEntrySerializer(serializers.ModelSerializer):
+    schedule_name = serializers.CharField(source='schedule.name', read_only=True)
+    linked_exam_title = serializers.CharField(source='linked_exam.title', read_only=True, allow_null=True)
+    linked_subject_name = serializers.CharField(source='linked_subject.name', read_only=True, allow_null=True)
+    supervisor_name = serializers.SerializerMethodField()
+    target_class_names = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ScheduleEntry
+        fields = [
+            'id', 'schedule', 'schedule_name', 'date', 'start_time', 'end_time', 'title',
+            'linked_exam', 'linked_exam_title', 'linked_subject', 'linked_subject_name',
+            'target_classes', 'target_class_names', 'supervisor', 'supervisor_name',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_supervisor_name(self, obj):
+        return obj.supervisor.get_full_name() if obj.supervisor else None
+
+    def get_target_class_names(self, obj):
+        return [c.name for c in obj.target_classes.all()]
+
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    session_term_display = serializers.CharField(source='session_term.__str__', read_only=True)
+    entries = ScheduleEntrySerializer(many=True, read_only=True)
+    entry_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Schedule
+        fields = [
+            'id', 'name', 'session_term', 'session_term_display', 'schedule_type',
+            'start_date', 'end_date', 'is_active', 'description',
+            'entries', 'entry_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+    def get_entry_count(self, obj):
+        return obj.entries.count()
+

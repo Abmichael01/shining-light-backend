@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.conf import settings
-from .academic import School, SessionTerm, Class, Subject
+from .academic import School, SessionTerm, Class, Subject, Exam
 from .student import Student
 from .staff import Staff
 
@@ -232,3 +232,137 @@ class StudentAttendance(models.Model):
 
     def __str__(self):
         return f"{self.student.admission_number} - {self.get_status_display()}"
+
+
+class Schedule(models.Model):
+    """
+    Groups scheduled events together (e.g., 'First Term Examination 2025', 'Sports Week')
+    Allows creating date-based timetables separate from the recurring weekly timetable.
+    """
+    TYPE_CHOICES = [
+        ('exam', 'Examination'),
+        ('test', 'Test/Quiz'),
+        ('event', 'School Event'),
+        ('general', 'General Schedule'),
+    ]
+
+    name = models.CharField(
+        _('schedule name'),
+        max_length=100,
+        help_text=_('e.g., First Term Exams, JS3 Mock Exams')
+    )
+    session_term = models.ForeignKey(
+        SessionTerm,
+        on_delete=models.CASCADE,
+        related_name='schedules',
+        verbose_name=_('session term')
+    )
+    schedule_type = models.CharField(
+        _('schedule type'),
+        max_length=20,
+        choices=TYPE_CHOICES,
+        default='general'
+    )
+    start_date = models.DateField(_('start date'))
+    end_date = models.DateField(_('end date'))
+    is_active = models.BooleanField(_('active'), default=True)
+    
+    description = models.TextField(_('description'), blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-start_date', 'name']
+        verbose_name = _('Schedule')
+        verbose_name_plural = _('Schedules')
+
+    def __str__(self):
+        return f"{self.name} ({self.session_term})"
+    
+    def clean(self):
+        super().clean()
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError(_('End date must be after start date'))
+
+
+class ScheduleEntry(models.Model):
+    """
+    A specific slot/event on a specific date within a Schedule.
+    """
+    schedule = models.ForeignKey(
+        Schedule,
+        on_delete=models.CASCADE,
+        related_name='entries',
+        verbose_name=_('schedule')
+    )
+    date = models.DateField(_('date'))
+    start_time = models.TimeField(_('start time'))
+    end_time = models.TimeField(_('end time'))
+    
+    title = models.CharField(
+        _('title'),
+        max_length=200,
+        help_text=_('e.g., Mathematics Exam, Morning Assembly')
+    )
+    
+    # Linking optional content
+    linked_exam = models.ForeignKey(
+        Exam,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schedule_entries',
+        verbose_name=_('linked exam'),
+        help_text=_('Link to a specific CBT Exam configuration if applicable')
+    )
+    linked_subject = models.ForeignKey(
+        Subject,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schedule_entries',
+        verbose_name=_('linked subject'),
+        help_text=_('Link to a subject for display purposes (e.g. Revision)')
+    )
+    
+    # Targets
+    target_classes = models.ManyToManyField(
+        Class,
+        related_name='schedule_entries',
+        verbose_name=_('target classes'),
+        help_text=_('Classes this entry applies to')
+    )
+    
+    supervisor = models.ForeignKey(
+        Staff,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supervised_schedules',
+        verbose_name=_('supervisor/invigilator')
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['date', 'start_time']
+        verbose_name = _('Schedule Entry')
+        verbose_name_plural = _('Schedule Entries')
+        indexes = [
+            models.Index(fields=['date', 'start_time']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} on {self.date}"
+
+    def clean(self):
+        super().clean()
+        if self.start_time and self.end_time and self.start_time >= self.end_time:
+            raise ValidationError(_('End time must be after start time'))
+        
+        # Ensure date falls within schedule range
+        if self.schedule and self.date:
+            if self.date < self.schedule.start_date or self.date > self.schedule.end_date:
+                raise ValidationError(_('Date must be within the schedule date range'))
+

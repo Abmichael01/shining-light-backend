@@ -47,7 +47,9 @@ from .scheduling import (
     Period,
     TimetableEntry,
     AttendanceRecord,
-    StudentAttendance
+    StudentAttendance,
+    Schedule,
+    ScheduleEntry
 )
 
 __all__ = [
@@ -92,6 +94,8 @@ __all__ = [
     'Period',
     'TimetableEntry',
     'AttendanceRecord',
-    'StudentAttendance'
+    'StudentAttendance',
+    'Schedule',
+    'ScheduleEntry'
 ]
 
