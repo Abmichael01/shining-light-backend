@@ -4,6 +4,7 @@ from api.views.staff import staff_me, staff_students, staff_student_detail_updat
 from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
 from api.views.config import school_configs
+from api.views.upload import FileUploadView
 
 app_name = 'api'
 
@@ -59,5 +60,9 @@ urlpatterns = [
     path('reports/convert-image/', convert_html_to_image, name='convert-html-to-image'),
     path('reports/convert-multi-pdf/', convert_multiple_html_to_pdf, name='convert-multiple-html-to-pdf'),
     path('reports/convert-multi-images-zip/', convert_multiple_html_to_images_zip, name='convert-multiple-html-to-images-zip'),
+    path('reports/convert-multi-images-zip/', convert_multiple_html_to_images_zip, name='convert-multiple-html-to-images-zip'),
+
+    # General File Upload
+    path('common/upload/', FileUploadView.as_view(), name='file-upload'),
 ]
 

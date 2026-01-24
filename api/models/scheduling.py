@@ -246,43 +246,26 @@ class Schedule(models.Model):
         ('general', 'General Schedule'),
     ]
 
-    name = models.CharField(
-        _('schedule name'),
-        max_length=100,
-        help_text=_('e.g., First Term Exams, JS3 Mock Exams')
-    )
-    session_term = models.ForeignKey(
-        SessionTerm,
-        on_delete=models.CASCADE,
-        related_name='schedules',
-        verbose_name=_('session term')
-    )
     schedule_type = models.CharField(
         _('schedule type'),
         max_length=20,
         choices=TYPE_CHOICES,
         default='general'
     )
-    start_date = models.DateField(_('start date'))
-    end_date = models.DateField(_('end date'))
     is_active = models.BooleanField(_('active'), default=True)
     
-    description = models.TextField(_('description'), blank=True, null=True)
+    start_date = models.DateField(_('start date'), null=True, blank=True)
+    end_date = models.DateField(_('end date'), null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['-start_date', 'name']
         verbose_name = _('Schedule')
         verbose_name_plural = _('Schedules')
 
     def __str__(self):
-        return f"{self.name} ({self.session_term})"
+        return f"{self.get_schedule_type_display()}"
     
-    def clean(self):
-        super().clean()
-        if self.start_date and self.end_date and self.start_date > self.end_date:
-            raise ValidationError(_('End date must be after start date'))
 
 
 class ScheduleEntry(models.Model):
@@ -361,8 +344,4 @@ class ScheduleEntry(models.Model):
         if self.start_time and self.end_time and self.start_time >= self.end_time:
             raise ValidationError(_('End time must be after start time'))
         
-        # Ensure date falls within schedule range
-        if self.schedule and self.date:
-            if self.date < self.schedule.start_date or self.date > self.schedule.end_date:
-                raise ValidationError(_('Date must be within the schedule date range'))
 

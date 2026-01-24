@@ -1343,19 +1343,15 @@ class ScheduleEntryInline(admin.TabularInline):
 @admin.register(Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
     """Admin interface for Schedule model"""
-    list_display = ['name', 'session_term', 'schedule_type', 'start_date', 'end_date', 'is_active', 'created_at']
-    list_filter = ['schedule_type', 'session_term', 'is_active', 'start_date']
-    search_fields = ['name', 'description']
-    ordering = ['-start_date', 'name']
+    list_display = ['schedule_type', 'is_active', 'entry_count', 'created_at']
+    list_filter = ['schedule_type', 'is_active']
+    ordering = ['-created_at']
     
     inlines = [ScheduleEntryInline]
     
     fieldsets = (
         (None, {
-            'fields': ('name', 'session_term', 'schedule_type', 'description')
-        }),
-        (_('Duration'), {
-            'fields': ('start_date', 'end_date', 'is_active')
+            'fields': ('schedule_type', 'is_active', 'start_date', 'end_date')
         }),
         (_('Metadata'), {
             'fields': ('created_at', 'updated_at'),
@@ -1363,6 +1359,10 @@ class ScheduleAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ['created_at', 'updated_at']
+    
+    def entry_count(self, obj):
+        return obj.entries.count()
+    entry_count.short_description = 'Entries'
 
 @admin.register(ScheduleEntry)
 class ScheduleEntryAdmin(admin.ModelAdmin):

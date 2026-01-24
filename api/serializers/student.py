@@ -405,6 +405,7 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     school_name = serializers.CharField(source='school.name', read_only=True)
     current_exam_seat = serializers.SerializerMethodField()
+    registered_subjects = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
@@ -414,7 +415,8 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
             'full_name',
             'class_name',
             'school_name',
-            'current_exam_seat'
+            'current_exam_seat',
+            'registered_subjects'
         ]
         read_only_fields = fields
 
@@ -435,6 +437,25 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
             'seat_number': latest_code.seat_number,
             'used_at': latest_code.used_at.isoformat() if latest_code.used_at else None,
         }
+
+    def get_registered_subjects(self, obj):
+        """Return list of subject names for active registrations in current term"""
+        # Get active subject registrations
+        active_registrations = obj.subject_registrations.filter(
+            is_active=True
+        ).select_related('subject', 'session_term')
+        
+        # Return list of subject names
+        return [
+            {
+                'id': reg.subject.id,
+                'name': reg.subject.name,
+                'code': reg.subject.code,
+                'session_term': reg.session_term.term_name if reg.session_term else None
+            }
+            for reg in active_registrations
+        ]
+
 
 
 class StudentListSerializer(serializers.ModelSerializer):

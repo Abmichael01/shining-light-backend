@@ -112,6 +112,7 @@ class StaffListSerializer(serializers.ModelSerializer):
             'staff_type_display',
             'assigned_class_name',
             'zone_display',
+            'school',
             'status_display',
             'entry_date',
             'created_at'
@@ -183,6 +184,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'staff_type_display',
             'zone',
             'zone_display',
+            'school',
             'assigned_class',
             'assigned_class_name',
             'number_of_children_in_school',
@@ -322,6 +324,7 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             'religion',
             'entry_date',
             'staff_type',
+            'school',
             'zone',
             'assigned_class',
             'number_of_children_in_school',

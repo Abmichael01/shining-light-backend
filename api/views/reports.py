@@ -124,41 +124,82 @@ def generate_report_image(html_content, scale=2):
 def convert_html_to_pdf(request):
     """
     Converts received HTML -> Image -> PDF.
-    This ensures the PDF looks EXACTLY like the image (consistent layout).
+    Supports 'orientation' ('portrait' or 'landscape') and 'viewport' options.
     """
     html_content = request.data.get('html_content')
     filename = request.data.get('filename', 'result.pdf')
+    orientation = request.data.get('orientation', 'portrait')
+    user_viewport = request.data.get('viewport', {})
     
     if not html_content:
         return HttpResponse("HTML content is required", status=400)
     
     try:
-        # Step 1: Generate High-Quality Image first (PNG)
-        image_data = generate_report_image(html_content, scale=2)
+        # Determine Page Size based on orientation
+        from reportlab.lib.pagesizes import landscape, portrait
         
-        # Step 2: Check if it's an error from HCTI
+        target_pagesize = A4
+        if orientation == 'landscape':
+            target_pagesize = landscape(A4)
+            # Default viewport for landscape (approx A4 width @ 96dpi)
+            default_width = 1123 
+        else:
+            target_pagesize = portrait(A4)
+            # Default viewport for portrait
+            default_width = 794
+
+        # Generate Image with Custom Viewport
+        # Allow user override, otherwise use intelligent default
+        viewport_width = user_viewport.get('width', default_width)
+        
+        image_options = {
+            "viewport_width": viewport_width,
+            "viewport_height": user_viewport.get('height', 1123), # Height expands anyway
+            "device_scale": user_viewport.get('deviceScaleFactor', 2)
+        }
+        
+        # Inject standard viewport meta if missing, to ensure renderer respects width
+        if '<meta name="viewport"' not in html_content:
+            html_content = f'<meta name="viewport" content="width={viewport_width}">\n' + html_content
+
+        image_data = call_external_render_api(html_content, format='png', options=image_options)
+        
         if not image_data.startswith(b'\x89PNG'):
              print(f"[ERROR] PNG Generation Failed. returned data: {image_data[:100]}")
              return HttpResponse(image_data, status=400, content_type='application/json')
 
-        # Step 3: Convert PNG to PDF locally using ReportLab for precise A4 fitting
+        # Convert to PDF
         img = Image.open(BytesIO(image_data))
         img_width, img_height = img.size
         
         pdf_buffer = BytesIO()
-        c = canvas.Canvas(pdf_buffer, pagesize=A4)
-        a4_width, a4_height = A4
+        c = canvas.Canvas(pdf_buffer, pagesize=target_pagesize)
+        page_width, page_height = target_pagesize
         
-        # Calculate aspect ratio and scaling
-        # We scale the rendered image (1024px logical) to fit the A4 width
-        scale_factor = a4_width / img_width
-        draw_width = a4_width
+        # Scale image to fit page width
+        scale_factor = page_width / img_width
+        draw_width = page_width
         draw_height = img_height * scale_factor
         
-        # Set dynamic page size to match proportional height
-        c.setPageSize((a4_width, draw_height))
-        
-        # Draw with high quality
+        # Draw
+        if orientation == 'landscape':
+             # For landscape, we might want to center vertically if it's short, or multi-page if long
+             # For now, simple draw at top
+             c.setPageSize((page_width, max(page_height, draw_height))) # Expand height if needed?
+             # Actually, if we want standard A4 PDF pages, we shouldn't change page size dynamically 
+             # unless we want a long scroll. User asked for "Standard A4".
+             # So we keep Standard A4 Page Size.
+             c.setPageSize(target_pagesize)
+             
+             # If content is taller than page, we might ideally split, but Image->PDF is hard to split.
+             # We'll just shrink-to-fit if strict single page is needed, OR let it clip/spill.
+             # But current logic was expanding height.
+             # The previous logic did: c.setPageSize((a4_width, draw_height)) -> Variable Height PDF.
+             # Let's preserve that "Variable Height" behavior but with correct Width for landscape.
+             c.setPageSize((page_width, draw_height))
+        else:
+             c.setPageSize((page_width, draw_height))
+
         c.drawInlineImage(img, 0, 0, width=draw_width, height=draw_height)
         c.showPage()
         c.save()

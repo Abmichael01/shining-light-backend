@@ -70,6 +70,13 @@ class Staff(models.Model):
     # Employment Details
     entry_date = models.DateField(default=timezone.now)
     staff_type = models.CharField(max_length=20, choices=STAFF_TYPE_CHOICES, default='teaching')
+    school = models.ForeignKey(
+        School,
+        on_delete=models.PROTECT,
+        related_name='staff_members',
+        null=True, # Allow null for existing records
+        blank=True
+    )
     zone = models.CharField(max_length=20, choices=ZONE_CHOICES)
     assigned_class = models.ForeignKey(
         Class,

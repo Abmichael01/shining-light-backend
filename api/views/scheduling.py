@@ -397,15 +397,6 @@ class ScheduleViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Schedule.objects.all().prefetch_related('entries')
         
-        # Filter by session_term
-        session_term_id = self.request.query_params.get('session_term')
-        if session_term_id:
-            queryset = queryset.filter(session_term_id=session_term_id)
-        else:
-            current_term = Session.get_current_session_term()
-            if current_term:
-                queryset = queryset.filter(session_term=current_term)
-        
         # Filter by type
         schedule_type = self.request.query_params.get('type')
         if schedule_type:
@@ -416,7 +407,27 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         
-        return queryset.order_by('-start_date', 'name')
+        return queryset.order_by('-created_at')
+
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """
+        Get or create the singleton schedule for a given type.
+        Usage: /api/scheduling/schedules/current/?type=exam
+        """
+        schedule_type = request.query_params.get('type', 'general')
+        
+        # Try to find an existing active schedule
+        schedule = Schedule.objects.filter(schedule_type=schedule_type).first()
+        
+        if not schedule:
+            schedule = Schedule.objects.create(
+                schedule_type=schedule_type,
+                is_active=True
+            )
+        
+        serializer = self.get_serializer(schedule)
+        return Response(serializer.data)
 
 
 class ScheduleEntryViewSet(viewsets.ModelViewSet):

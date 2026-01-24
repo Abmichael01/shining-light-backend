@@ -473,9 +473,12 @@ def get_cbt_student_profile(request):
     try:
         session_student = request.user
         
-        # Fetch actual student record
+        # Fetch actual student record with prefetch for subject registrations
         try:
-            student = Student.objects.select_related('school', 'class_model').get(
+            student = Student.objects.select_related('school', 'class_model').prefetch_related(
+                'subject_registrations__subject',
+                'subject_registrations__session_term'
+            ).get(
                 admission_number=session_student.admission_number
             )
         except Student.DoesNotExist:
@@ -505,7 +508,7 @@ def get_cbt_exams(request):
         student = request.user
         
         # Get student record
-        from api.models import Student
+        from api.models import Student, StudentSubject
         try:
             student_obj = Student.objects.get(admission_number=student.admission_number)
         except Student.DoesNotExist:
@@ -514,9 +517,18 @@ def get_cbt_exams(request):
                 status=status.HTTP_404_NOT_FOUND
             )
         
-        # Get exams that are active
+        # Get student's registered subjects (active registrations only)
+        registered_subjects = StudentSubject.objects.filter(
+            student=student_obj,
+            is_active=True
+        ).values_list('subject_id', flat=True)
+        
+        print(f"DEBUG: Student {student_obj.admission_number} registered subjects: {list(registered_subjects)}")
+        
+        # Get exams that are active and for registered subjects
         exams = Exam.objects.filter(
-            status='active'
+            status='active',
+            subject_id__in=registered_subjects  # Only exams for registered subjects
         ).order_by('-created_at')
         
         # Filter out exams that the student has already taken
@@ -526,7 +538,7 @@ def get_cbt_exams(request):
         ).values_list('exam', flat=True)
         
         print(f"DEBUG: Student {student_obj.admission_number} has taken exams: {list(taken_exams)}")
-        print(f"DEBUG: Total active exams: {exams.count()}")
+        print(f"DEBUG: Total active exams for registered subjects: {exams.count()}")
         
         available_exams = exams.exclude(id__in=taken_exams)
         

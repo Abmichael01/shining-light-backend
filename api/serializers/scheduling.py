@@ -66,7 +66,7 @@ class AttendanceRecordSerializer(serializers.ModelSerializer):
 
 
 class ScheduleEntrySerializer(serializers.ModelSerializer):
-    schedule_name = serializers.CharField(source='schedule.name', read_only=True)
+    # schedule_name removed
     linked_exam_title = serializers.CharField(source='linked_exam.title', read_only=True, allow_null=True)
     linked_subject_name = serializers.CharField(source='linked_subject.name', read_only=True, allow_null=True)
     supervisor_name = serializers.SerializerMethodField()
@@ -75,7 +75,7 @@ class ScheduleEntrySerializer(serializers.ModelSerializer):
     class Meta:
         model = ScheduleEntry
         fields = [
-            'id', 'schedule', 'schedule_name', 'date', 'start_time', 'end_time', 'title',
+            'id', 'schedule', 'date', 'start_time', 'end_time', 'title',
             'linked_exam', 'linked_exam_title', 'linked_subject', 'linked_subject_name',
             'target_classes', 'target_class_names', 'supervisor', 'supervisor_name',
             'created_at', 'updated_at'
@@ -90,15 +90,13 @@ class ScheduleEntrySerializer(serializers.ModelSerializer):
 
 
 class ScheduleSerializer(serializers.ModelSerializer):
-    session_term_display = serializers.CharField(source='session_term.__str__', read_only=True)
     entries = ScheduleEntrySerializer(many=True, read_only=True)
     entry_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Schedule
         fields = [
-            'id', 'name', 'session_term', 'session_term_display', 'schedule_type',
-            'start_date', 'end_date', 'is_active', 'description',
+            'id', 'schedule_type', 'is_active', 'start_date', 'end_date',
             'entries', 'entry_count', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
