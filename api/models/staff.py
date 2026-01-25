@@ -406,6 +406,26 @@ class SalaryPayment(models.Model):
             })
 
 
+class LoanTenure(models.Model):
+    """
+    Pre-defined loan tenures/plans created by Admin
+    """
+    name = models.CharField(max_length=100, help_text="e.g. 6 Months Plan")
+    duration_months = models.PositiveIntegerField()
+    interest_rate = models.DecimalField(max_digits=5, decimal_places=2, help_text="Interest rate (percentage)")
+    is_active = models.BooleanField(default=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'loan_tenures'
+        ordering = ['duration_months']
+    
+    def __str__(self):
+        return f"{self.name} ({self.interest_rate}%)"
+
+
 class LoanApplication(models.Model):
     """
     Staff loan applications
@@ -422,6 +442,7 @@ class LoanApplication(models.Model):
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='loan_applications')
     
     # Loan Details
+    tenure = models.ForeignKey(LoanTenure, on_delete=models.PROTECT, related_name='applications', null=True, blank=True)
     application_number = models.CharField(max_length=20, unique=True, blank=True)
     loan_amount = models.DecimalField(max_digits=10, decimal_places=2)
     interest_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='Interest rate as percentage')
@@ -575,3 +596,60 @@ class LoanPayment(models.Model):
                 })
 
 
+class StaffWallet(models.Model):
+    """
+    Staff digital wallet for loan disbursements and repayments
+    Stores the Paystack Dedicated Virtual Account details
+    """
+    staff = models.OneToOneField(Staff, on_delete=models.CASCADE, related_name='wallet')
+    wallet_balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    
+    # Paystack Dedicated Account Details
+    paystack_customer_code = models.CharField(max_length=100, blank=True)
+    account_number = models.CharField(max_length=20, blank=True, help_text="Virtual Account Number")
+    bank_name = models.CharField(max_length=100, blank=True)
+    account_name = models.CharField(max_length=200, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'staff_wallets'
+    
+    def __str__(self):
+        return f"{self.staff.get_full_name()} - Wallet (₦{self.wallet_balance:,.2f})"
+
+    def create_virtual_account(self):
+        """
+        Call Paystack to generate a VA for this staff
+        """
+        from api.utils.paystack import Paystack
+        paystack = Paystack()
+        
+        # 1. Ensure Customer Exists
+        # Use staff email or fallback
+        email = self.staff.user.email if self.staff.user.email else f"staff_{self.staff.staff_id}@school.com"
+        
+        customer = paystack.create_customer(
+            email=email,
+            first_name=self.staff.first_name,
+            last_name=self.staff.surname,
+            phone=self.staff.phone_number
+        )
+        
+        if customer and 'customer_code' in customer:
+            self.paystack_customer_code = customer['customer_code']
+            self.save()
+            
+            # 2. Create Dedicated Account
+            dva = paystack.create_dedicated_account(self.paystack_customer_code)
+            if dva:
+                # Paystack DVA response structure varies but usually contains 'account_number', 'bank'
+                # Adjust based on actual response structure
+                bank_data = dva.get('bank', {})
+                self.account_number = dva.get('account_number')
+                self.bank_name = bank_data.get('name', 'Wema Bank')
+                self.account_name = dva.get('account_name', f"{self.staff.get_full_name()}")
+                self.save()
+                return True
+        return False

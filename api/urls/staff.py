@@ -9,7 +9,8 @@ from api.views.staff import (
     StaffSalaryViewSet,
     SalaryPaymentViewSet,
     LoanApplicationViewSet,
-    LoanPaymentViewSet
+    LoanPaymentViewSet,
+    LoanTenureViewSet
 )
 
 router = DefaultRouter()
@@ -26,6 +27,7 @@ router.register(r'salary-payments', SalaryPaymentViewSet, basename='salary-payme
 # Loan management
 router.register(r'loan-applications', LoanApplicationViewSet, basename='loan-application')
 router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
+router.register(r'loan-tenures', LoanTenureViewSet, basename='loan-tenure')
 
 urlpatterns = router.urls
 

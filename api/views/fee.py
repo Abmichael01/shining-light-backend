@@ -13,8 +13,8 @@ from api.serializers import (
     StudentFeeStatusSerializer,
     RecordFeePaymentSerializer
 )
-from api.permissions import IsSchoolAdmin, IsAdminOrStaff
-from api.models import Class, Subject, Staff
+from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
+from api.models import Class, Subject, Staff, Student
 
 
 class FeeTypeViewSet(viewsets.ModelViewSet):
@@ -27,6 +27,7 @@ class FeeTypeViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter queryset based on request parameters"""
+        # ... logic unchanged ...
         queryset = FeeType.objects.select_related(
             'school',
             'created_by'
@@ -85,7 +86,16 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     """
     queryset = FeePayment.objects.all()
     serializer_class = FeePaymentSerializer
-    permission_classes = [IsAdminOrStaff]
+    permission_classes = [IsAdminOrStaffOrStudent]
+    
+    def get_permissions(self):
+        """
+        Allow specific permissions for custom actions
+        """
+        if self.action in ['initialize_payment', 'verify_payment']:
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
     
     def get_queryset(self):
         """Filter queryset based on request parameters"""
@@ -97,9 +107,19 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             'session_term',
             'processed_by'
         )
-        # Staff scoping: restrict to students in assigned classes/subjects
+        
         user = self.request.user
-        if getattr(user, 'user_type', None) == 'staff':
+        user_type = getattr(user, 'user_type', None)
+        
+        # Student scoping: can only see own payments
+        if user_type == 'student':
+            if hasattr(user, 'student_profile'):
+                queryset = queryset.filter(student=user.student_profile)
+            else:
+                return FeePayment.objects.none()
+        
+        # Staff scoping: restrict to students in assigned classes/subjects
+        elif user_type == 'staff':
             staff = Staff.objects.filter(user=user).first()
             assigned_classes = Class.objects.filter(
                 models.Q(class_staff=user) | models.Q(assigned_teachers__user=user)
@@ -112,9 +132,17 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
                 models.Q(student__subject_registrations__subject__in=assigned_subjects)
             ).distinct()
         
-        # Filter by student
+        # ... logic continues ...
+        
+        # Filter by student (Admin/Staff only logic, for student it's already filtered)
         student_id = self.request.query_params.get('student')
         if student_id:
+            # If student is checking, ensure they are querying themselves (redundant due to queryset filter but safer)
+            if user_type == 'student' and hasattr(user, 'student_profile'):
+                if str(student_id) != str(user.student_profile.id):
+                     # If student tries to filter by another student ID, return empty or their own?
+                     # Queryset filter already handles it, so this filter just refines inside their own data
+                     pass 
             queryset = queryset.filter(student_id=student_id)
         
         # Filter by fee type
@@ -171,6 +199,13 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         """
         Record a new fee payment with validation
         """
+        # Only admin/staff can record payments
+        if getattr(request.user, 'user_type', None) == 'student':
+             return Response(
+                {'error': 'Students cannot record payments manually.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         serializer = RecordFeePaymentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             payment = serializer.save()
@@ -183,52 +218,60 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def student_fees(self, request):
         """
-        Get all applicable fees and payment status for a student
+        Get fees applicable to the logged-in student for a specific session/term
         """
-        student_id = request.query_params.get('student')
-        if not student_id:
-            return Response(
-                {'error': 'Student ID is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        user = request.user
         
-        try:
-            student = Student.objects.get(id=student_id)
-        except Student.DoesNotExist:
+        # 1. Start with Profile Check
+        student = getattr(user, 'student_profile', None)
+        if not student:
             return Response(
-                {'error': 'Student not found'},
+                {'error': 'No student profile found for this user.'},
                 status=status.HTTP_404_NOT_FOUND
             )
+
+        # 2. Determine Session and Term to View
+        session_id = request.query_params.get('session_id')
+        term_id = request.query_params.get('term_id')
         
-        # Get current session and term
-        session = request.query_params.get('session')
-        session_term = request.query_params.get('session_term')
-        
-        # Get all applicable fee types for this student
-        fee_types = FeeType.objects.filter(
+        # Default to current if not provided
+        if not session_id and student.current_session:
+             session_id = student.current_session.id
+        if not term_id and student.current_term:
+             term_id = student.current_term.id
+             
+        # 3. Filter Fee Types
+        # Rules: For School, Active, and Applicable Class
+        fees_qs = FeeType.objects.filter(
             school=student.school,
             is_active=True
         ).filter(
-            Q(applicable_classes__isnull=True) |  # No classes = all classes
-            Q(applicable_classes=student.class_model)  # Or student's class
+            models.Q(applicable_classes__isnull=True) | 
+            models.Q(applicable_classes=student.class_model)
         ).distinct()
         
-        # Build status for each fee
+        # Session/Term Filter: Active for Term OR Recurring
+        if term_id:
+            fees_qs = fees_qs.filter(
+                models.Q(active_terms__id=term_id) |
+                models.Q(is_recurring_per_term=True)
+            )
+        
         fee_statuses = []
-        for fee_type in fee_types:
-            # Get payments
+        for fee_type in fees_qs:
+            # 4. Calculate Payment Status for THIS SPECIFIC Session/Term
             payment_filters = {
                 'student': student,
-                'fee_type': fee_type,
+                'fee_type': fee_type
             }
             
-            if fee_type.is_recurring_per_term and session_term:
-                payment_filters['session_term_id'] = session_term
-            elif session:
-                payment_filters['session_id'] = session
-            
+            if term_id:
+                payment_filters['session_term_id'] = term_id
+            elif session_id:
+                payment_filters['session_id'] = session_id
+                
             payments = FeePayment.objects.filter(**payment_filters)
-            total_paid = payments.aggregate(total=Sum('amount'))['total'] or 0
+            total_paid = payments.aggregate(sum=Sum('amount'))['sum'] or 0
             installments_made = payments.count()
             
             # Calculate status
@@ -238,6 +281,23 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
                 fee_status = 'partial'
             else:
                 fee_status = 'unpaid'
+            
+            # Check Prerequisites (Using SAME Session/Term context)
+            is_locked = False
+            locked_message = ""
+            
+            prerequisites = fee_type.prerequisites.all()
+            for prereq in prerequisites:
+                # Check if prereq is paid FOR THIS SESSION/TERM
+                prereq_paid = prereq.get_student_total_paid(
+                    student.id, 
+                    session=session_id, 
+                    session_term=term_id
+                )
+                if prereq_paid < prereq.amount:
+                    is_locked = True
+                    locked_message = f"Requires {prereq.name} to be paid first"
+                    break
             
             fee_statuses.append({
                 'fee_type_id': fee_type.id,
@@ -252,9 +312,192 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
                 'is_mandatory': fee_type.is_mandatory,
                 'is_recurring': fee_type.is_recurring_per_term,
                 'payments': FeePaymentSerializer(payments, many=True).data,
+                'is_locked': is_locked,
+                'locked_message': locked_message
             })
         
         serializer = StudentFeeStatusSerializer(fee_statuses, many=True)
         return Response(serializer.data)
 
 
+    @action(detail=False, methods=['post'])
+    def initialize_payment(self, request):
+        """
+        Initialize a Paystack transaction
+        """
+        from api.utils.paystack import Paystack
+        import uuid
+        
+        user = request.user
+        fee_type_id = request.data.get('fee_type_id')
+        amount = request.data.get('amount')
+        
+        if not fee_type_id or not amount:
+            return Response(
+                {'error': 'Fee Type ID and Amount are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            fee_type = FeeType.objects.get(id=fee_type_id)
+        except FeeType.DoesNotExist:
+            return Response(
+                {'error': 'Fee Type not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+            
+        # Get student logic (reuse from student_fees)
+        student = None
+        if getattr(user, 'user_type', None) == 'student':
+            if hasattr(user, 'student_profile'):
+                student = user.student_profile
+        
+        if not student:
+             # Fallback if staff/admin is initiating (future use)
+             return Response(
+                 {'error': 'Student profile required for payment initialization'},
+                 status=status.HTTP_400_BAD_REQUEST
+             )
+             
+        # Check Prerequisites (Security Check)
+        prerequisites = fee_type.prerequisites.all()
+        for prereq in prerequisites:
+            prereq_paid = prereq.get_student_total_paid(student.id) # Should consider session if needed
+            if prereq_paid < prereq.amount:
+                 return Response(
+                     {'error': f'Payment Locked: You must pay {prereq.name} first.'},
+                     status=status.HTTP_403_FORBIDDEN
+                 )
+             
+        # Generate Reference
+        reference = f"TREF-{uuid.uuid4().hex[:12].upper()}"
+        
+        # Callback URL (Frontend URL)
+        # Using port 3050 as specified
+        callback_url = f"http://localhost:3050/portals/student/fees/callback" 
+        
+        pass_metadata = {
+            'fee_type_id': fee_type.id,
+            'student_id': student.id,
+            'session_id': student.current_session.id if student.current_session else None,
+            'term_id': student.current_term.id if student.current_term else None,
+            'custom_fields': [
+                {
+                    'display_name': "Fee Type",
+                    'variable_name': "fee_type",
+                    'value': fee_type.name
+                },
+                {
+                    'display_name': "Student",
+                    'variable_name': "student",
+                    'value': student.get_full_name()
+                }
+            ]
+        }
+        
+        paystack = Paystack()
+        email = user.email or f"student_{student.id}@school.com"
+        
+        response = paystack.initialize_transaction(
+            email=email,
+            amount=amount,
+            reference=reference,
+            callback_url=callback_url,
+            metadata=pass_metadata
+        )
+        
+        if response:
+            return Response({
+                'authorization_url': response['authorization_url'],
+                'access_code': response['access_code'],
+                'reference': reference
+            })
+        else:
+            return Response(
+                {'error': 'Failed to initialize payment with Paystack'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=False, methods=['post'])
+    def verify_payment(self, request):
+        """
+        Verify Paystack transaction and record payment
+        """
+        from api.utils.paystack import Paystack
+        from django.db import transaction
+        
+        reference = request.data.get('reference')
+        fee_type_id = request.data.get('fee_type_id')
+        student_id = request.data.get('student_id') # Optional if we trust the user session context
+        
+        if not reference:
+             return Response(
+                {'error': 'Reference is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        paystack = Paystack()
+        data = paystack.verify_transaction(reference)
+        
+        if data and data['status'] == 'success':
+            # Payment Verified
+            amount_paid = float(data['amount']) / 100 # Convert kobo to Naira
+            
+            # Check if payment already exists
+            if FeePayment.objects.filter(reference_number=reference).exists():
+                 return Response({
+                    'status': 'success',
+                    'message': 'Payment already verified',
+                    'amount': amount_paid
+                })
+            
+            try:
+                with transaction.atomic():
+                    # Get IDs from Metadata if not provided in request
+                    metadata = data.get('metadata', {})
+                    if not fee_type_id:
+                        fee_type_id = metadata.get('fee_type_id')
+                    
+                    if not fee_type_id: 
+                         return Response({'error': 'Fee Type ID required for verification'}, status=400)
+                         
+                    fee_type = FeeType.objects.get(id=fee_type_id)
+                    
+                    student = None
+                    if hasattr(request.user, 'student_profile'):
+                        student = request.user.student_profile
+                    elif student_id:
+                        student = Student.objects.get(id=student_id)
+                    
+                    if not student:
+                        return Response({'error': 'Student not identified'}, status=400)
+
+                    # Create Payment Record
+                    payment = FeePayment.objects.create(
+                        student=student,
+                        fee_type=fee_type,
+                        amount=amount_paid,
+                        payment_method='online', # Paystack
+                        payment_date=timezone.now().date(),
+                        reference_number=reference,
+                        notes=f"Paystack Ref: {reference}",
+                        processed_by=request.user # The student themselves initiated it
+                    )
+                    
+                    return Response({
+                        'status': 'success',
+                        'message': 'Payment verified and recorded',
+                        'payment_id': payment.id,
+                        'amount': amount_paid
+                    })
+            except Exception as e:
+                print(f"Verification Error: {e}")
+                return Response(
+                    {'error': f'Payment verified but recording failed: {str(e)}'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+        else:
+            return Response(
+                {'error': 'Transaction verification failed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )

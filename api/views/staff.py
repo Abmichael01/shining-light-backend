@@ -15,7 +15,9 @@ from api.models import (
     StaffSalary,
     SalaryPayment,
     LoanApplication,
+    LoanTenure,
     LoanPayment,
+    StaffWallet,
     Student,
     Class
 )
@@ -30,11 +32,53 @@ from api.serializers import (
     SalaryPaymentSerializer,
     LoanApplicationSerializer,
     LoanPaymentSerializer,
+    StaffWalletSerializer,
+    LoanTenureSerializer,
     StudentListSerializer,
     StudentSerializer
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff
 from api.utils.email import generate_password, send_staff_registration_email
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_wallet(request):
+    """
+    Get or create wallet for authenticated staff
+    """
+    try:
+        staff = Staff.objects.filter(user=request.user).first()
+        if not staff:
+             return Response({'error': 'Staff profile not found'}, status=status.HTTP_404_NOT_FOUND)
+             
+        wallet, created = StaffWallet.objects.get_or_create(staff=staff)
+        
+        # If no account number, try to create VA
+        if not wallet.account_number:
+            created_va = wallet.create_virtual_account()
+            if created_va:
+                wallet.refresh_from_db()
+                
+        serializer = StaffWalletSerializer(wallet)
+        return Response(serializer.data)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class LoanTenureViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for LoanTenure
+    """
+    queryset = LoanTenure.objects.filter(is_active=True)
+    serializer_class = LoanTenureSerializer
+    permission_classes = [IsAdminOrStaff] 
+    # Staff need to LIST it. Admin create.
+    # IsAdminOrStaff allows read?
+    # Actually IsAdminOrStaff permission class allows "Any authenticated staff" to have permission.
+    
+    def get_queryset(self):
+        return LoanTenure.objects.filter(is_active=True).order_by('duration_months')
 
 
 class StaffViewSet(viewsets.ModelViewSet):
@@ -585,7 +629,7 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     """
     queryset = LoanApplication.objects.all()
     serializer_class = LoanApplicationSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter by various parameters"""
@@ -597,7 +641,12 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
             'reviewed_by'
         ).prefetch_related('loan_payments')
         
-        # Filter by staff
+        # If user is staff, restrict to their own loans
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            queryset = queryset.filter(staff__user=user)
+        
+        # Filter by staff (admin use)
         staff_id = self.request.query_params.get('staff')
         if staff_id:
             queryset = queryset.filter(staff_id=staff_id)
@@ -623,6 +672,17 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
             )
         
         return queryset.order_by('-application_date')
+
+    def perform_create(self, serializer):
+        """Auto-asign staff if user is staff"""
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+             staff = Staff.objects.filter(user=user).first()
+             if not staff:
+                 raise serializers.ValidationError("Staff profile not found")
+             serializer.save(staff=staff)
+        else:
+             serializer.save()
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

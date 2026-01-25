@@ -1263,7 +1263,7 @@ class FeeTypeAdmin(admin.ModelAdmin):
     ]
     list_filter = ['school', 'is_mandatory', 'is_recurring_per_term', 'is_active', 'created_at']
     search_fields = ['name', 'description']
-    filter_horizontal = ['applicable_classes']
+    filter_horizontal = ['applicable_classes', 'active_terms']
     ordering = ['school', 'name']
     readonly_fields = ['created_at', 'updated_at']
     
@@ -1272,7 +1272,7 @@ class FeeTypeAdmin(admin.ModelAdmin):
             'fields': ('name', 'description', 'amount', 'school')
         }),
         (_('Applicability'), {
-            'fields': ('applicable_classes',)
+            'fields': ('applicable_classes', 'active_terms')
         }),
         (_('Payment Options'), {
             'fields': ('max_installments', 'is_mandatory', 'is_recurring_per_term', 'is_active')

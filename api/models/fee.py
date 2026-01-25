@@ -109,6 +109,23 @@ class FeeType(models.Model):
         related_name='fee_types_created'
     )
     
+    # Dependencies
+    prerequisites = models.ManyToManyField(
+        'self',
+        symmetrical=False,
+        blank=True,
+        related_name='required_by',
+        help_text='Fees that must be paid before this fee can be paid'
+    )
+    
+    # Session Activation (The Switch)
+    active_terms = models.ManyToManyField(
+        SessionTerm,
+        blank=True,
+        related_name='active_fees',
+        help_text='Terms in which this fee is available for payment'
+    )
+    
     class Meta:
         db_table = 'fee_types'
         ordering = ['school', 'name']
