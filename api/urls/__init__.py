@@ -5,6 +5,7 @@ from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
 from api.views.config import school_configs
 from api.views.upload import FileUploadView
+from api.views.webhook import paystack_webhook
 
 app_name = 'api'
 
@@ -65,5 +66,8 @@ urlpatterns = [
 
     # General File Upload
     path('common/upload/', FileUploadView.as_view(), name='file-upload'),
+    
+    # Centralized Payment Webhook
+    path('payment/webhook/', paystack_webhook, name='central-paystack-webhook'),
 ]
 
