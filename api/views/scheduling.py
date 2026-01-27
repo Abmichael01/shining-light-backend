@@ -409,7 +409,7 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         
         # Enforce active filtering for non-admins
         user = self.request.user
-        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        is_admin = user.is_superuser or user.is_staff or getattr(user, 'user_type', None) == 'admin'
         
         if not is_admin:
             queryset = queryset.filter(is_active=True)
@@ -424,10 +424,9 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         """
         schedule_type = request.query_params.get('type', 'general')
         
-        # Try to find an existing active schedule
         # For non-admins, must be active. For admins, we typically show the latest configuration.
         user = request.user
-        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        is_admin = user.is_superuser or user.is_staff or getattr(user, 'user_type', None) == 'admin'
         
         query = Schedule.objects.filter(schedule_type=schedule_type)
         if not is_admin:
@@ -480,7 +479,7 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
         
         # Enforce active schedule filtering for non-admins
         user = self.request.user
-        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        is_admin = user.is_superuser or user.is_staff or getattr(user, 'user_type', None) == 'admin'
         
         if not is_admin:
             queryset = queryset.filter(schedule__is_active=True)
