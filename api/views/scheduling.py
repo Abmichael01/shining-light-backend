@@ -407,6 +407,13 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         if is_active is not None:
             queryset = queryset.filter(is_active=is_active.lower() == 'true')
         
+        # Enforce active filtering for non-admins
+        user = self.request.user
+        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        
+        if not is_admin:
+            queryset = queryset.filter(is_active=True)
+        
         return queryset.order_by('-created_at')
 
     @action(detail=False, methods=['get'])
@@ -418,13 +425,26 @@ class ScheduleViewSet(viewsets.ModelViewSet):
         schedule_type = request.query_params.get('type', 'general')
         
         # Try to find an existing active schedule
-        schedule = Schedule.objects.filter(schedule_type=schedule_type).first()
+        # For non-admins, must be active. For admins, we typically show the latest configuration.
+        user = request.user
+        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        
+        query = Schedule.objects.filter(schedule_type=schedule_type)
+        if not is_admin:
+            query = query.filter(is_active=True)
+            
+        schedule = query.order_by('-created_at').first()
         
         if not schedule:
-            schedule = Schedule.objects.create(
-                schedule_type=schedule_type,
-                is_active=True
-            )
+            if is_admin:
+                # Admins can create a new one if none exists
+                schedule = Schedule.objects.create(
+                    schedule_type=schedule_type,
+                    is_active=True
+                )
+            else:
+                # If no active schedule for student/teacher, return 404
+                return Response({"detail": "No active schedule found."}, status=status.HTTP_404_NOT_FOUND)
         
         serializer = self.get_serializer(schedule)
         return Response(serializer.data)
@@ -458,5 +478,12 @@ class ScheduleEntryViewSet(viewsets.ModelViewSet):
         if class_id:
             queryset = queryset.filter(target_classes__id=class_id)
         
+        # Enforce active schedule filtering for non-admins
+        user = self.request.user
+        is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'user_type', None) == 'admin'
+        
+        if not is_admin:
+            queryset = queryset.filter(schedule__is_active=True)
+            
         return queryset.order_by('date', 'start_time')
 
