@@ -506,11 +506,13 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
             from api.models.fee import FeeType
             from django.db.models import Sum
             
-            # Find mandatory fees for this student's class and current term
+            # Find mandatory fees OR fees with 'Tuition' in name for this student's class and current term
             mandatory_fees = FeeType.objects.filter(
                 school_id=request.user.student_profile.school_id,
-                is_mandatory=True,
                 is_active=True
+            ).filter(
+                models.Q(is_mandatory=True) | 
+                models.Q(name__icontains='Tuition')
             ).filter(
                 models.Q(applicable_classes__isnull=True) | 
                 models.Q(applicable_classes=request.user.student_profile.class_model)
