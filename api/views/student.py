@@ -500,6 +500,41 @@ class StudentSubjectViewSet(viewsets.ModelViewSet):
                 current_term = current_session.session_terms.filter(is_current=True).first()
                 session_term_id = current_term.id if current_term else None
         
+        # Security Check: Prevent registration if mandatory fees are unpaid
+        # This applies to students registering themselves
+        if user_type == 'student':
+            from api.models.fee import FeeType
+            from django.db.models import Sum
+            
+            # Find mandatory fees for this student's class and current term
+            mandatory_fees = FeeType.objects.filter(
+                school_id=request.user.student_profile.school_id,
+                is_mandatory=True,
+                is_active=True
+            ).filter(
+                models.Q(applicable_classes__isnull=True) | 
+                models.Q(applicable_classes=request.user.student_profile.class_model)
+            ).filter(
+                models.Q(active_terms__id=session_term_id) |
+                models.Q(is_recurring_per_term=True)
+            ).distinct()
+            
+            unpaid_mandatory_fees = []
+            for fee in mandatory_fees:
+                paid_amount = fee.get_student_total_paid(
+                    request.user.student_profile.id,
+                    session=session_id,
+                    session_term=session_term_id
+                )
+                if paid_amount < fee.amount:
+                    unpaid_mandatory_fees.append(fee.name)
+            
+            if unpaid_mandatory_fees:
+                return Response({
+                    'detail': f'Registration Locked: Please pay the following mandatory fees first: {", ".join(unpaid_mandatory_fees)}',
+                    'unpaid_fees': unpaid_mandatory_fees
+                }, status=status.HTTP_403_FORBIDDEN)
+        
         # DEBUG: Print incoming parameters
         print(f"\n=== BULK REGISTER DEBUG ===")
         print(f"student_id: {student_id} (type: {type(student_id)})")

@@ -55,6 +55,20 @@ class FeeTypeSerializer(serializers.ModelSerializer):
         total = obj.payments.aggregate(total=Sum('amount'))['total']
         return float(total) if total else 0.0
 
+    def update(self, instance, validated_data):
+        applicable_classes = validated_data.pop('applicable_classes', None)
+        instance = super().update(instance, validated_data)
+        if applicable_classes is not None:
+            instance.applicable_classes.set(applicable_classes)
+        return instance
+
+    def create(self, validated_data):
+        applicable_classes = validated_data.pop('applicable_classes', [])
+        instance = super().create(validated_data)
+        if applicable_classes:
+            instance.applicable_classes.set(applicable_classes)
+        return instance
+
 
 class FeePaymentSerializer(serializers.ModelSerializer):
     """Serializer for FeePayment model"""
