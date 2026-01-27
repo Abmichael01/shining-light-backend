@@ -29,6 +29,11 @@ router.register(r'loan-applications', LoanApplicationViewSet, basename='loan-app
 router.register(r'loan-payments', LoanPaymentViewSet, basename='loan-payment')
 router.register(r'loan-tenures', LoanTenureViewSet, basename='loan-tenure')
 
+# Withdrawal management
+from api.views.staff import WithdrawalRequestViewSet, StaffBeneficiaryViewSet
+router.register(r'withdrawal-requests', WithdrawalRequestViewSet, basename='withdrawal-request')
+router.register(r'beneficiaries', StaffBeneficiaryViewSet, basename='staff-beneficiary')
+
 urlpatterns = router.urls
 
 

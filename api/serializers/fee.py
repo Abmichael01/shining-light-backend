@@ -68,10 +68,10 @@ class FeePaymentSerializer(serializers.ModelSerializer):
         decimal_places=2,
         read_only=True
     )
-    session_name = serializers.CharField(source='session.name', read_only=True, allow_null=True)
-    session_term_name = serializers.CharField(source='session_term.term_name', read_only=True, allow_null=True)
+    session_name = serializers.SerializerMethodField()
+    session_term_name = serializers.SerializerMethodField()
     payment_method_display = serializers.CharField(source='get_payment_method_display', read_only=True)
-    processed_by_email = serializers.EmailField(source='processed_by.email', read_only=True, allow_null=True)
+    processed_by_email = serializers.SerializerMethodField()
     
     class Meta:
         model = FeePayment
@@ -104,6 +104,15 @@ class FeePaymentSerializer(serializers.ModelSerializer):
     def get_student_name(self, obj):
         """Return student's full name"""
         return obj.student.get_full_name()
+
+    def get_session_name(self, obj):
+        return obj.session.name if obj.session else None
+
+    def get_session_term_name(self, obj):
+        return obj.session_term.term_name if obj.session_term else None
+
+    def get_processed_by_email(self, obj):
+        return obj.processed_by.email if obj.processed_by else None
 
 
 class StudentFeeStatusSerializer(serializers.Serializer):

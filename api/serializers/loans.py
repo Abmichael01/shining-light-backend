@@ -5,7 +5,9 @@ from api.models import (
     LoanPayment,
     StaffWallet,
     LoanTenure,
-    User
+    User,
+    WithdrawalRequest,
+    StaffBeneficiary
 )
 
 class StaffWalletSerializer(serializers.ModelSerializer):
@@ -67,14 +69,14 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
     staff_name = serializers.SerializerMethodField()
     staff_id = serializers.CharField(source='staff.staff_id', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    reviewed_by_email = serializers.EmailField(source='reviewed_by.email', read_only=True, allow_null=True)
+    reviewed_by_email = serializers.SerializerMethodField()
     amount_paid = serializers.SerializerMethodField()
     amount_remaining = serializers.SerializerMethodField()
     loan_payments = LoanPaymentSerializer(many=True, read_only=True)
     
     # Tenure selection
     tenure_id = serializers.IntegerField(write_only=True, required=False)
-    tenure_name = serializers.CharField(source='tenure.name', read_only=True)
+    tenure_name = serializers.SerializerMethodField()
     
     class Meta:
         model = LoanApplication
@@ -132,6 +134,16 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
         """Return remaining loan balance"""
         return obj.get_amount_remaining()
 
+    def get_reviewed_by_email(self, obj):
+        if obj.reviewed_by:
+            return obj.reviewed_by.email
+        return None
+
+    def get_tenure_name(self, obj):
+        if obj.tenure:
+            return obj.tenure.name
+        return None
+
     def create(self, validated_data):
         """Handle tenure selection"""
         tenure_id = validated_data.pop('tenure_id', None)
@@ -149,3 +161,55 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
              validated_data['interest_rate'] = 0
         
         return super().create(validated_data)
+
+
+class WithdrawalRequestSerializer(serializers.ModelSerializer):
+    """Serializer for WithdrawalRequest"""
+    staff_name = serializers.CharField(source='staff.get_full_name', read_only=True)
+    staff_id = serializers.CharField(source='staff.staff_id', read_only=True)
+    processed_by_name = serializers.CharField(source='processed_by.get_full_name', read_only=True)
+    beneficiary_id = serializers.IntegerField(write_only=True, required=True)
+    
+    class Meta:
+        model = WithdrawalRequest
+        fields = [
+            'id',
+            'staff',
+            'staff_name',
+            'staff_id',
+            'amount',
+            'account_number',
+            'bank_name',
+            'account_name',
+            'status',
+            'processed_by',
+            'processed_by_name',
+            'rejection_reason',
+            'admin_notes',
+            'created_at',
+            'updated_at',
+            'processed_at',
+            'beneficiary_id'
+        ]
+        read_only_fields = [
+            'id', 'staff', 'status', 'processed_by', 
+            'processed_at', 'rejection_reason', 
+            'admin_notes', 'created_at', 'updated_at'
+        ]
+
+
+class StaffBeneficiarySerializer(serializers.ModelSerializer):
+    """Serializer for StaffBeneficiary"""
+    class Meta:
+        model = StaffBeneficiary
+        fields = [
+            'id',
+            'staff',
+            'bank_name',
+            'bank_code',
+            'account_number',
+            'account_name',
+            'is_verified',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'staff', 'is_verified', 'created_at']

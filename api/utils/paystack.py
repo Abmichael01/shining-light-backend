@@ -134,3 +134,43 @@ class Paystack:
         except Exception as e:
             print(f"Paystack DVA Exception: {e}")
             return None
+
+    def list_banks(self):
+        """
+        Fetch list of banks from Paystack
+        """
+        url = f"{self.BASE_URL}/bank"
+        headers = {"Authorization": f"Bearer {self.PAYSTACK_SECRET_KEY}"}
+        
+        try:
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status'):
+                    return data['data']
+            return []
+        except Exception as e:
+            print(f"Paystack List Banks Error: {e}")
+            return []
+
+    def resolve_account_number(self, account_number, bank_code):
+        """
+        Resolve account number to get account name
+        """
+        url = f"{self.BASE_URL}/bank/resolve"
+        headers = {"Authorization": f"Bearer {self.PAYSTACK_SECRET_KEY}"}
+        params = {
+            "account_number": account_number,
+            "bank_code": bank_code
+        }
+        
+        try:
+            response = requests.get(url, headers=headers, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('status'):
+                    return data['data'] # Contains account_name, account_number
+            return None
+        except Exception as e:
+            print(f"Paystack Resolve Account Error: {e}")
+            return None

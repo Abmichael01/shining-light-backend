@@ -15,7 +15,8 @@ from .academic import (
     ExamHallSerializer,
     CBTExamCodeSerializer,
     ExamSerializer,
-    AssignmentSerializer
+    AssignmentSerializer,
+    SchemeOfWorkSerializer
 )
 from .student import (
     StudentSerializer,
@@ -46,7 +47,9 @@ from .loans import (
     StaffWalletSerializer,
     LoanTenureSerializer,
     LoanApplicationSerializer,
-    LoanPaymentSerializer
+    LoanPaymentSerializer,
+    WithdrawalRequestSerializer,
+    StaffBeneficiarySerializer
 )
 from .fee import (
     FeeTypeSerializer,
@@ -74,6 +77,7 @@ __all__ = [
     'CBTExamCodeSerializer',
     'ExamSerializer',
     'AssignmentSerializer',
+    'SchemeOfWorkSerializer',
     'StudentSerializer',
     'StudentListSerializer',
     'StudentRegistrationSerializer',
@@ -98,6 +102,8 @@ __all__ = [
     'FeeTypeSerializer',
     'FeePaymentSerializer',
     'StudentFeeStatusSerializer',
-    'RecordFeePaymentSerializer'
+    'RecordFeePaymentSerializer',
+    'WithdrawalRequestSerializer',
+    'StaffBeneficiarySerializer'
 ]
 

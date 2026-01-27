@@ -653,3 +653,79 @@ class StaffWallet(models.Model):
                 self.save()
                 return True
         return False
+
+
+class WithdrawalRequest(models.Model):
+    """
+    Staff wallet withdrawal requests
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('processed', 'Processed'),
+    ]
+
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='withdrawal_requests')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    # Destination Account Details (Snapshot)
+    account_number = models.CharField(max_length=20)
+    bank_name = models.CharField(max_length=100)
+    account_name = models.CharField(max_length=200)
+    
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Admin Processing
+    processed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='withdrawals_processed'
+    )
+    rejection_reason = models.TextField(blank=True)
+    admin_notes = models.TextField(blank=True)
+    
+    # Dates
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'withdrawal_requests'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"{self.staff.get_full_name()} - ₦{self.amount:,.2f} ({self.status})"
+    
+    def clean(self):
+        super().clean()
+        if self.amount <= 0:
+            raise ValidationError({'amount': 'Withdrawal amount must be greater than zero.'})
+
+
+class StaffBeneficiary(models.Model):
+    """
+    Saved beneficiaries for staff withdrawals
+    """
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='beneficiaries')
+    bank_name = models.CharField(max_length=100)
+    bank_code = models.CharField(max_length=20)
+    account_number = models.CharField(max_length=20)
+    account_name = models.CharField(max_length=200)
+    is_verified = models.BooleanField(default=False)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'staff_beneficiaries'
+        unique_together = ['staff', 'account_number', 'bank_code']
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.account_name} - {self.bank_name}"

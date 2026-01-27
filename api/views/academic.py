@@ -4,7 +4,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, Exam, Assignment, Student, StudentExam, StudentAnswer
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, Exam, Assignment, Student, StudentExam, StudentAnswer, SchemeOfWork
 from api.serializers import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -20,7 +20,8 @@ from api.serializers import (
     ClubSerializer,
     ExamHallSerializer,
     ExamSerializer,
-    AssignmentSerializer
+    AssignmentSerializer,
+    SchemeOfWorkSerializer
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff
 from datetime import date
@@ -92,8 +93,58 @@ class SessionViewSet(viewsets.ModelViewSet):
             'detail': f'Session {session.name} is now current'
         })
     
-    @action(detail=True, methods=['post'])
-    def start_next_term(self, request, pk=None):
+        return Response({
+            'detail': f'Session {session.name} is now current'
+        })
+
+
+class SchemeOfWorkViewSet(viewsets.ModelViewSet):
+    """ViewSet for Scheme of Work"""
+    queryset = SchemeOfWork.objects.all().select_related('subject')
+    serializer_class = SchemeOfWorkSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        
+        # Filter by subject
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            queryset = queryset.filter(subject_id=subject_id)
+            
+        # Filter by term
+        term = self.request.query_params.get('term')
+        if term:
+            queryset = queryset.filter(term=term)
+            
+        return queryset.order_by('week_number')
+    
+    @action(detail=False, methods=['post'])
+    def bulk_create(self, request):
+        """Bulk create topics for a subject"""
+        subject_id = request.data.get('subject_id')
+        term = request.data.get('term')
+        topics = request.data.get('topics', [])
+        
+        if not all([subject_id, term, topics]):
+            return Response({'error': 'Missing required fields'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Delete existing schemes for this subject and term to ensure clean slate (manages updates and deletions)
+        SchemeOfWork.objects.filter(subject_id=subject_id, term=term).delete()
+            
+        created = []
+        for item in topics:
+            scheme = SchemeOfWork.objects.create(
+                subject_id=subject_id,
+                term=term,
+                week_number=item.get('week_number'),
+                topic=item.get('topic'),
+                learning_objectives=item.get('learning_objectives', ''),
+                resources=item.get('resources', '')
+            )
+            created.append(scheme)
+            
+        return Response(SchemeOfWorkSerializer(created, many=True).data, status=status.HTTP_201_CREATED)
         """Start the next term for this session"""
         session = self.get_object()
         
@@ -243,6 +294,11 @@ class SubjectViewSet(viewsets.ModelViewSet):
         department = self.request.query_params.get('department', None)
         if department:
             queryset = queryset.filter(department=department)
+            
+        # Filter by assigned teacher (user id)
+        teacher_id = self.request.query_params.get('teacher_id', None)
+        if teacher_id:
+            queryset = queryset.filter(assigned_teachers__user_id=teacher_id)
         
         # Search
         search = self.request.query_params.get('search', None)

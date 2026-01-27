@@ -803,6 +803,8 @@ class Question(models.Model):
         verbose_name=_('topic'),
         help_text=_('Specific topic or unit this question covers')
     )
+
+
     question_text = models.TextField(
         _('question text'),
         help_text=_('The question text (supports HTML and LaTeX for math formulas)')
@@ -1565,4 +1567,70 @@ class CBTExamCode(models.Model):
             self.is_used = True
             self.used_at = timezone.now()
             self.save(update_fields=['is_used', 'used_at'])
+
+
+class SchemeOfWork(models.Model):
+    """
+    Weekly Scheme of Work for subjects
+    Generic per term (not session-bound) for reusability
+    """
+    
+    TERM_CHOICES = [
+        ('1st Term', '1st Term'),
+        ('2nd Term', '2nd Term'),
+        ('3rd Term', '3rd Term'),
+    ]
+    
+    subject = models.ForeignKey(
+        Subject,
+        on_delete=models.CASCADE,
+        related_name='schemes_of_work',
+        verbose_name=_('subject')
+    )
+    term = models.CharField(
+        _('term'),
+        max_length=20,
+        choices=TERM_CHOICES
+    )
+    week_number = models.PositiveIntegerField(
+        _('week number'),
+        help_text=_('Week number (1-15)')
+    )
+    topic = models.CharField(
+        _('topic'),
+        max_length=200,
+        blank=True,  # Make it optional as we prefer topic_model
+        help_text=_('Legacy/Fallback topic name')
+    )
+    topic_model = models.ForeignKey(
+        Topic,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='schemes_of_work',
+        verbose_name=_('topic reference'),
+        help_text=_('Link to existing topic')
+    )
+    learning_objectives = models.TextField(
+        _('learning objectives'),
+        blank=True,
+        help_text=_('What students should be able to do by the end of the week')
+    )
+    resources = models.TextField(
+        _('resources'),
+        blank=True,
+        help_text=_('Teaching resources, links, or textbook references')
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Scheme of Work')
+        verbose_name_plural = _('Schemes of Work')
+        ordering = ['subject', 'term', 'week_number']
+        unique_together = [['subject', 'term', 'week_number']]
+    
+    def __str__(self):
+        return f"{self.subject.name} - {self.term} Week {self.week_number}: {self.topic}"
 

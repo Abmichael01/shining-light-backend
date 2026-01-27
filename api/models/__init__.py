@@ -17,7 +17,8 @@ from .academic import (
     Club,
     ExamHall,
     CBTExamCode,
-    AdmissionSettings
+    AdmissionSettings,
+    SchemeOfWork
 )
 from .student import (
     Student,
@@ -38,7 +39,9 @@ from .staff import (
     LoanApplication,
     LoanPayment,
     StaffWallet,
-    LoanTenure
+    LoanTenure,
+    WithdrawalRequest,
+    StaffBeneficiary
 )
 from .fee import (
     FeeType,
@@ -76,6 +79,7 @@ __all__ = [
     'ExamHall',
     'CBTExamCode',
     'AdmissionSettings',
+    'SchemeOfWork',
     'Student',
     'BioData',
     'Guardian',
@@ -89,10 +93,10 @@ __all__ = [
     'StaffSalary',
     'SalaryPayment',
     'LoanApplication',
-    'LoanApplication',
     'LoanPayment',
     'StaffWallet',
     'LoanTenure',
+    'WithdrawalRequest',
     'FeeType',
     'FeePayment',
     'PaymentPurpose',
@@ -102,6 +106,7 @@ __all__ = [
     'AttendanceRecord',
     'StudentAttendance',
     'Schedule',
-    'ScheduleEntry'
+    'ScheduleEntry',
+    'StaffBeneficiary'
 ]
 

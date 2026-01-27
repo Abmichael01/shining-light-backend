@@ -1,7 +1,7 @@
 """
 ViewSets for staff-related models
 """
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db import models
@@ -35,7 +35,9 @@ from api.serializers import (
     StaffWalletSerializer,
     LoanTenureSerializer,
     StudentListSerializer,
-    StudentSerializer
+    StudentSerializer,
+    WithdrawalRequestSerializer,
+    StaffBeneficiarySerializer
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff
 from api.utils.email import generate_password, send_staff_registration_email
@@ -737,7 +739,7 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'])
     def disburse(self, request, pk=None):
         """
-        Mark loan as disbursed
+        Mark loan as disbursed and credit staff wallet
         """
         loan = self.get_object()
         
@@ -747,12 +749,29 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        loan.status = 'disbursed'
-        from django.utils import timezone
-        loan.disbursement_date = timezone.now().date()
-        loan.save()
-        
-        return Response(LoanApplicationSerializer(loan).data)
+        try:
+            from django.db import transaction
+            from api.models import StaffWallet
+            
+            with transaction.atomic():
+                # 1. Update Loan Status
+                loan.status = 'disbursed'
+                from django.utils import timezone
+                loan.disbursement_date = timezone.now().date()
+                loan.save()
+                
+                # 2. Credit Staff Wallet
+                wallet, created = StaffWallet.objects.get_or_create(staff=loan.staff)
+                wallet.wallet_balance += loan.loan_amount
+                wallet.save()
+                
+            return Response(LoanApplicationSerializer(loan).data)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Disbursement failed: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class LoanPaymentViewSet(viewsets.ModelViewSet):
@@ -790,5 +809,247 @@ class LoanPaymentViewSet(viewsets.ModelViewSet):
         if loan.get_amount_remaining() <= 0:
             loan.status = 'completed'
             loan.save()
+
+
+from api.models.staff import WithdrawalRequest
+from api.serializers.loans import WithdrawalRequestSerializer
+
+class WithdrawalRequestViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for WithdrawalRequest model
+    Handling:
+    - Create (Staff): Deducts balance immediately (hold).
+    - Approve (Admin): Marks as processed.
+    - Reject (Admin): Refunds balance to wallet.
+    """
+    queryset = WithdrawalRequest.objects.all()
+    serializer_class = WithdrawalRequestSerializer
+    permission_classes = [IsAuthenticated] # Custom logic inside for staff/admin
+    
+    def get_queryset(self):
+        queryset = WithdrawalRequest.objects.select_related('staff', 'processed_by')
+        
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            # Staff sees only their own requests
+            queryset = queryset.filter(staff__user=user)
+        
+        # Filters for Admin
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+            
+        staff_id = self.request.query_params.get('staff')
+        if staff_id:
+            queryset = queryset.filter(staff__staff_id=staff_id)
+            
+        return queryset.order_by('-created_at')
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Staff initiates a withdrawal.
+        Check balance -> Deduct -> Create Request
+        """
+        from django.db import transaction
+        from api.models.staff import StaffBeneficiary
+        
+        user = request.user
+        staff = Staff.objects.filter(user=user).first()
+        
+        # Admins shouldn't be creating withdrawals here usually, but if needed logic can adapt
+        # Typically strictly for staff portal usage
+        if not staff:
+             return Response({'error': 'Staff profile not found'}, status=status.HTTP_404_NOT_FOUND)
+             
+        amount = request.data.get('amount')
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            return Response({'error': 'Invalid amount'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if amount <= 0:
+            return Response({'error': 'Amount must be greater than zero'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Validate and Get Beneficiary
+        beneficiary_id = request.data.get('beneficiary_id')
+        if not beneficiary_id:
+             return Response({'error': 'Please select a beneficiary account'}, status=status.HTTP_400_BAD_REQUEST)
+             
+        try:
+            beneficiary = StaffBeneficiary.objects.get(id=beneficiary_id, staff=staff)
+            account_number = beneficiary.account_number
+            bank_name = beneficiary.bank_name
+            account_name = beneficiary.account_name
+        except StaffBeneficiary.DoesNotExist:
+             return Response({'error': 'Invalid beneficiary selected'}, status=status.HTTP_400_BAD_REQUEST)
+             
+        if not account_number or not bank_name:
+            return Response(
+                {'error': 'Beneficiary details incomplete'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            with transaction.atomic():
+                # Lock wallet for update
+                wallet, _ = StaffWallet.objects.select_for_update().get_or_create(staff=staff)
+                
+                if wallet.wallet_balance < amount:
+                    return Response(
+                        {'error': f'Insufficient balance. Current balance: ₦{wallet.wallet_balance:,.2f}'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # Deduct immediately (Escrow/Hold)
+                from decimal import Decimal
+                wallet.wallet_balance -= Decimal(str(amount))
+                wallet.save()
+                
+                # Create Request
+                withdrawal = WithdrawalRequest.objects.create(
+                    staff=staff,
+                    amount=amount,
+                    account_number=account_number,
+                    bank_name=bank_name,
+                    account_name=account_name,
+                    status='pending'
+                )
+                
+                return Response(
+                    WithdrawalRequestSerializer(withdrawal).data,
+                    status=status.HTTP_201_CREATED
+                )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        """
+        Admin marks request as approved/processed.
+        Money was already deducted at creation, so we just update status.
+        """
+        if not request.user.is_staff and not getattr(request.user, 'user_type', '') == 'admin':
+             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+             
+        withdrawal = self.get_object()
+        if withdrawal.status != 'pending':
+            return Response({'error': 'Can only approve pending requests'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        withdrawal.status = 'approved'
+        withdrawal.processed_by = request.user
+        from django.utils import timezone
+        withdrawal.processed_at = timezone.now()
+        withdrawal.admin_notes = request.data.get('admin_notes', '')
+        withdrawal.save()
+        
+        return Response(WithdrawalRequestSerializer(withdrawal).data)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """
+        Admin rejects request.
+        REFUND the amount back to staff wallet.
+        """
+        if not request.user.is_staff and not getattr(request.user, 'user_type', '') == 'admin':
+             return Response({'error': 'Permission denied'}, status=status.HTTP_403_FORBIDDEN)
+             
+        withdrawal = self.get_object()
+        if withdrawal.status != 'pending':
+            return Response({'error': 'Can only reject pending requests'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        reason = request.data.get('rejection_reason')
+        if not reason:
+            return Response({'error': 'Rejection reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                # Refund
+                wallet = StaffWallet.objects.select_for_update().get(staff=withdrawal.staff)
+                wallet.wallet_balance += withdrawal.amount
+                wallet.save()
+                
+                # Update Request
+                withdrawal.status = 'rejected'
+                withdrawal.processed_by = request.user
+                from django.utils import timezone
+                withdrawal.processed_at = timezone.now()
+                withdrawal.rejection_reason = reason
+                withdrawal.admin_notes = request.data.get('admin_notes', '')
+                withdrawal.save()
+                
+            return Response(WithdrawalRequestSerializer(withdrawal).data)
+        except Exception as e:
+             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+from api.models.staff import StaffBeneficiary
+from api.utils.paystack import Paystack
+
+class StaffBeneficiaryViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for StaffBeneficiary
+    """
+    queryset = StaffBeneficiary.objects.all()
+    serializer_class = StaffBeneficiarySerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        # Staff sees only their own
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            return StaffBeneficiary.objects.filter(staff__user=user).order_by('-created_at')
+        # Admin can filter by staff
+        staff_id = self.request.query_params.get('staff')
+        if staff_id:
+             return StaffBeneficiary.objects.filter(staff__staff_id=staff_id).order_by('-created_at')
+        return StaffBeneficiary.objects.all()
+
+    def perform_create(self, serializer):
+        user = self.request.user
+        staff = Staff.objects.filter(user=user).first()
+        if not staff:
+            raise serializers.ValidationError("Staff profile not found")
+        
+        bank_code = self.request.data.get('bank_code')
+        account_number = self.request.data.get('account_number')
+        
+        if bank_code and account_number:
+            paystack = Paystack()
+            resolved = paystack.resolve_account_number(account_number, bank_code)
+            if resolved:
+                # Override account name from Paystack to ensure accuracy
+                serializer.save(
+                    staff=staff, 
+                    account_name=resolved['account_name'],
+                    is_verified=True
+                )
+            else:
+                 raise serializers.ValidationError("Could not verify account details with Paystack.")
+        else:
+            serializer.save(staff=staff)
+
+    @action(detail=False, methods=['get'])
+    def list_banks(self, request):
+        """Proxy to Paystack list banks"""
+        paystack = Paystack()
+        banks = paystack.list_banks()
+        return Response(banks)
+
+    @action(detail=False, methods=['get'])
+    def resolve_account(self, request):
+        """Proxy to Paystack resolve account"""
+        account_number = request.query_params.get('account_number')
+        bank_code = request.query_params.get('bank_code')
+        
+        if not account_number or not bank_code:
+            return Response({'error': 'account_number and bank_code are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        paystack = Paystack()
+        resolved = paystack.resolve_account_number(account_number, bank_code)
+        
+        if resolved:
+            return Response(resolved)
+        return Response({'error': 'Could not resolve account'}, status=status.HTTP_400_BAD_REQUEST)
 
 
