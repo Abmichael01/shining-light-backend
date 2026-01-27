@@ -281,6 +281,8 @@ class StudentSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     passport_photo = serializers.SerializerMethodField()
     all_subjects_cleared = serializers.SerializerMethodField()
+    has_staff_parent = serializers.SerializerMethodField()
+    staff_parents_details = serializers.SerializerMethodField()
     
     # Email field for updates
     email = serializers.EmailField(write_only=True, required=False)
@@ -298,7 +300,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             # Nested data
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
-            'all_subjects_cleared', 'staff_parents'
+            'all_subjects_cleared', 'staff_parents', 'has_staff_parent', 'staff_parents_details'
         ]
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name', 'passport_photo',
@@ -396,6 +398,19 @@ class StudentSerializer(serializers.ModelSerializer):
         if not registrations:
             return False
         return all(getattr(reg, 'cleared', False) for reg in registrations)
+
+    def get_has_staff_parent(self, obj):
+        return obj.staff_parents.exists()
+    
+    def get_staff_parents_details(self, obj):
+        return [
+            {
+                'id': staff.staff_id,
+                'full_name': staff.full_name,
+                'staff_type': staff.staff_type_display
+            }
+            for staff in obj.staff_parents.all()
+        ]
 
 
 class CBTStudentProfileSerializer(serializers.ModelSerializer):

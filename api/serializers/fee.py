@@ -151,7 +151,7 @@ class StudentFeeStatusSerializer(serializers.Serializer):
 class RecordFeePaymentSerializer(serializers.Serializer):
     """Serializer for recording a fee payment"""
     
-    student = serializers.IntegerField()
+    student = serializers.CharField()
     fee_type = serializers.IntegerField()
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     payment_date = serializers.DateField(required=False)
@@ -171,6 +171,35 @@ class RecordFeePaymentSerializer(serializers.Serializer):
             raise serializers.ValidationError({
                 'amount': 'Payment amount must be greater than zero.'
             })
+        
+        # Validate against applicable amount (including staff discount)
+        try:
+            student = Student.objects.get(pk=data['student'])
+            fee_type = FeeType.objects.get(pk=data['fee_type'])
+            
+            applicable_amount = fee_type.get_applicable_amount(student)
+            
+            # Calculate total paid so far
+            payment_filters = {
+                'student': student,
+                'fee_type': fee_type
+            }
+            if data.get('session_term'):
+                payment_filters['session_term_id'] = data['session_term']
+            elif data.get('session'):
+                payment_filters['session_id'] = data['session']
+                
+            total_paid = FeePayment.objects.filter(**payment_filters).aggregate(
+                total=Sum('amount'))['total'] or 0
+                
+            if total_paid + data['amount'] > applicable_amount:
+                raise serializers.ValidationError({
+                    'amount': f'Total payment would exceed the applicable amount (₦{applicable_amount}).'
+                })
+                
+        except (Student.DoesNotExist, FeeType.DoesNotExist):
+            pass # Let create() or other field validation handle this if needed, 
+                 # but usually CharField/IntegerField validation catches basic cases.
         
         return data
     

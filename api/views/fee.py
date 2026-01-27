@@ -223,7 +223,18 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         user = request.user
         
         # 1. Start with Profile Check
-        student = getattr(user, 'student_profile', None)
+        student_id = request.query_params.get('student')
+        if student_id and (user.is_superuser or user.user_type in ['admin', 'staff']):
+            try:
+                student = Student.objects.get(pk=student_id)
+            except (Student.DoesNotExist, ValueError):
+                return Response(
+                    {'error': 'Student not found.'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            student = getattr(user, 'student_profile', None)
+            
         if not student:
             return Response(
                 {'error': 'No student profile found for this user.'},
@@ -260,6 +271,8 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         fee_statuses = []
         for fee_type in fees_qs:
             # 4. Calculate Payment Status for THIS SPECIFIC Session/Term
+            applicable_amount = fee_type.get_applicable_amount(student)
+            
             payment_filters = {
                 'student': student,
                 'fee_type': fee_type
@@ -275,7 +288,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             installments_made = payments.count()
             
             # Calculate status
-            if total_paid >= fee_type.amount:
+            if total_paid >= applicable_amount:
                 fee_status = 'paid'
             elif total_paid > 0:
                 fee_status = 'partial'
@@ -288,13 +301,14 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             
             prerequisites = fee_type.prerequisites.all()
             for prereq in prerequisites:
-                # Check if prereq is paid FOR THIS SESSION/TERM
+                # Check if prereq is paid FOR THIS SESSION/TERM (using student specific amount)
+                prereq_applicable = prereq.get_applicable_amount(student)
                 prereq_paid = prereq.get_student_total_paid(
                     student.id, 
                     session=session_id, 
                     session_term=term_id
                 )
-                if prereq_paid < prereq.amount:
+                if prereq_paid < prereq_applicable:
                     is_locked = True
                     locked_message = f"Requires {prereq.name} to be paid first"
                     break
@@ -303,15 +317,20 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
                 'fee_type_id': fee_type.id,
                 'fee_type_name': fee_type.name,
                 'fee_type_description': fee_type.description,
-                'total_amount': fee_type.amount,
+                'total_amount': applicable_amount,
                 'amount_paid': total_paid,
-                'amount_remaining': max(0, fee_type.amount - total_paid),
+                'amount_remaining': max(0, applicable_amount - total_paid),
                 'installments_made': installments_made,
                 'installments_allowed': fee_type.max_installments,
+                'is_staff_discount_applied': (
+                    fee_type.staff_children_amount is not None and 
+                    applicable_amount == fee_type.staff_children_amount and
+                    student.staff_parents.exists()
+                ),
                 'status': fee_status,
                 'is_mandatory': fee_type.is_mandatory,
                 'is_recurring': fee_type.is_recurring_per_term,
-                'payments': FeePaymentSerializer(payments, many=True).data,
+                'payments': payments,
                 'is_locked': is_locked,
                 'locked_message': locked_message
             })

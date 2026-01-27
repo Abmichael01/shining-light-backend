@@ -191,6 +191,18 @@ class Student(models.Model):
         except:
             return "N/A"
     
+    @property
+    def current_session(self):
+        """Get the currently active academic session"""
+        from .academic import Session
+        return Session.objects.filter(is_current=True).first()
+
+    @property
+    def current_term(self):
+        """Get the currently active session term"""
+        from .academic import SessionTerm
+        return SessionTerm.objects.filter(is_current=True).first()
+
     def save(self, *args, **kwargs):
         """Auto-generate application number and admission number"""
         if not self.application_number:
