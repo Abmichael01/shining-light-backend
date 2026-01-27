@@ -298,7 +298,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             # Nested data
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
-            'all_subjects_cleared'
+            'all_subjects_cleared', 'staff_parents'
         ]
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name', 'passport_photo',

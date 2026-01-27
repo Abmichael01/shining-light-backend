@@ -211,6 +211,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'assigned_class',
             'assigned_class_name',
             'number_of_children_in_school',
+            'children',
             'account_name',
             'account_number',
             'bank_name',

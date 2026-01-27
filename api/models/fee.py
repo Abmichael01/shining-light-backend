@@ -69,6 +69,13 @@ class FeeType(models.Model):
     name = models.CharField(max_length=200, help_text='e.g., Admission Fee, Tuition Fee, Sport Fee')
     description = models.TextField(blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    staff_children_amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2, 
+        null=True, 
+        blank=True,
+        help_text='Discounted amount for staff children. Leave blank for no discount.'
+    )
     school = models.ForeignKey(School, on_delete=models.PROTECT, related_name='fee_types')
     
     # Applicability
@@ -151,6 +158,12 @@ class FeeType(models.Model):
                 'max_installments': 'Maximum installments must be at least 1.'
             })
     
+    def get_applicable_amount(self, student):
+        """Get the actual amount a student should pay (normal vs staff discount)"""
+        if self.staff_children_amount is not None and student.staff_parents.exists():
+            return self.staff_children_amount
+        return self.amount
+
     def is_applicable_to_class(self, class_id):
         """Check if this fee applies to a specific class"""
         # If no classes specified, applies to all
@@ -179,14 +192,18 @@ class FeeType(models.Model):
     
     def get_student_remaining(self, student_id, session=None, session_term=None):
         """Get remaining amount for a student"""
+        student = Student.objects.get(id=student_id)
+        applicable_amount = self.get_applicable_amount(student)
         total_paid = self.get_student_total_paid(student_id, session, session_term)
-        return max(0, self.amount - total_paid)
+        return max(0, applicable_amount - total_paid)
     
     def get_student_status(self, student_id, session=None, session_term=None):
         """Get payment status for a student"""
+        student = Student.objects.get(id=student_id)
+        applicable_amount = self.get_applicable_amount(student)
         total_paid = self.get_student_total_paid(student_id, session, session_term)
         
-        if total_paid >= self.amount:
+        if total_paid >= applicable_amount:
             return 'paid'
         elif total_paid > 0:
             return 'partial'
@@ -331,13 +348,14 @@ class FeePayment(models.Model):
         total_paid = existing_payments.aggregate(total=Sum('amount'))['total'] or 0
         
         # Check if already fully paid
-        if total_paid >= self.fee_type.amount:
+        applicable_amount = self.fee_type.get_applicable_amount(self.student)
+        if total_paid >= applicable_amount:
             raise ValidationError({
                 'amount': f'This fee is already fully paid (₦{total_paid:,.2f}).'
             })
         
         # Check if payment exceeds remaining
-        remaining = self.fee_type.amount - total_paid
+        remaining = applicable_amount - total_paid
         if self.amount > remaining:
             raise ValidationError({
                 'amount': f'Payment amount (₦{self.amount:,.2f}) exceeds remaining balance (₦{remaining:,.2f}).'

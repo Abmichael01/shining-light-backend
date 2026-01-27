@@ -37,6 +37,7 @@ class FeeTypeSerializer(serializers.ModelSerializer):
             'created_by_email',
             'payment_count',
             'total_collected',
+            'staff_children_amount',
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
     
@@ -143,6 +144,7 @@ class StudentFeeStatusSerializer(serializers.Serializer):
     status = serializers.CharField()  # paid, partial, unpaid
     is_mandatory = serializers.BooleanField()
     is_recurring = serializers.BooleanField()
+    staff_children_amount = serializers.DecimalField(max_digits=10, decimal_places=2, allow_null=True)
     payments = FeePaymentSerializer(many=True, read_only=True)
 
 

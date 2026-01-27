@@ -89,6 +89,12 @@ class Staff(models.Model):
     
     # Family
     number_of_children_in_school = models.PositiveIntegerField(default=0)
+    children = models.ManyToManyField(
+        'Student',
+        blank=True,
+        related_name='staff_parents',
+        help_text='Select students who are children of this staff member'
+    )
     
     # Account Details
     account_name = models.CharField(max_length=200, blank=True)
