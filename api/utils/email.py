@@ -237,6 +237,80 @@ Shining Light School Administration
         return False
 
 
+def send_withdrawal_status_email(withdrawal, status_type):
+    """
+    Send email notification for withdrawal status updates
+    
+    Args:
+        withdrawal: WithdrawalRequest model instance
+        status_type: 'success' or 'failed'
+    """
+    try:
+        staff = withdrawal.staff
+        staff_email = staff.user.email if hasattr(staff, 'user') and staff.user else None
+        
+        if not staff_email:
+            return False
+            
+        context = {
+            'staff_name': staff.get_full_name(),
+            'amount': withdrawal.amount,
+            'reference': withdrawal.reference_number,
+            'account_details': f"{withdrawal.bank_name} - {withdrawal.account_number}",
+            'status': status_type,
+            'reason': withdrawal.rejection_reason if status_type == 'failed' else None,
+            'year': datetime.datetime.now().year,
+        }
+        
+        subject = f'Withdrawal {status_type.title()} - Shining Light School'
+        
+        if status_type == 'success':
+            plain_message = f"""
+Dear {context['staff_name']},
+
+Your withdrawal of ₦{context['amount']:,} has been successfully processed via Paystack.
+
+Transaction Details:
+- Reference: {context['reference']}
+- Destination: {context['account_details']}
+- Status: Completed
+
+The funds should arrive in your bank account shortly.
+
+Best regards,
+Shining Light School Administration
+"""
+        else:
+            plain_message = f"""
+Dear {context['staff_name']},
+
+Your withdrawal of ₦{context['amount']:,} could not be processed.
+
+Transaction Details:
+- Reference: {context['reference']}
+- Destination: {context['account_details']}
+- Status: Failed
+- Reason: {context['reason']}
+
+Please contact administration or try again later.
+
+Best regards,
+Shining Light School Administration
+"""
+        
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[staff_email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Error sending withdrawal email: {str(e)}")
+        return False
+
+
 def template_exists(template_name):
     """Check if a template file exists"""
     from django.template.loader import get_template

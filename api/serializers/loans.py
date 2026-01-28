@@ -257,6 +257,17 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             if transfer:
                 withdrawal.transfer_code = transfer.get('transfer_code')
                 withdrawal.save()
+            else:
+                # If transfer initiation fails, delete the record and notify user
+                withdrawal.delete()
+                raise serializers.ValidationError({
+                    "non_field_errors": ["Failed to initiate withdrawal with Paystack. Please verify your account details or try again later."]
+                })
+        else:
+             withdrawal.delete()
+             raise serializers.ValidationError({
+                 "beneficiary_id": ["Could not verify this beneficiary with Paystack. Please try re-adding the account."]
+             })
                 
         return withdrawal
 

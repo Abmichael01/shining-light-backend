@@ -10,6 +10,7 @@ from django.utils import timezone
 from api.models.fee import FeeType, FeePayment, PaymentPurpose
 from api.models.student import Student
 from api.models.staff import StaffWallet, WithdrawalRequest
+from api.utils.email import send_withdrawal_status_email
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -194,12 +195,14 @@ def paystack_webhook(request):
                         withdrawal.processed_at = timezone.now()
                         withdrawal.save()
                         print(f"✅ Withdrawal Success: {withdrawal.reference_number}")
+                        send_withdrawal_status_email(withdrawal, 'success')
                         
                 elif event in ['transfer.failed', 'transfer.reversed']:
                     withdrawal.status = 'rejected'
                     withdrawal.rejection_reason = f"Paystack Transfer Failed: {transfer_data.get('reason', 'Unknown error')}"
                     withdrawal.save()
                     print(f"❌ Withdrawal Failed: {withdrawal.reference_number}")
+                    send_withdrawal_status_email(withdrawal, 'failed')
                 
                 return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
