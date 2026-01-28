@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 from api.models.fee import FeeType, FeePayment, PaymentPurpose
 from api.models.student import Student
-from api.models.staff import StaffWallet
+from api.models.staff import StaffWallet, WithdrawalRequest
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -170,6 +170,38 @@ def paystack_webhook(request):
         if not fee_type:
              print("❌ Could not determine Fee Type. Cannot record payment.")
              return Response({'error': 'Fee Type required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # --- SCENARIO 3: Paystack Transfers (Payouts) ---
+        if event in ['transfer.success', 'transfer.failed', 'transfer.reversed']:
+            transfer_data = data.get('data', {})
+            transfer_code = transfer_data.get('transfer_code')
+            reference = transfer_data.get('reference')
+            
+            withdrawal = WithdrawalRequest.objects.filter(reference_number=reference).first()
+            if not withdrawal:
+                withdrawal = WithdrawalRequest.objects.filter(transfer_code=transfer_code).first()
+                
+            if withdrawal:
+                if event == 'transfer.success':
+                    if withdrawal.status != 'processed':
+                        # Debit wallet on success
+                        amount = withdrawal.amount
+                        wallet = withdrawal.staff.wallet
+                        wallet.wallet_balance -= amount
+                        wallet.save()
+                        
+                        withdrawal.status = 'processed'
+                        withdrawal.processed_at = timezone.now()
+                        withdrawal.save()
+                        print(f"✅ Withdrawal Success: {withdrawal.reference_number}")
+                        
+                elif event in ['transfer.failed', 'transfer.reversed']:
+                    withdrawal.status = 'rejected'
+                    withdrawal.rejection_reason = f"Paystack Transfer Failed: {transfer_data.get('reason', 'Unknown error')}"
+                    withdrawal.save()
+                    print(f"❌ Withdrawal Failed: {withdrawal.reference_number}")
+                
+                return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         # Record Payment
         payment = FeePayment.objects.create(

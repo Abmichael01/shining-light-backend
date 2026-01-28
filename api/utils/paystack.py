@@ -174,3 +174,63 @@ class Paystack:
         except Exception as e:
             print(f"Paystack Resolve Account Error: {e}")
             return None
+
+    def create_transfer_recipient(self, name, account_number, bank_code):
+        """
+        Create a transfer recipient on Paystack
+        """
+        url = f"{self.BASE_URL}/transferrecipient"
+        headers = {
+            "Authorization": f"Bearer {self.PAYSTACK_SECRET_KEY}",
+            "Content-Type": "application/json",
+        }
+        data = {
+            "type": "nuban",
+            "name": name,
+            "account_number": account_number,
+            "bank_code": bank_code,
+            "currency": "NGN"
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            response_data = response.json()
+            if response.status_code in [200, 201] and response_data.get('status'):
+                return response_data['data'] # Contains recipient_code
+            print(f"Paystack Recipient Error: {response_data}")
+            return None
+        except Exception as e:
+            print(f"Paystack Recipient Exception: {e}")
+            return None
+
+    def initiate_transfer(self, amount, recipient_code, reference, reason="Staff Wallet Withdrawal"):
+        """
+        Initiate a transfer on Paystack
+        """
+        url = f"{self.BASE_URL}/transfer"
+        headers = {
+            "Authorization": f"Bearer {self.PAYSTACK_SECRET_KEY}",
+            "Content-Type": "application/json",
+        }
+        
+        # Paystack expects amount in Kobo
+        amount_kobo = int(float(amount) * 100)
+        
+        data = {
+            "source": "balance",
+            "amount": amount_kobo,
+            "recipient": recipient_code,
+            "reference": reference,
+            "reason": reason
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=data)
+            response_data = response.json()
+            if response.status_code == 200 and response_data.get('status'):
+                return response_data['data'] # Contains transfer_code, status
+            print(f"Paystack Transfer Error: {response_data}")
+            return None
+        except Exception as e:
+            print(f"Paystack Transfer Exception: {e}")
+            return None

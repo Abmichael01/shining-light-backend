@@ -199,6 +199,68 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         ]
 
 
+    def create(self, validated_data):
+        beneficiary_id = validated_data.pop('beneficiary_id')
+        request = self.context.get('request')
+        if not request or not hasattr(request.user, 'staff'):
+            raise serializers.ValidationError("Only staff members can make withdrawal requests")
+            
+        staff = request.user.staff
+        
+        try:
+            beneficiary = StaffBeneficiary.objects.get(id=beneficiary_id, staff=staff)
+        except StaffBeneficiary.DoesNotExist:
+            raise serializers.ValidationError({"beneficiary_id": "Invalid beneficiary selected"})
+
+        # Check balance
+        try:
+            wallet = staff.wallet
+        except StaffWallet.DoesNotExist:
+             raise serializers.ValidationError({"amount": "You do not have a wallet"})
+
+        if wallet.wallet_balance < validated_data['amount']:
+             raise serializers.ValidationError({"amount": "Insufficient wallet balance"})
+
+        # Update validated_data with snapshot
+        validated_data['staff'] = staff
+        validated_data['account_number'] = beneficiary.account_number
+        validated_data['bank_name'] = beneficiary.bank_name
+        validated_data['account_name'] = beneficiary.account_name
+        
+        # 1. Create the request
+        withdrawal = super().create(validated_data)
+
+        # 2. Initiate Paystack Transfer
+        from api.utils.paystack import Paystack
+        paystack = Paystack()
+        
+        # Ensure recipient code exists
+        recipient_code = beneficiary.paystack_recipient_code
+        if not recipient_code:
+            recipient = paystack.create_transfer_recipient(
+                name=beneficiary.account_name,
+                account_number=beneficiary.account_number,
+                bank_code=beneficiary.bank_code
+            )
+            if recipient:
+                recipient_code = recipient.get('recipient_code')
+                beneficiary.paystack_recipient_code = recipient_code
+                beneficiary.save()
+        
+        if recipient_code:
+            transfer = paystack.initiate_transfer(
+                amount=withdrawal.amount,
+                recipient_code=recipient_code,
+                reference=withdrawal.reference_number,
+                reason=f"Withdrawal for {staff.get_full_name()}"
+            )
+            if transfer:
+                withdrawal.transfer_code = transfer.get('transfer_code')
+                withdrawal.save()
+                
+        return withdrawal
+
+
 class StaffBeneficiarySerializer(serializers.ModelSerializer):
     """Serializer for StaffBeneficiary"""
     class Meta:

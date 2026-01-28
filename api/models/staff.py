@@ -681,6 +681,7 @@ class WithdrawalRequest(models.Model):
     account_name = models.CharField(max_length=200)
     
     reference_number = models.CharField(max_length=30, unique=True, blank=True)
+    transfer_code = models.CharField(max_length=50, blank=True, null=True, help_text="Paystack Transfer Code")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
     # Admin Processing
@@ -735,6 +736,8 @@ class StaffBeneficiary(models.Model):
     bank_code = models.CharField(max_length=20)
     account_number = models.CharField(max_length=20)
     account_name = models.CharField(max_length=200)
+    
+    paystack_recipient_code = models.CharField(max_length=50, blank=True, null=True)
     is_verified = models.BooleanField(default=False)
     
     created_at = models.DateTimeField(auto_now_add=True)
