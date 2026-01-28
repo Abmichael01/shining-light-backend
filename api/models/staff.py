@@ -680,6 +680,7 @@ class WithdrawalRequest(models.Model):
     bank_name = models.CharField(max_length=100)
     account_name = models.CharField(max_length=200)
     
+    reference_number = models.CharField(max_length=30, unique=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
     # Admin Processing
@@ -712,6 +713,17 @@ class WithdrawalRequest(models.Model):
         super().clean()
         if self.amount <= 0:
             raise ValidationError({'amount': 'Withdrawal amount must be greater than zero.'})
+
+    def _generate_reference(self):
+        """Generate unique withdrawal reference: WTH-YYYY-XXXX"""
+        year = timezone.now().year
+        count = WithdrawalRequest.objects.filter(created_at__year=year).count() + 1
+        return f"WTH-{year}-{count:04d}"
+
+    def save(self, *args, **kwargs):
+        if not self.reference_number:
+            self.reference_number = self._generate_reference()
+        super().save(*args, **kwargs)
 
 
 class StaffBeneficiary(models.Model):

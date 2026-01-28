@@ -174,6 +174,7 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         model = WithdrawalRequest
         fields = [
             'id',
+            'reference_number',
             'staff',
             'staff_name',
             'staff_id',
