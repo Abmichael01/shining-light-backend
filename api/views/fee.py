@@ -265,7 +265,8 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         if term_id:
             fees_qs = fees_qs.filter(
                 models.Q(active_terms__id=term_id) |
-                models.Q(is_recurring_per_term=True)
+                models.Q(is_recurring_per_term=True) |
+                models.Q(active_terms__isnull=True)
             )
         
         fee_statuses = []
