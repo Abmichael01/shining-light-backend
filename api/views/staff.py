@@ -70,6 +70,29 @@ def staff_wallet(request):
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def staff_wallet_transactions(request):
+    """
+    Get wallet transaction history for authenticated staff
+    """
+    try:
+        staff = Staff.objects.filter(user=request.user).first()
+        if not staff:
+            return Response({'error': 'Staff profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        try:
+            wallet = staff.wallet
+            transactions = wallet.transactions.all().order_by('-created_at')
+            serializer = StaffWalletTransactionSerializer(transactions, many=True)
+            return Response(serializer.data)
+        except StaffWallet.DoesNotExist:
+            return Response([], status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 class LoanTenureViewSet(viewsets.ModelViewSet):
     """
     ViewSet for LoanTenure
@@ -551,21 +574,50 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['patch'])
     def mark_paid(self, request, pk=None):
         """
-        Mark a salary payment as paid
+        Mark a salary payment as paid and credit staff wallet
         """
+        from django.db import transaction
+        from api.models import StaffWallet, StaffWalletTransaction
+        
         payment = self.get_object()
+        
+        if payment.status == 'paid':
+             return Response({'error': 'Payment already marked as paid'}, status=status.HTTP_400_BAD_REQUEST)
+             
         payment_date = request.data.get('payment_date')
         reference_number = request.data.get('reference_number')
         
-        payment.status = 'paid'
-        if payment_date:
-            payment.payment_date = payment_date
-        if reference_number:
-            payment.reference_number = reference_number
-        payment.processed_by = request.user
-        payment.save()
-        
-        return Response(SalaryPaymentSerializer(payment).data)
+        try:
+            with transaction.atomic():
+                # 1. Update Payment Status
+                payment.status = 'paid'
+                if payment_date:
+                    payment.payment_date = payment_date
+                if reference_number:
+                    payment.reference_number = reference_number
+                payment.processed_by = request.user
+                payment.save()
+                
+                # 2. Credit Staff Wallet
+                wallet, _ = StaffWallet.objects.get_or_create(staff=payment.staff)
+                wallet.wallet_balance += payment.net_amount
+                wallet.save()
+                
+                # 3. Create Transaction Record
+                tx_ref = reference_number if reference_number else f"SAL-{payment.year}-{payment.month}-{payment.id}"
+                StaffWalletTransaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='credit',
+                    category='salary',
+                    amount=payment.net_amount,
+                    reference=tx_ref,
+                    status='success',
+                    description=f"Salary Payment: {payment.month}/{payment.year}"
+                )
+                
+            return Response(SalaryPaymentSerializer(payment).data)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     @action(detail=False, methods=['post'])
     def bulk_create(self, request):
@@ -768,6 +820,20 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
                 wallet.wallet_balance += loan.loan_amount
                 wallet.save()
                 
+                # 3. Create Transaction Record
+                from api.models import StaffWalletTransaction
+                transaction_ref = f"LN-DISB-{loan.application_number}"
+                if not StaffWalletTransaction.objects.filter(reference=transaction_ref).exists():
+                    StaffWalletTransaction.objects.create(
+                        wallet=wallet,
+                        transaction_type='credit',
+                        category='loan_disbursement',
+                        amount=loan.loan_amount,
+                        reference=transaction_ref,
+                        status='success',
+                        description=f"Loan Disbursement: {loan.application_number}"
+                    )
+                
             return Response(LoanApplicationSerializer(loan).data)
             
         except Exception as e:
@@ -804,14 +870,34 @@ class LoanPaymentViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-payment_date')
     
     def perform_create(self, serializer):
-        """Set processed_by and check if loan is completed"""
-        payment = serializer.save(processed_by=self.request.user)
+        """Set processed_by, deduct from wallet, and check if loan is completed"""
+        from django.db import transaction
+        from api.models import StaffWallet, StaffWalletTransaction
         
-        # Check if loan is fully paid
-        loan = payment.loan_application
-        if loan.get_amount_remaining() <= 0:
-            loan.status = 'completed'
-            loan.save()
+        with transaction.atomic():
+            payment = serializer.save(processed_by=self.request.user)
+            loan = payment.loan_application
+            staff = loan.staff
+            
+            # Deduct from Wallet
+            wallet, _ = StaffWallet.objects.get_or_create(staff=staff)
+            wallet.wallet_balance -= payment.amount
+            wallet.save()
+            
+            # Record Transaction
+            StaffWalletTransaction.objects.create(
+                wallet=wallet,
+                transaction_type='debit',
+                category='loan_repayment',
+                amount=payment.amount,
+                reference=payment.reference_number if payment.reference_number else f"LN-PAY-{payment.id}",
+                status='success',
+                description=f"Loan Repayment: {loan.application_number}"
+            )
+            
+            if loan.get_amount_remaining() <= 0:
+                loan.status = 'completed'
+                loan.save()
 
 
 from api.models.staff import StaffWalletTransaction

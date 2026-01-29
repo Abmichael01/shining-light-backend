@@ -209,12 +209,11 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
             'account_number',
             'bank_name',
             'status',
-            'status_display',
             'created_at',
             'beneficiary_id'
         ]
         read_only_fields = [
-            'id', 'status', 'created_at'
+            'id', 'reference', 'status', 'created_at'
         ]
 
     def create(self, validated_data):

@@ -50,6 +50,46 @@ def paystack_webhook(request):
         data = request.data
         event = data.get('event')
         
+        # --- SCENARIO: Paystack Transfers (Payouts/Withdrawals) ---
+        if event in ['transfer.success', 'transfer.failed', 'transfer.reversed']:
+            from api.models import StaffWalletTransaction
+            transfer_data = data.get('data', {})
+            transfer_code = transfer_data.get('transfer_code')
+            reference = transfer_data.get('reference')
+            
+            # First try by reference (our WTH-... format)
+            tx = StaffWalletTransaction.objects.filter(reference=reference, category='withdrawal').first()
+            if not tx:
+                # Fallback to transfer_code
+                tx = StaffWalletTransaction.objects.filter(transfer_code=transfer_code, category='withdrawal').first()
+                
+            if tx:
+                if event == 'transfer.success':
+                    if tx.status != 'success':
+                        # Balance was ALREADY deducted at creation time.
+                        tx.status = 'success'
+                        tx.processed_at = timezone.now()
+                        tx.save()
+                        
+                        print(f"✅ Withdrawal Success: {tx.reference}")
+                        
+                elif event in ['transfer.failed', 'transfer.reversed']:
+                    if tx.status not in ['failed', 'rejected']:
+                         # Refund the wallet!
+                        wallet = tx.wallet
+                        wallet.wallet_balance += tx.amount
+                        wallet.save()
+                        
+                        tx.status = 'failed'
+                        tx.save()
+                        
+                        print(f"❌ Withdrawal Failed: {tx.reference} (Refunded)")
+                
+                return Response({'status': 'success'}, status=status.HTTP_200_OK)
+            else:
+                print(f"⚠️ Transfer event received but no matching withdrawal found: {reference} / {transfer_code}")
+                return Response({'message': 'Transfer not matched'}, status=status.HTTP_200_OK)
+        
         if event != 'charge.success':
             return Response({'message': 'Event ignored'}, status=status.HTTP_200_OK)
         
@@ -189,46 +229,6 @@ def paystack_webhook(request):
              print("❌ Could not determine Fee Type. Cannot record payment.")
              return Response({'error': 'Fee Type required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # --- SCENARIO 3: Paystack Transfers (Payouts) ---
-        if event in ['transfer.success', 'transfer.failed', 'transfer.reversed']:
-            transfer_data = data.get('data', {})
-            transfer_code = transfer_data.get('transfer_code')
-            reference = transfer_data.get('reference')
-            
-            from api.models import StaffWalletTransaction
-            # First try by reference (our WTH-... format)
-            tx = StaffWalletTransaction.objects.filter(reference=reference, category='withdrawal').first()
-            if not tx:
-                # Fallback to transfer_code
-                tx = StaffWalletTransaction.objects.filter(transfer_code=transfer_code, category='withdrawal').first()
-                
-            if tx:
-                if event == 'transfer.success':
-                    if tx.status != 'success':
-                        # Balance was ALREADY deducted at creation time.
-                        tx.status = 'success'
-                        tx.processed_at = timezone.now()
-                        tx.save()
-                        
-                        print(f"✅ Withdrawal Success: {tx.reference}")
-                        # We might need a small adapter to send email if it expects WithdrawalRequest object
-                        # But for now let's keep it simple.
-                        # send_withdrawal_status_email(tx, 'success')
-                        
-                elif event in ['transfer.failed', 'transfer.reversed']:
-                    if tx.status not in ['failed', 'rejected']:
-                         # Refund the wallet!
-                        wallet = tx.wallet
-                        wallet.wallet_balance += tx.amount
-                        wallet.save()
-                        
-                        tx.status = 'failed'
-                        tx.save()
-                        
-                        print(f"❌ Withdrawal Failed: {tx.reference} (Refunded)")
-                        # send_withdrawal_status_email(tx, 'failed')
-                
-                return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
         # Record Payment
         payment = FeePayment.objects.create(
