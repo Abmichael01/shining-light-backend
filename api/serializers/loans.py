@@ -253,9 +253,33 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         validated_data['account_number'] = beneficiary.account_number
         validated_data['bank_name'] = beneficiary.bank_name
         validated_data['account_name'] = beneficiary.account_name
+        validated_data['status'] = 'processing' # Set to processing immediately
         
-        # 1. Create the request
-        withdrawal = super().create(validated_data)
+        # 1. Deduct Balance & create Transaction (Atomic ideally)
+        from django.db import transaction
+        
+        try:
+            with transaction.atomic():
+                # Deduct balance
+                wallet.wallet_balance -= validated_data['amount']
+                wallet.save()
+                
+                # Create Withdrawal Request
+                withdrawal = super().create(validated_data)
+                
+                # Create Transaction Record
+                from api.models import StaffWalletTransaction
+                StaffWalletTransaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='debit',
+                    category='withdrawal',
+                    amount=withdrawal.amount,
+                    reference=withdrawal.reference_number,
+                    status='pending', # Pending until webhook confirms success
+                    description=f"Withdrawal to {beneficiary.bank_name} - {beneficiary.account_number}"
+                )
+        except Exception as e:
+            raise serializers.ValidationError({"error": f"Failed to process withdrawal: {str(e)}"})
 
         # 2. Initiate Paystack Transfer
         from api.utils.paystack import Paystack
@@ -285,15 +309,37 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
                 withdrawal.transfer_code = transfer.get('transfer_code')
                 withdrawal.save()
             else:
-                # If transfer initiation fails, delete the record and notify user
-                withdrawal.delete()
+                # If transfer initiation fails, refund and delete
+                wallet.wallet_balance += withdrawal.amount
+                wallet.save()
+                
+                # Mark transaction as failed or delete it? 
+                # Better to update status to failed
+                tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
+                if tx:
+                    tx.status = 'failed'
+                    tx.save()
+                
+                withdrawal.status = 'rejected'
+                withdrawal.rejection_reason = "Failed to initiate transfer with Paystack"
+                withdrawal.save()
+                
                 raise serializers.ValidationError({
-                    "non_field_errors": ["Failed to initiate withdrawal with Paystack. Please verify your account details or try again later."]
+                    "non_field_errors": ["Failed to initiate withdrawal. Your wallet has been refunded."]
                 })
         else:
+             # Refund
+             wallet.wallet_balance += withdrawal.amount
+             wallet.save()
+             
+             tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
+             if tx:
+                tx.status = 'failed'
+                tx.save()
+             
              withdrawal.delete()
              raise serializers.ValidationError({
-                 "beneficiary_id": ["Could not verify this beneficiary with Paystack. Please try re-adding the account."]
+                 "beneficiary_id": ["Could not verify this beneficiary with Paystack. Wallet refunded."]
              })
                 
         return withdrawal

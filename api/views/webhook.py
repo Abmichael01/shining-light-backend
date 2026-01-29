@@ -195,24 +195,45 @@ def paystack_webhook(request):
             if withdrawal:
                 if event == 'transfer.success':
                     if withdrawal.status != 'processed':
-                        # Debit wallet on success
-                        amount = withdrawal.amount
-                        wallet = withdrawal.staff.wallet
-                        wallet.wallet_balance -= amount
-                        wallet.save()
+                        # Balance was ALREADY deducted at creation time.
+                        # Just update status and transaction.
                         
                         withdrawal.status = 'processed'
                         withdrawal.processed_at = timezone.now()
                         withdrawal.save()
+                        
+                        # Update Transaction Status
+                        from api.models import StaffWalletTransaction
+                        tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
+                        if tx:
+                            tx.status = 'success'
+                            tx.save()
+                            
                         print(f"✅ Withdrawal Success: {withdrawal.reference_number}")
                         send_withdrawal_status_email(withdrawal, 'success')
                         
                 elif event in ['transfer.failed', 'transfer.reversed']:
-                    withdrawal.status = 'rejected'
-                    withdrawal.rejection_reason = f"Paystack Transfer Failed: {transfer_data.get('reason', 'Unknown error')}"
-                    withdrawal.save()
-                    print(f"❌ Withdrawal Failed: {withdrawal.reference_number}")
-                    send_withdrawal_status_email(withdrawal, 'failed')
+                    if withdrawal.status != 'rejected':
+                         # Refund the wallet!
+                        amount = withdrawal.amount
+                        wallet = withdrawal.staff.wallet
+                        wallet.wallet_balance += amount
+                        wallet.save()
+                        
+                        withdrawal.status = 'rejected'
+                        withdrawal.rejection_reason = f"Paystack Transfer Failed: {transfer_data.get('reason', 'Unknown error')}"
+                        withdrawal.save()
+                        
+                        # Mark Transaction as Failed
+                        from api.models import StaffWalletTransaction
+                        tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
+                        if tx:
+                            tx.status = 'failed'
+                            tx.description += f" (Failed: {transfer_data.get('reason', '')})"
+                            tx.save()
+                        
+                        print(f"❌ Withdrawal Failed: {withdrawal.reference_number} (Refunded)")
+                        send_withdrawal_status_email(withdrawal, 'failed')
                 
                 return Response({'status': 'success'}, status=status.HTTP_200_OK)
 
