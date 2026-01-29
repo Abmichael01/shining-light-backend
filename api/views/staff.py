@@ -826,7 +826,7 @@ class WithdrawalRequestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        queryset = StaffWalletTransaction.objects.filter(category='withdrawal').select_related('wallet__staff', 'processed_by')
+        queryset = StaffWalletTransaction.objects.filter(category='withdrawal').select_related('wallet__staff')
         
         user = self.request.user
         if getattr(user, 'user_type', None) == 'staff':
