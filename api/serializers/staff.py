@@ -162,6 +162,7 @@ class StaffSerializer(serializers.ModelSerializer):
     staff_pk = serializers.IntegerField(source='pk', read_only=True)
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     children_ids = serializers.PrimaryKeyRelatedField(source='children', many=True, read_only=True)
+    children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False, write_only=True)
     
     class Meta:
         model = Staff
@@ -196,6 +197,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'assigned_class_name',
             'number_of_children_in_school',
             'children_ids',
+            'children',
             'account_name',
             'account_number',
             'bank_name',
@@ -215,6 +217,7 @@ class StaffSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         passport_photo_data = validated_data.pop('passport_photo', None)
+        children_data = validated_data.pop('children', None)
 
         if passport_photo_data is not None:
             if passport_photo_data == "":
@@ -230,7 +233,14 @@ class StaffSerializer(serializers.ModelSerializer):
                 # For actual InMemoryUploadedFile or similar, assign directly
                 instance.passport_photo = passport_photo_data
 
-        return super().update(instance, validated_data)
+        # Update the instance
+        instance = super().update(instance, validated_data)
+        
+        # Handle children separately (ManyToMany relationship)
+        if children_data is not None:
+            instance.children.set(children_data)
+        
+        return instance
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
