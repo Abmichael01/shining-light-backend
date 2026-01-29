@@ -161,6 +161,7 @@ class StaffSerializer(serializers.ModelSerializer):
     id = serializers.CharField(source='staff_id', read_only=True)
     staff_pk = serializers.IntegerField(source='pk', read_only=True)
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    children_ids = serializers.PrimaryKeyRelatedField(source='children', many=True, read_only=True)
     
     class Meta:
         model = Staff
@@ -194,7 +195,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'assigned_class',
             'assigned_class_name',
             'number_of_children_in_school',
-            'children',
+            'children_ids',
             'account_name',
             'account_number',
             'bank_name',
