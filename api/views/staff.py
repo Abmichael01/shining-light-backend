@@ -93,7 +93,7 @@ class StaffViewSet(viewsets.ModelViewSet):
     queryset = Staff.objects.all()
     permission_classes = [IsSchoolAdmin]
     lookup_field = 'staff_id'
-    lookup_value_regex = '[^/\s]+'
+    lookup_value_regex = r'[^/\s]+'
 
     def get_object(self):
         """Allow lookups by staff_id (default) or numeric primary key for backwards compatibility."""
@@ -220,7 +220,7 @@ class StaffViewSet(viewsets.ModelViewSet):
             )
     
     @action(detail=True, methods=['patch'])
-    def update_status(self, request, pk=None):
+    def update_status(self, request, **kwargs):
         """
         Update staff status (active, on_leave, suspended, terminated, retired)
         """
@@ -245,7 +245,7 @@ class StaffViewSet(viewsets.ModelViewSet):
         return Response(StaffSerializer(staff).data)
     
     @action(detail=True, methods=['get'])
-    def salary_history(self, request, pk=None):
+    def salary_history(self, request, **kwargs):
         """
         Get salary payment history for a staff member
         """
@@ -255,7 +255,7 @@ class StaffViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'])
-    def wallet(self, request, pk=None):
+    def wallet(self, request, **kwargs):
         """
         Get wallet details for a specific staff member
         """
@@ -276,7 +276,7 @@ class StaffViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
-    def transactions(self, request, pk=None):
+    def transactions(self, request, **kwargs):
         """
         Get wallet transaction history for a specific staff member
         """
