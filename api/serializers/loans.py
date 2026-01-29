@@ -6,8 +6,8 @@ from api.models import (
     StaffWallet,
     LoanTenure,
     User,
-    WithdrawalRequest,
-    StaffBeneficiary
+    StaffBeneficiary,
+    StaffWalletTransaction
 )
 
 class StaffWalletSerializer(serializers.ModelSerializer):
@@ -39,7 +39,6 @@ class StaffWalletTransactionSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     
     class Meta:
-        from api.models import StaffWalletTransaction
         model = StaffWalletTransaction
         fields = [
             'id',
@@ -53,6 +52,9 @@ class StaffWalletTransactionSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'description',
+            'transfer_code',
+            'account_number',
+            'bank_name',
             'created_at',
         ]
         read_only_fields = ['id', 'wallet', 'created_at']
@@ -191,48 +193,37 @@ class LoanApplicationSerializer(serializers.ModelSerializer):
 
 
 class WithdrawalRequestSerializer(serializers.ModelSerializer):
-    """Serializer for WithdrawalRequest"""
-    staff_name = serializers.CharField(source='staff.get_full_name', read_only=True)
-    staff_id = serializers.CharField(source='staff.staff_id', read_only=True)
-    processed_by_name = serializers.CharField(source='processed_by.get_full_name', read_only=True)
+    """Serializer for Withdrawal (creates a StaffWalletTransaction)"""
+    staff_name = serializers.CharField(source='wallet.staff.get_full_name', read_only=True)
+    staff_id = serializers.CharField(source='wallet.staff.staff_id', read_only=True)
     beneficiary_id = serializers.IntegerField(write_only=True, required=True)
     
     class Meta:
-        model = WithdrawalRequest
+        model = StaffWalletTransaction
         fields = [
             'id',
-            'reference_number',
-            'staff',
+            'reference',
             'staff_name',
             'staff_id',
             'amount',
             'account_number',
             'bank_name',
-            'account_name',
             'status',
-            'processed_by',
-            'processed_by_name',
-            'rejection_reason',
-            'admin_notes',
+            'status_display',
             'created_at',
-            'updated_at',
-            'processed_at',
             'beneficiary_id'
         ]
         read_only_fields = [
-            'id', 'staff', 'status', 'processed_by', 
-            'processed_at', 'rejection_reason', 
-            'admin_notes', 'created_at', 'updated_at'
+            'id', 'status', 'created_at'
         ]
-
 
     def create(self, validated_data):
         beneficiary_id = validated_data.pop('beneficiary_id')
         request = self.context.get('request')
-        if not request or not hasattr(request.user, 'staff'):
+        if not request or not hasattr(request.user, 'staff_profile'):
             raise serializers.ValidationError("Only staff members can make withdrawal requests")
             
-        staff = request.user.staff
+        staff = request.user.staff_profile
         
         try:
             beneficiary = StaffBeneficiary.objects.get(id=beneficiary_id, staff=staff)
@@ -249,11 +240,19 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
              raise serializers.ValidationError({"amount": "Insufficient wallet balance"})
 
         # Update validated_data with snapshot
-        validated_data['staff'] = staff
+        validated_data['wallet'] = wallet
+        validated_data['transaction_type'] = 'debit'
+        validated_data['category'] = 'withdrawal'
         validated_data['account_number'] = beneficiary.account_number
         validated_data['bank_name'] = beneficiary.bank_name
-        validated_data['account_name'] = beneficiary.account_name
-        validated_data['status'] = 'processing' # Set to processing immediately
+        validated_data['status'] = 'pending'
+        validated_data['description'] = f"Withdrawal to {beneficiary.bank_name} - {beneficiary.account_number}"
+        
+        # Generate reference
+        from django.utils import timezone
+        year = timezone.now().year
+        count = StaffWalletTransaction.objects.filter(category='withdrawal', created_at__year=year).count() + 1
+        validated_data['reference'] = f"WTH-{year}-{count:04d}"
         
         # 1. Deduct Balance & create Transaction (Atomic ideally)
         from django.db import transaction
@@ -264,20 +263,8 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
                 wallet.wallet_balance -= validated_data['amount']
                 wallet.save()
                 
-                # Create Withdrawal Request
-                withdrawal = super().create(validated_data)
-                
-                # Create Transaction Record
-                from api.models import StaffWalletTransaction
-                StaffWalletTransaction.objects.create(
-                    wallet=wallet,
-                    transaction_type='debit',
-                    category='withdrawal',
-                    amount=withdrawal.amount,
-                    reference=withdrawal.reference_number,
-                    status='pending', # Pending until webhook confirms success
-                    description=f"Withdrawal to {beneficiary.bank_name} - {beneficiary.account_number}"
-                )
+                # Create Transaction Record (Withdrawal)
+                withdrawal_tx = super().create(validated_data)
         except Exception as e:
             raise serializers.ValidationError({"error": f"Failed to process withdrawal: {str(e)}"})
 
@@ -300,49 +287,38 @@ class WithdrawalRequestSerializer(serializers.ModelSerializer):
         
         if recipient_code:
             transfer = paystack.initiate_transfer(
-                amount=withdrawal.amount,
+                amount=withdrawal_tx.amount,
                 recipient_code=recipient_code,
-                reference=withdrawal.reference_number,
+                reference=withdrawal_tx.reference,
                 reason=f"Withdrawal for {staff.get_full_name()}"
             )
             if transfer:
-                withdrawal.transfer_code = transfer.get('transfer_code')
-                withdrawal.save()
+                withdrawal_tx.transfer_code = transfer.get('transfer_code')
+                withdrawal_tx.save()
             else:
-                # If transfer initiation fails, refund and delete
-                wallet.wallet_balance += withdrawal.amount
+                # If transfer initiation fails, refund and mark failed
+                wallet.wallet_balance += withdrawal_tx.amount
                 wallet.save()
                 
-                # Mark transaction as failed or delete it? 
-                # Better to update status to failed
-                tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
-                if tx:
-                    tx.status = 'failed'
-                    tx.save()
-                
-                withdrawal.status = 'rejected'
-                withdrawal.rejection_reason = "Failed to initiate transfer with Paystack"
-                withdrawal.save()
+                withdrawal_tx.status = 'failed'
+                withdrawal_tx.save()
                 
                 raise serializers.ValidationError({
                     "non_field_errors": ["Failed to initiate withdrawal. Your wallet has been refunded."]
                 })
         else:
              # Refund
-             wallet.wallet_balance += withdrawal.amount
+             wallet.wallet_balance += withdrawal_tx.amount
              wallet.save()
              
-             tx = StaffWalletTransaction.objects.filter(reference=withdrawal.reference_number).first()
-             if tx:
-                tx.status = 'failed'
-                tx.save()
+             withdrawal_tx.status = 'failed'
+             withdrawal_tx.save()
              
-             withdrawal.delete()
              raise serializers.ValidationError({
                  "beneficiary_id": ["Could not verify this beneficiary with Paystack. Wallet refunded."]
              })
                 
-        return withdrawal
+        return withdrawal_tx
 
 
 class StaffBeneficiarySerializer(serializers.ModelSerializer):

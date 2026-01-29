@@ -694,6 +694,11 @@ class StaffWalletTransaction(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     description = models.CharField(max_length=255)
     
+    # Withdrawal/Payout specific fields
+    transfer_code = models.CharField(max_length=100, blank=True, null=True, help_text="Paystack Transfer Code")
+    account_number = models.CharField(max_length=20, blank=True, null=True)
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
@@ -702,76 +707,11 @@ class StaffWalletTransaction(models.Model):
         indexes = [
             models.Index(fields=['reference']),
             models.Index(fields=['category']),
+            models.Index(fields=['status']),
         ]
         
     def __str__(self):
         return f"{self.wallet.staff.get_full_name()} - {self.get_transaction_type_display()} ₦{self.amount} ({self.status})"
-
-
-class WithdrawalRequest(models.Model):
-    """
-    Staff wallet withdrawal requests
-    """
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('rejected', 'Rejected'),
-        ('processed', 'Processed'),
-    ]
-
-    staff = models.ForeignKey(Staff, on_delete=models.CASCADE, related_name='withdrawal_requests')
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
-    
-    # Destination Account Details (Snapshot)
-    account_number = models.CharField(max_length=20)
-    bank_name = models.CharField(max_length=100)
-    account_name = models.CharField(max_length=200)
-    
-    reference_number = models.CharField(max_length=30, unique=True, blank=True)
-    transfer_code = models.CharField(max_length=50, blank=True, null=True, help_text="Paystack Transfer Code")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    
-    # Admin Processing
-    processed_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='withdrawals_processed'
-    )
-    rejection_reason = models.TextField(blank=True)
-    admin_notes = models.TextField(blank=True)
-    
-    # Dates
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    processed_at = models.DateTimeField(null=True, blank=True)
-
-    class Meta:
-        db_table = 'withdrawal_requests'
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['status']),
-        ]
-
-    def __str__(self):
-        return f"{self.staff.get_full_name()} - ₦{self.amount:,.2f} ({self.status})"
-    
-    def clean(self):
-        super().clean()
-        if self.amount <= 0:
-            raise ValidationError({'amount': 'Withdrawal amount must be greater than zero.'})
-
-    def _generate_reference(self):
-        """Generate unique withdrawal reference: WTH-YYYY-XXXX"""
-        year = timezone.now().year
-        count = WithdrawalRequest.objects.filter(created_at__year=year).count() + 1
-        return f"WTH-{year}-{count:04d}"
-
-    def save(self, *args, **kwargs):
-        if not self.reference_number:
-            self.reference_number = self._generate_reference()
-        super().save(*args, **kwargs)
 
 
 class StaffBeneficiary(models.Model):
