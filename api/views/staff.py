@@ -101,24 +101,17 @@ class StaffViewSet(viewsets.ModelViewSet):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
         lookup_value = self.kwargs.get(self.lookup_field) or self.kwargs.get(lookup_url_kwarg)
 
-        print(f"[StaffViewSet.get_object] lookup_value raw: {lookup_value}")
-
         if lookup_value is None:
-            print("[StaffViewSet.get_object] No lookup value provided; raising 404")
             raise Http404
 
         # Try staff_id lookup first
         obj = queryset.filter(staff_id=lookup_value).first()
-        print(f"[StaffViewSet.get_object] Staff lookup by staff_id found: {bool(obj)}")
 
         # Fallback to numeric primary key when applicable
         if obj is None and lookup_value.isdigit():
-            print(f"[StaffViewSet.get_object] Falling back to numeric PK lookup for value: {lookup_value}")
             obj = queryset.filter(pk=lookup_value).first()
-            print(f"[StaffViewSet.get_object] Staff lookup by pk found: {bool(obj)}")
 
         if obj is None:
-            print("[StaffViewSet.get_object] No staff record found; raising 404")
             raise Http404
 
         self.check_object_permissions(self.request, obj)
@@ -126,19 +119,14 @@ class StaffViewSet(viewsets.ModelViewSet):
     
     def get_serializer_class(self):
         """Return appropriate serializer based on action"""
-        print(f"StaffViewSet.get_serializer_class called for action: {self.action}")
         if self.action == 'list':
-            print("Using StaffListSerializer")
             return StaffListSerializer
         elif self.action == 'register':
-            print("Using StaffRegistrationSerializer")
             return StaffRegistrationSerializer
-        print("Using StaffSerializer")
         return StaffSerializer
     
     def get_queryset(self):
         """Filter queryset based on request parameters"""
-        print(f"StaffViewSet.get_queryset called with params: {self.request.query_params}")
         
         queryset = Staff.objects.select_related(
             'user',
@@ -146,25 +134,21 @@ class StaffViewSet(viewsets.ModelViewSet):
             'created_by'
         ).prefetch_related('education_records')
         
-        print(f"Initial queryset count: {queryset.count()}")
         
         # Filter by status
         status_param = self.request.query_params.get('status')
         if status_param:
             queryset = queryset.filter(status=status_param)
-            print(f"After status filter ({status_param}): {queryset.count()}")
         
         # Filter by staff type
         staff_type = self.request.query_params.get('staff_type')
         if staff_type:
             queryset = queryset.filter(staff_type=staff_type)
-            print(f"After staff_type filter ({staff_type}): {queryset.count()}")
         
         # Filter by zone
         zone = self.request.query_params.get('zone')
         if zone:
             queryset = queryset.filter(zone=zone)
-            print(f"After zone filter ({zone}): {queryset.count()}")
         
         # Search
         search = self.request.query_params.get('search')
@@ -177,10 +161,8 @@ class StaffViewSet(viewsets.ModelViewSet):
                 Q(phone_number__icontains=search) |
                 Q(user__email__icontains=search)
             )
-            print(f"After search filter ({search}): {queryset.count()}")
         
         final_queryset = queryset.order_by('-entry_date')
-        print(f"Final queryset count: {final_queryset.count()}")
         return final_queryset
     
     @action(detail=False, methods=['post'])
@@ -188,38 +170,16 @@ class StaffViewSet(viewsets.ModelViewSet):
         """
         Register a new staff member with user account
         """
-        print(f"StaffViewSet.register called with data keys: {list(request.data.keys())}")
         
-        # Print data without base64 fields
-        filtered_data = {}
-        for key, value in request.data.items():
-            if key in ['passport_photo'] or (isinstance(value, str) and value.startswith('data:')):
-                filtered_data[key] = f"[BASE64_DATA_{len(str(value))}_chars]"
-            elif key == 'education_records' and isinstance(value, list):
-                filtered_records = []
-                for record in value:
-                    filtered_record = {}
-                    for k, v in record.items():
-                        if k == 'certificate' and isinstance(v, str) and v.startswith('data:'):
-                            filtered_record[k] = f"[BASE64_DATA_{len(str(v))}_chars]"
-                        else:
-                            filtered_record[k] = v
-                    filtered_records.append(filtered_record)
-                filtered_data[key] = filtered_records
-            else:
-                filtered_data[key] = value
-        print(f"Request data (filtered): {filtered_data}")
+        # Process data without base64 fields if needed for logging (skipped now)
         
         serializer = StaffRegistrationSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            print("Serializer is valid, creating staff member")
             staff = serializer.save()
-            print(f"Staff member created with ID: {staff.id}")
             return Response(
                 StaffSerializer(staff).data,
                 status=status.HTTP_201_CREATED
             )
-        print(f"Serializer errors: {serializer.errors}")
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     @action(detail=True, methods=['post'])
@@ -309,7 +269,8 @@ class StaffViewSet(viewsets.ModelViewSet):
                 if created_va:
                     wallet.refresh_from_db()
             except Exception as e:
-                print(f"Error creating VA for staff {staff.id}: {e}")
+                # print(f"Error creating VA for staff {staff.id}: {e}")
+                pass
                 
         serializer = StaffWalletSerializer(wallet)
         return Response(serializer.data)

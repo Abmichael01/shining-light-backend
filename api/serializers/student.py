@@ -571,11 +571,6 @@ class StudentRegistrationSerializer(serializers.Serializer):
         from api.models import User, School, Class, Department
         
         with transaction.atomic():
-            # Debug logging for admission number
-            print('=== STUDENT REGISTRATION DEBUG ===')
-            print('Received admission_number:', validated_data.get('admission_number'))
-            print('All validated_data keys:', list(validated_data.keys()))
-            
             # Extract nested data
             guardians_data = validated_data.pop('guardians', [])
             email = validated_data.pop('email')

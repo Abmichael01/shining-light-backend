@@ -31,18 +31,15 @@ class CBTSessionAuthentication(BaseAuthentication):
         Authenticate using CBT session token
         """
         # Get session token from header or cookie
+        # Get session token from header or cookie
         session_token = self._get_session_token(request)
         
-        print(f"DEBUG: CBT Auth - Session token: {session_token}")
-        
         if not session_token:
-            print("DEBUG: CBT Auth - No session token found")
             return None
         
         try:
             # Validate session
             session_data = CBTSessionService.validate_session(session_token)
-            print(f"DEBUG: CBT Auth - Session validated successfully for student: {session_data.get('student_admission_number')}")
             
             # Create a custom user object for CBT sessions
             cbt_user = CBTSessionUser(session_data)
@@ -51,7 +48,6 @@ class CBTSessionAuthentication(BaseAuthentication):
             
         except ValueError as e:
             # Invalid or expired session
-            print(f"DEBUG: CBT Auth - Session validation failed: {str(e)}")
             return None
     
     def authenticate_header(self, request):

@@ -360,25 +360,14 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         """Create staff with user account and education records"""
-        # Print filtered data without base64
-        filtered_data = {}
-        for key, value in validated_data.items():
-            if key in ['passport_photo'] or (isinstance(value, str) and value.startswith('data:')):
-                filtered_data[key] = f"[BASE64_DATA_{len(str(value))}_chars]"
-            else:
-                filtered_data[key] = value
-        print(f"StaffRegistrationSerializer.create called with data: {filtered_data}")
-        
         # Extract user data
         email = validated_data.pop('email')
         password = validated_data.pop('password')
         education_records_data = validated_data.pop('education_records', [])
         
-        print(f"Education records count: {len(education_records_data)}")
-        
+        # Handle base64 passport photo
         # Handle base64 passport photo
         passport_photo_data = validated_data.pop('passport_photo', None)
-        print(f"Passport photo data type: {type(passport_photo_data)}")
         
         if passport_photo_data and isinstance(passport_photo_data, str) and passport_photo_data.startswith('data:image'):
             # Extract base64 data
@@ -387,13 +376,6 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             # Create file from base64
             passport_file = ContentFile(base64.b64decode(imgstr), name=f'staff_{uuid.uuid4()}.{ext}')
             validated_data['passport_photo'] = passport_file
-            print(f"Created passport file: {passport_file}")
-        elif passport_photo_data and isinstance(passport_photo_data, str):
-            # If it's a string but not base64, skip it
-            print(f"Skipping non-base64 passport photo data")
-        else:
-            # If it's None or empty, skip it
-            print(f"No passport photo data provided")
         
         # Get the requesting user for created_by
         request = self.context.get('request')
@@ -406,19 +388,17 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             user_type='staff',
             is_staff=True
         )
-        print(f"Created user: {user}")
         
+        # Create staff profile
         # Create staff profile
         staff = Staff.objects.create(
             user=user,
             created_by=created_by,
             **validated_data
         )
-        print(f"Created staff: {staff}")
         
         # Create education records
         for i, edu_data in enumerate(education_records_data):
-            print(f"Processing education record {i+1}: {edu_data.get('level', 'unknown')} - {edu_data.get('institution_name', 'unknown')}")
             
             # Handle base64 certificate if present
             certificate_data = edu_data.pop('certificate', None)
@@ -430,9 +410,7 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
                     # Create file from base64
                     certificate_file = ContentFile(base64.b64decode(filestr), name=f'cert_{uuid.uuid4()}.{ext}')
                     edu_data['certificate'] = certificate_file
-                    print(f"Created certificate file: {certificate_file}")
                 except Exception as e:
-                    print(f"Error processing certificate for education record {i+1}: {e}")
                     # Continue without certificate if there's an error
                     edu_data['certificate'] = None
             else:
@@ -440,7 +418,6 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
                 edu_data['certificate'] = None
             
             StaffEducation.objects.create(staff=staff, **edu_data)
-            print(f"Created education record {i+1} for staff {staff.id}")
         
         return staff
 
