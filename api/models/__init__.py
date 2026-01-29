@@ -35,13 +35,11 @@ from .staff import (
     SalaryGrade,
     StaffSalary,
     SalaryPayment,
-    SalaryPayment,
     LoanApplication,
     LoanPayment,
     StaffWallet,
     StaffWalletTransaction,
     LoanTenure,
-    WithdrawalRequest,
     StaffBeneficiary
 )
 from .fee import (
@@ -98,7 +96,6 @@ __all__ = [
     'StaffWallet',
     'StaffWalletTransaction',
     'LoanTenure',
-    'WithdrawalRequest',
     'FeeType',
     'FeePayment',
     'PaymentPurpose',
