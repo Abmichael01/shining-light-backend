@@ -546,7 +546,10 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
         # Filter by staff
         staff_id = self.request.query_params.get('staff')
         if staff_id:
-            queryset = queryset.filter(staff_id=staff_id)
+            if staff_id.isdigit():
+                queryset = queryset.filter(staff_id=staff_id)
+            else:
+                queryset = queryset.filter(staff__staff_id=staff_id)
         
         # Filter by school
         school_id = self.request.query_params.get('school')
@@ -687,7 +690,10 @@ class LoanApplicationViewSet(viewsets.ModelViewSet):
         # Filter by staff (admin use)
         staff_id = self.request.query_params.get('staff')
         if staff_id:
-            queryset = queryset.filter(staff_id=staff_id)
+            if staff_id.isdigit():
+                queryset = queryset.filter(staff_id=staff_id)
+            else:
+                queryset = queryset.filter(staff__staff_id=staff_id)
         
         # Filter by school (via assigned_class)
         school_id = self.request.query_params.get('school')
