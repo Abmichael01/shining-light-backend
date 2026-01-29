@@ -292,6 +292,26 @@ class StaffViewSet(viewsets.ModelViewSet):
         serializer = SalaryPaymentSerializer(payments, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'])
+    def wallet(self, request, pk=None):
+        """
+        Get wallet details for a specific staff member
+        """
+        staff = self.get_object()
+        wallet, created = StaffWallet.objects.get_or_create(staff=staff)
+        
+        # If no account number, try to create VA
+        if not wallet.account_number:
+            try:
+                created_va = wallet.create_virtual_account()
+                if created_va:
+                    wallet.refresh_from_db()
+            except Exception as e:
+                print(f"Error creating VA for staff {staff.id}: {e}")
+                
+        serializer = StaffWalletSerializer(wallet)
+        return Response(serializer.data)
+
 
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
