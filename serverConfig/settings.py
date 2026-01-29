@@ -45,7 +45,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',') if os.getenv('ALLOWED_HOSTS') else []
 
 # Allow ngrok URLs for testing webhooks
-ALLOWED_HOSTS.extend(['.ngrok-free.dev', '.ngrok.io'])
+ALLOWED_HOSTS.extend(['.ngrok-free.dev', '.ngrok.io', 'interavailable-lexi-instigative.ngrok-free'])
 
 
 # Application definition
@@ -127,6 +127,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://127.0.0.1:3001',
     'http://localhost:3050',
     'http://127.0.0.1:3050',
+    'https://interavailable-lexi-instigative.ngrok-free',
 ]
 
 # CORS Settings
