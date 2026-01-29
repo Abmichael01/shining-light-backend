@@ -10,7 +10,11 @@ from django.utils import timezone
 from api.models.fee import FeeType, FeePayment, PaymentPurpose
 from api.models.student import Student
 from api.models.staff import StaffWallet, WithdrawalRequest
-from api.utils.email import send_withdrawal_status_email
+from api.utils.email import (
+    send_withdrawal_status_email, 
+    send_staff_funding_receipt,
+    send_student_fee_receipt
+)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -91,6 +95,10 @@ def paystack_webhook(request):
                 )
                 
                 print(f"💰 Wallet Funded: {wallet.staff.get_full_name()} +₦{amount_paid}")
+                
+                # Send Receipt
+                send_staff_funding_receipt(wallet, amount_paid, reference)
+                
                 return Response({'status': 'success', 'message': 'Wallet funded'}, status=status.HTTP_200_OK)
 
         # --- SCENARIO 2: Student/Admission Payments ---
@@ -250,6 +258,10 @@ def paystack_webhook(request):
         )
         
         print(f"✅ Payment recorded: {payment.id} for {student.get_full_name()}")
+        
+        # Send Receipt
+        send_student_fee_receipt(payment)
+        
         return Response({'status': 'success'}, status=status.HTTP_200_OK)
         
     except Exception as e:

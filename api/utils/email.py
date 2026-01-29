@@ -311,6 +311,133 @@ Shining Light School Administration
         return False
 
 
+
+def send_staff_funding_receipt(wallet, amount, reference):
+    """
+    Send receipt for staff wallet funding
+    
+    Args:
+        wallet: StaffWallet model instance
+        amount: Amount funded
+        reference: Transaction reference
+    """
+    try:
+        staff = wallet.staff
+        staff_email = staff.user.email if hasattr(staff, 'user') and staff.user else None
+        
+        if not staff_email:
+            return False
+            
+        context = {
+            'staff_name': staff.get_full_name(),
+            'amount': amount,
+            'reference': reference,
+            'balance': wallet.wallet_balance,
+            'date': datetime.datetime.now().strftime("%B %d, %Y"),
+            'year': datetime.datetime.now().year,
+        }
+        
+        subject = 'Wallet Funding Receipt - Shining Light School'
+        
+        plain_message = f"""
+Dear {context['staff_name']},
+
+Your wallet has been successfully funded.
+
+Transaction Details:
+- Amount: ₦{context['amount']:,}
+- Reference: {context['reference']}
+- Date: {context['date']}
+
+Current Wallet Balance: ₦{context['balance']:,}
+
+Thank you for using Shining Light School Portal.
+
+Best regards,
+Shining Light School Administration
+"""
+        
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[staff_email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Error sending funding receipt: {str(e)}")
+        return False
+
+
+def send_student_fee_receipt(payment):
+    """
+    Send receipt for student fee payment
+    
+    Args:
+        payment: FeePayment model instance
+    """
+    try:
+        student = payment.student
+        # Get email: Check student user first, then guardian user logic could be added here if needed
+        # For now, we assume student email or guardian email linked to student bio data?
+        # Simpler: Get student user email.
+        
+        recipient_email = None
+        if hasattr(student, 'user') and student.user:
+            recipient_email = student.user.email
+            
+        # Optional: Send to guardians too if available
+        # This requires more complex logic to fetch guardian emails. 
+        # For now, let's stick to student email as primary.
+        
+        if not recipient_email:
+             print(f"Warning: No email found for student {student.admission_number}")
+             return False
+            
+        context = {
+            'student_name': student.get_full_name(),
+            'admission_number': student.admission_number,
+            'amount': payment.amount,
+            'purpose': payment.fee_type.name if payment.fee_type else "School Fees",
+            'reference': payment.reference_number,
+            'date': payment.payment_date,
+            'year': datetime.datetime.now().year,
+        }
+        
+        subject = 'Payment Receipt - Shining Light School'
+        
+        plain_message = f"""
+Dear {context['student_name']},
+
+We have received your payment.
+
+Payment Details:
+- Student: {context['student_name']} ({context['admission_number']})
+- Purpose: {context['purpose']}
+- Amount: ₦{context['amount']:,}
+- Reference: {context['reference']}
+- Date: {context['date']}
+
+This email serves as your official receipt.
+
+Best regards,
+Shining Light School Administration
+"""
+        
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[recipient_email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Error sending fee receipt: {str(e)}")
+        return False
+
+
 def template_exists(template_name):
     """Check if a template file exists"""
     from django.template.loader import get_template
