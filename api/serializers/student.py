@@ -406,8 +406,8 @@ class StudentSerializer(serializers.ModelSerializer):
         return [
             {
                 'id': staff.staff_id,
-                'full_name': staff.full_name,
-                'staff_type': staff.staff_type_display
+                'full_name': staff.get_full_name(),
+                'staff_type': staff.get_staff_type_display()
             }
             for staff in obj.staff_parents.all()
         ]
