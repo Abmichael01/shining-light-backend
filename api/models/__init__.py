@@ -39,6 +39,7 @@ from .staff import (
     LoanApplication,
     LoanPayment,
     StaffWallet,
+    StaffWalletTransaction,
     LoanTenure,
     WithdrawalRequest,
     StaffBeneficiary
@@ -95,6 +96,7 @@ __all__ = [
     'LoanApplication',
     'LoanPayment',
     'StaffWallet',
+    'StaffWalletTransaction',
     'LoanTenure',
     'WithdrawalRequest',
     'FeeType',

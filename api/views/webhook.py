@@ -67,18 +67,28 @@ def paystack_webhook(request):
         if customer_code:
             wallet = StaffWallet.objects.filter(paystack_customer_code=customer_code).first()
             if wallet:
-                # This is a wallet funding transaction!
-                # We simply credit the wallet.
-                # Check idempotency?
-                # Ideally we check a Transaction log, but for MVP we assume Paystack doesn't double-fire/we trust updating balance.
-                # TODO: Implement StaffWalletTransaction model for idempotency.
+                # 1. Idempotency Check
+                from api.models import StaffWalletTransaction
                 
-                # Verify if this specific reference was already processed? 
-                # Since we don't have a transaction table, we might process dupes if Paystack retries.
-                # Mitigated by returning 200 OK fast.
+                # Check if we already processed this reference
+                if StaffWalletTransaction.objects.filter(reference=reference).exists():
+                    print(f"⚠️ Duplicate webhook for {reference}")
+                    return Response({'message': 'Transaction already processed'}, status=status.HTTP_200_OK)
                 
+                # 2. Credit Wallet
                 wallet.wallet_balance += type(wallet.wallet_balance)(amount_paid) # Decimal conversion
                 wallet.save()
+                
+                # 3. Create Transaction Record
+                StaffWalletTransaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='credit',
+                    category='funding',
+                    amount=amount_paid,
+                    reference=reference,
+                    status='success',
+                    description=f"Wallet funding via Paystack"
+                )
                 
                 print(f"💰 Wallet Funded: {wallet.staff.get_full_name()} +₦{amount_paid}")
                 return Response({'status': 'success', 'message': 'Wallet funded'}, status=status.HTTP_200_OK)

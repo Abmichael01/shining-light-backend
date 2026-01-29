@@ -11,6 +11,7 @@ from api.models import (
     LoanApplication,
     LoanPayment,
     StaffWallet,
+    StaffWalletTransaction,
     LoanTenure,
     User
 )
@@ -21,25 +22,7 @@ import base64
 import uuid
 
 
-class StaffWalletSerializer(serializers.ModelSerializer):
-    """Serializer for StaffWallet model"""
-    
-    staff_name = serializers.CharField(source='staff.get_full_name', read_only=True)
-    
-    class Meta:
-        model = StaffWallet
-        fields = [
-            'id',
-            'staff',
-            'staff_name',
-            'wallet_balance',
-            'account_number',
-            'bank_name',
-            'account_name',
-            'created_at',
-            'updated_at'
-        ]
-        read_only_fields = ['id', 'staff', 'wallet_balance', 'paystack_customer_code', 'created_at', 'updated_at']
+
 
 
 class StaffEducationSerializer(serializers.ModelSerializer):

@@ -661,6 +661,53 @@ class StaffWallet(models.Model):
         return False
 
 
+class StaffWalletTransaction(models.Model):
+    """
+    History of all transactions on a staff wallet
+    """
+    TRANSACTION_TYPES = [
+        ('credit', 'Credit'),
+        ('debit', 'Debit'),
+    ]
+    
+    CATEGORY_CHOICES = [
+        ('funding', 'Wallet Funding'),
+        ('withdrawal', 'Withdrawal'),
+        ('loan_disbursement', 'Loan Disbursement'),
+        ('loan_repayment', 'Loan Repayment'),
+        ('salary', 'Salary Payment'),
+        ('other', 'Other'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+    ]
+
+    wallet = models.ForeignKey(StaffWallet, on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=10, choices=TRANSACTION_TYPES)
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    
+    reference = models.CharField(max_length=100, unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    description = models.CharField(max_length=255)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'staff_wallet_transactions'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['reference']),
+            models.Index(fields=['category']),
+        ]
+        
+    def __str__(self):
+        return f"{self.wallet.staff.get_full_name()} - {self.get_transaction_type_display()} ₦{self.amount} ({self.status})"
+
+
 class WithdrawalRequest(models.Model):
     """
     Staff wallet withdrawal requests

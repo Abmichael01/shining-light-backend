@@ -31,6 +31,33 @@ class StaffWalletSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'staff', 'wallet_balance', 'paystack_customer_code', 'created_at', 'updated_at']
 
 
+class StaffWalletTransactionSerializer(serializers.ModelSerializer):
+    """Serializer for StaffWalletTransaction model"""
+    
+    transaction_type_display = serializers.CharField(source='get_transaction_type_display', read_only=True)
+    category_display = serializers.CharField(source='get_category_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        from api.models import StaffWalletTransaction
+        model = StaffWalletTransaction
+        fields = [
+            'id',
+            'wallet',
+            'transaction_type',
+            'transaction_type_display',
+            'category',
+            'category_display',
+            'amount',
+            'reference',
+            'status',
+            'status_display',
+            'description',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'wallet', 'created_at']
+
+
 class LoanTenureSerializer(serializers.ModelSerializer):
     """Serializer for LoanTenure"""
     class Meta:

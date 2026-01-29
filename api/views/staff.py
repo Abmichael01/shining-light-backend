@@ -18,6 +18,7 @@ from api.models import (
     LoanTenure,
     LoanPayment,
     StaffWallet,
+    StaffWalletTransaction,
     Student,
     Class
 )
@@ -33,6 +34,7 @@ from api.serializers import (
     LoanApplicationSerializer,
     LoanPaymentSerializer,
     StaffWalletSerializer,
+    StaffWalletTransactionSerializer,
     LoanTenureSerializer,
     StudentListSerializer,
     StudentSerializer,
@@ -311,6 +313,20 @@ class StaffViewSet(viewsets.ModelViewSet):
                 
         serializer = StaffWalletSerializer(wallet)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def transactions(self, request, pk=None):
+        """
+        Get wallet transaction history for a specific staff member
+        """
+        staff = self.get_object()
+        try:
+            wallet = staff.wallet
+            transactions = wallet.transactions.all().order_by('-created_at')
+            serializer = StaffWalletTransactionSerializer(transactions, many=True)
+            return Response(serializer.data)
+        except StaffWallet.DoesNotExist:
+            return Response([], status=status.HTTP_200_OK)
 
 
 @api_view(['GET', 'PATCH'])

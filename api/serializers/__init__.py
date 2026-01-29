@@ -45,6 +45,7 @@ from .staff import (
 )
 from .loans import (
     StaffWalletSerializer,
+    StaffWalletTransactionSerializer,
     LoanTenureSerializer,
     LoanApplicationSerializer,
     LoanPaymentSerializer,
@@ -104,6 +105,7 @@ __all__ = [
     'StudentFeeStatusSerializer',
     'RecordFeePaymentSerializer',
     'WithdrawalRequestSerializer',
-    'StaffBeneficiarySerializer'
+    'StaffBeneficiarySerializer',
+    'StaffWalletTransactionSerializer'
 ]
 
