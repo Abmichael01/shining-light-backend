@@ -199,6 +199,8 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         """
         Record a new fee payment with validation
         """
+        from api.utils.email import send_student_fee_receipt
+        
         # Only admin/staff can record payments
         if getattr(request.user, 'user_type', None) == 'student':
              return Response(
@@ -209,11 +211,31 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         serializer = RecordFeePaymentSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             payment = serializer.save()
+            
+            # Send receipt email
+            send_student_fee_receipt(payment)
+            
             return Response(
                 FeePaymentSerializer(payment).data,
                 status=status.HTTP_201_CREATED
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def download_receipt(self, request, pk=None):
+        """
+        Download payment receipt PDF
+        """
+        from api.utils.receipt_generator import generate_receipt_pdf
+        from django.http import HttpResponse
+        
+        payment = self.get_object()
+        
+        pdf_file = generate_receipt_pdf(payment)
+        
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
+        return response
     
     @action(detail=False, methods=['get'])
     def student_fees(self, request):
@@ -367,15 +389,21 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             )
             
         # Get student logic (reuse from student_fees)
-        student = None
         if getattr(user, 'user_type', None) == 'student':
             if hasattr(user, 'student_profile'):
                 student = user.student_profile
-        
+        elif user.is_superuser or user.user_type in ['admin', 'staff']:
+            # Admin/Staff initiating on behalf of student
+            student_id = request.data.get('student_id')
+            if student_id:
+                try:
+                    student = Student.objects.get(pk=student_id)
+                except Student.DoesNotExist:
+                    pass
+
         if not student:
-             # Fallback if staff/admin is initiating (future use)
              return Response(
-                 {'error': 'Student profile required for payment initialization'},
+                 {'error': 'Student profile required for payment initialization. If Admin, provide student_id.'},
                  status=status.HTTP_400_BAD_REQUEST
              )
              

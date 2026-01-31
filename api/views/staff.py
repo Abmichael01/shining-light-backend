@@ -625,10 +625,13 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
         Create salary payments for multiple staff at once
         Expects: month, year, and optionally staff_ids (if not provided, creates for all active staff)
         """
+        from django.db import transaction
+        
         month = request.data.get('month')
         year = request.data.get('year')
         school_id = request.data.get('school')
         staff_ids = request.data.get('staff_ids', [])
+        process_payment = request.data.get('process_payment', False)
         
         if not month or not year:
             return Response(
@@ -649,26 +652,62 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
         created_payments = []
         errors = []
         
-        for staff in staff_members:
-            # Check if payment already exists
-            if SalaryPayment.objects.filter(staff=staff, month=month, year=year).exists():
-                errors.append(f"Payment for {staff.get_full_name()} already exists for {month}/{year}")
-                continue
-            
-            try:
-                payment = SalaryPayment.objects.create(
-                    staff=staff,
-                    salary_grade=staff.current_salary.salary_grade,
-                    month=month,
-                    year=year,
-                    amount=staff.current_salary.salary_grade.monthly_amount,
-                    deductions=0,
-                    status='pending',
-                    processed_by=request.user
-                )
-                created_payments.append(payment)
-            except Exception as e:
-                errors.append(f"Error creating payment for {staff.get_full_name()}: {str(e)}")
+        with transaction.atomic():
+            for staff in staff_members:
+                # Check if payment already exists
+                if SalaryPayment.objects.filter(staff=staff, month=month, year=year).exists():
+                    errors.append(f"Payment for {staff.get_full_name()} already exists for {month}/{year}")
+                    continue
+                
+                try:
+                    amount = staff.current_salary.salary_grade.monthly_amount
+                    
+                    # Prepare payment data
+                    payment_data = {
+                        'staff': staff,
+                        'salary_grade': staff.current_salary.salary_grade,
+                        'month': month,
+                        'year': year,
+                        'amount': amount,
+                        'deductions': 0,
+                        'status': 'pending',
+                        'processed_by': request.user
+                    }
+                    
+                    if process_payment:
+                         from django.utils import timezone
+                         payment_data['status'] = 'paid'
+                         payment_data['payment_date'] = timezone.now().date()
+                         payment_data['net_amount'] = amount # Assuming deductions 0 for now
+                         
+                         # Ensure net_amount is set correctly by model save, but we need it here for wallet
+                    
+                    payment = SalaryPayment(
+                        **payment_data
+                    )
+                    payment.save() # This calculates net_amount
+                    
+                    if process_payment:
+                        # Credit Wallet
+                        wallet, _ = StaffWallet.objects.get_or_create(staff=staff)
+                        wallet.wallet_balance += payment.net_amount
+                        wallet.save()
+                        
+                        # Create Transaction
+                        tx_ref = f"SAL-{year}-{month}-{staff.id}-{payment.id}"
+                        StaffWalletTransaction.objects.create(
+                            wallet=wallet,
+                            transaction_type='credit',
+                            category='salary',
+                            amount=payment.net_amount,
+                            reference=tx_ref,
+                            status='success',
+                            description=f"Salary Payment: {month}/{year}"
+                        )
+
+                    created_payments.append(payment)
+                except Exception as e:
+                    errors.append(f"Error creating payment for {staff.get_full_name()}: {str(e)}")
         
         return Response({
             'created': len(created_payments),

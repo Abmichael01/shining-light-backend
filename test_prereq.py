@@ -1,5 +1,6 @@
 import os
 import django
+import pytest
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 django.setup()
@@ -9,6 +10,7 @@ from django.db.models import Q
 from api.serializers import StudentFeeStatusSerializer
 from django.db.models import Sum
 
+@pytest.mark.django_db
 def test_prereq():
     print("Testing Prerequisite Logic...")
     
