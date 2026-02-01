@@ -197,18 +197,71 @@ class FeeType(models.Model):
         total_paid = self.get_student_total_paid(student_id, session, session_term)
         return max(0, applicable_amount - total_paid)
     
-    def get_student_status(self, student_id, session=None, session_term=None):
-        """Get payment status for a student"""
-        student = Student.objects.get(id=student_id)
-        applicable_amount = self.get_applicable_amount(student)
-        total_paid = self.get_student_total_paid(student_id, session, session_term)
+    
+    def get_payment_status_context(self, student, session=None, session_term=None):
+        """
+        Standardized method to get comprehensive payment status
+        Returns a dict with amounts, status, and logic context
+        """
+        # 1. Determine Applicable Amount (Staff Discount Logic)
+        applicable_amount = self.amount
+        is_staff_child = False
         
-        if total_paid >= applicable_amount:
-            return 'paid'
-        elif total_paid > 0:
-            return 'partial'
+        # Check if student is staff child (cached or db query)
+        if hasattr(student, 'is_staff_child_cached'):
+            is_staff_child = student.is_staff_child_cached
         else:
-            return 'unpaid'
+             is_staff_child = student.staff_parents.exists()
+             
+        if self.staff_children_amount is not None and is_staff_child:
+            applicable_amount = self.staff_children_amount
+            
+        # 2. Determine Scope (Session/Term) for Payments
+        filters = {
+            'student': student,
+            'fee_type': self,
+        }
+        
+        # For recurring fees, we MUST scope to the specific term/session
+        if self.is_recurring_per_term:
+            if session_term:
+                filters['session_term'] = session_term
+            # If recurring but no term provided, we might be looking at global history 
+            # OR simple total (danger zone). Ideally, caller provides term.
+        elif session:
+             # Non-recurring fees might still be linked to a session (e.g. Admission)
+             filters['session'] = session
+             
+        # 3. Calculate Totals
+        payments_qs = FeePayment.objects.filter(**filters)
+        total_paid = payments_qs.aggregate(total=Sum('amount'))['total'] or 0
+        installments_made = payments_qs.count()
+        
+        # 4. Determine Status
+        status = 'unpaid'
+        if total_paid >= applicable_amount:
+            status = 'paid'
+        elif total_paid > 0:
+            status = 'partial'
+            
+        remaining = max(0, applicable_amount - total_paid)
+        
+        return {
+            'applicable_amount': applicable_amount,
+            'total_paid': total_paid,
+            'amount_remaining': remaining,
+            'status': status,
+            'installments_made': installments_made,
+            'is_staff_child': is_staff_child,
+            'fee_type_id': self.id,
+            'fee_type_name': self.name
+        }
+
+    def get_student_status(self, student_id, session=None, session_term=None):
+        """Wrapper for backward compatibility or simple status checks"""
+        student = Student.objects.get(id=student_id)
+        context = self.get_payment_status_context(student, session, session_term)
+        return context['status']
 
 
 class FeePayment(models.Model):
@@ -301,17 +354,32 @@ class FeePayment(models.Model):
         super().save(*args, **kwargs)
     
     def _generate_receipt_number(self):
-        """Generate unique receipt number: RCP-YYYY-XXXXXX"""
+        """
+        Generate unique receipt number: RCP-YYYY-XXXXXX
+        Uses a retry loop to handle race conditions where multiple
+        payments are created simultaneously.
+        """
         year = timezone.now().year
-        
-        # Get count of payments this year
         year_start = timezone.datetime(year, 1, 1, tzinfo=timezone.get_current_timezone())
-        count = FeePayment.objects.filter(
-            created_at__gte=year_start
-        ).count() + 1
         
-        # Format: RCP-2025-000001
-        return f"RCP-{year}-{count:06d}"
+        # Try up to 100 times to generate a unique receipt number
+        for attempt in range(100):
+            # Get count of payments this year + attempt offset
+            count = FeePayment.objects.filter(
+                created_at__gte=year_start
+            ).count() + 1 + attempt
+            
+            # Format: RCP-2026-000001
+            receipt_number = f"RCP-{year}-{count:06d}"
+            
+            # Check if this receipt number already exists
+            if not FeePayment.objects.filter(receipt_number=receipt_number).exists():
+                return receipt_number
+        
+        # Fallback: use timestamp if we can't find a unique number after 100 attempts
+        import time
+        timestamp = int(time.time() * 1000) % 1000000
+        return f"RCP-{year}-{timestamp:06d}"
     
     def clean(self):
         """Validate payment"""

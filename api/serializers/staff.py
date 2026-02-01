@@ -477,6 +477,7 @@ class StaffSalarySerializer(serializers.ModelSerializer):
             'id',
             'staff',
             'staff_name',
+            'staff_registration_number',
             'staff_id',
             'salary_grade',
             'grade_number',
@@ -489,7 +490,22 @@ class StaffSalarySerializer(serializers.ModelSerializer):
             'assigned_by_email'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'staff': {'validators': []},
+        }
     
+    
+    def create(self, validated_data):
+        """
+        create or update staff salary (OneToOne relationship)
+        """
+        staff = validated_data.pop('staff')
+        instance, created = StaffSalary.objects.update_or_create(
+            staff=staff,
+            defaults=validated_data
+        )
+        return instance
+
     def get_staff_name(self, obj):
         """Return staff member's full name"""
         return obj.staff.get_full_name()

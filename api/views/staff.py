@@ -312,6 +312,46 @@ class StaffViewSet(viewsets.ModelViewSet):
         except StaffWallet.DoesNotExist:
             return Response([], status=status.HTTP_200_OK)
 
+    @action(detail=True, methods=['post'])
+    def link_child(self, request, pk=None, **kwargs):
+        """
+        Link a student as a child of this staff member
+        """
+        staff = self.get_object()
+        student_id = request.data.get('student_id')
+        
+        if not student_id:
+            return Response({'error': 'Student ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            student = Student.objects.get(id=student_id)
+            staff.children.add(student)
+            return Response({'status': 'success', 'message': 'Student linked successfully'})
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    @action(detail=True, methods=['post'])
+    def unlink_child(self, request, pk=None, **kwargs):
+        """
+        Unlink a student from this staff member
+        """
+        staff = self.get_object()
+        student_id = request.data.get('student_id')
+        
+        if not student_id:
+            return Response({'error': 'Student ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            student = Student.objects.get(id=student_id)
+            staff.children.remove(student)
+            return Response({'status': 'success', 'message': 'Student unlinked successfully'})
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['GET', 'PATCH'])
 @permission_classes([IsAuthenticated])
@@ -600,7 +640,8 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
                 
                 # 2. Credit Staff Wallet
                 wallet, _ = StaffWallet.objects.get_or_create(staff=payment.staff)
-                wallet.wallet_balance += payment.net_amount
+                from decimal import Decimal
+                wallet.wallet_balance = Decimal(str(wallet.wallet_balance)) + payment.net_amount
                 wallet.save()
                 
                 # 3. Create Transaction Record
@@ -690,7 +731,8 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
                     if process_payment:
                         # Credit Wallet
                         wallet, _ = StaffWallet.objects.get_or_create(staff=staff)
-                        wallet.wallet_balance += payment.net_amount
+                        from decimal import Decimal
+                        wallet.wallet_balance = Decimal(str(wallet.wallet_balance)) + payment.net_amount
                         wallet.save()
                         
                         # Create Transaction

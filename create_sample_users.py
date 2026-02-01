@@ -46,7 +46,7 @@ staff_data = [
         'staff_type': 'teaching',
         'zone': 'ransowa',
         'account_name': 'Oluwaseun Adeyemi Adebayo',
-        'account_number': '0123456789',
+        'account_number': '0000000000',
         'bank_name': 'First Bank Nigeria',
         'education': {
             'level': 'tertiary',

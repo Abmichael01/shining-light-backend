@@ -293,30 +293,12 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         
         fee_statuses = []
         for fee_type in fees_qs:
-            # 4. Calculate Payment Status for THIS SPECIFIC Session/Term
-            applicable_amount = fee_type.get_applicable_amount(student)
-            
-            payment_filters = {
-                'student': student,
-                'fee_type': fee_type
-            }
-            
-            if term_id:
-                payment_filters['session_term_id'] = term_id
-            elif session_id:
-                payment_filters['session_id'] = session_id
-                
-            payments = FeePayment.objects.filter(**payment_filters)
-            total_paid = payments.aggregate(sum=Sum('amount'))['sum'] or 0
-            installments_made = payments.count()
-            
-            # Calculate status
-            if total_paid >= applicable_amount:
-                fee_status = 'paid'
-            elif total_paid > 0:
-                fee_status = 'partial'
-            else:
-                fee_status = 'unpaid'
+            # 4. Calculate Payment Status using UNIFIED LOGIC
+            context = fee_type.get_payment_status_context(
+                student=student,
+                session=session_id,
+                session_term=term_id
+            )
             
             # Check Prerequisites (Using SAME Session/Term context)
             is_locked = False
@@ -324,33 +306,42 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             
             prerequisites = fee_type.prerequisites.all()
             for prereq in prerequisites:
-                # Check if prereq is paid FOR THIS SESSION/TERM (using student specific amount)
-                prereq_applicable = prereq.get_applicable_amount(student)
-                prereq_paid = prereq.get_student_total_paid(
-                    student.id, 
-                    session=session_id, 
+                # Check if prereq is paid FOR THIS SESSION/TERM 
+                prereq_context = prereq.get_payment_status_context(
+                    student=student,
+                    session=session_id,
                     session_term=term_id
                 )
-                if prereq_paid < prereq_applicable:
+                
+                if prereq_context['status'] != 'paid':
                     is_locked = True
                     locked_message = f"Requires {prereq.name} to be paid first"
                     break
+            
+            # Get raw payment objects for API response details (optional, but good for history)
+            # The context gave us totals, but front-end might want the list
+            payment_filters = {
+                'student': student,
+                'fee_type': fee_type
+            }
+            if term_id and fee_type.is_recurring_per_term:
+                 payment_filters['session_term_id'] = term_id
+            elif session_id:
+                 payment_filters['session_id'] = session_id
+
+            payments = FeePayment.objects.filter(**payment_filters)
             
             fee_statuses.append({
                 'fee_type_id': fee_type.id,
                 'fee_type_name': fee_type.name,
                 'fee_type_description': fee_type.description,
-                'total_amount': applicable_amount,
-                'amount_paid': total_paid,
-                'amount_remaining': max(0, applicable_amount - total_paid),
-                'installments_made': installments_made,
+                'total_amount': context['applicable_amount'],
+                'amount_paid': context['total_paid'],
+                'amount_remaining': context['amount_remaining'],
+                'installments_made': context['installments_made'],
                 'installments_allowed': fee_type.max_installments,
-                'is_staff_discount_applied': (
-                    fee_type.staff_children_amount is not None and 
-                    applicable_amount == fee_type.staff_children_amount and
-                    student.staff_parents.exists()
-                ),
-                'status': fee_status,
+                'is_staff_discount_applied': context['is_staff_child'],
+                'status': context['status'],
                 'is_mandatory': fee_type.is_mandatory,
                 'is_recurring': fee_type.is_recurring_per_term,
                 'payments': payments,

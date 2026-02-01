@@ -62,14 +62,14 @@ def run_tests():
     beneficiary_data = {
         "bank_name": "Access Bank",
         "bank_code": "044",
-        "account_number": "0123456789",
+        "account_number": "0000000000",
         "account_name": "Test User Account"
     }
     
     # Check if exists first to avoid dupes logic (though serializer might handle it)
     existing = StaffBeneficiary.objects.filter(
         staff=staff, 
-        account_number="0123456789", 
+        account_number="0000000000", 
         bank_code="044"
     ).first()
     
