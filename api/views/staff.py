@@ -520,7 +520,7 @@ class StaffSalaryViewSet(viewsets.ModelViewSet):
     """
     queryset = StaffSalary.objects.all()
     serializer_class = StaffSalarySerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
         """Filter by staff or school"""
@@ -531,6 +531,9 @@ class StaffSalaryViewSet(viewsets.ModelViewSet):
             'salary_grade',
             'assigned_by'
         )
+        
+        if getattr(user, 'user_type', None) == 'staff':
+            queryset = queryset.filter(staff__user=user)
         
         staff_param = self.request.query_params.get('staff')
         if staff_param:
