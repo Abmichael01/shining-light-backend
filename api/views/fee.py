@@ -224,7 +224,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], renderer_classes=[])
     def download_receipt(self, request, pk=None):
         """
         Download payment receipt PDF
