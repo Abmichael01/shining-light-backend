@@ -56,6 +56,7 @@ from .scheduling import (
     Schedule,
     ScheduleEntry
 )
+from .leave import LeaveRequest
 
 __all__ = [
     'User',
@@ -106,6 +107,7 @@ __all__ = [
     'StudentAttendance',
     'Schedule',
     'ScheduleEntry',
-    'StaffBeneficiary'
+    'StaffBeneficiary',
+    'LeaveRequest'
 ]
 

@@ -23,6 +23,7 @@ from api.serializers import (
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
 from api.models import Class as ClassModelAlias, Subject as SubjectModelAlias, Staff as StaffModelAlias
+from api.pagination import StandardResultsSetPagination
 
 
 class StudentViewSet(viewsets.ModelViewSet):
@@ -30,6 +31,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     ViewSet for Student CRUD operations
     Handles both applications and enrolled students
     """
+    pagination_class = StandardResultsSetPagination
     queryset = Student.objects.select_related(
         'school', 'class_model', 'department', 'club', 'user', 'biodata'
     ).prefetch_related(
