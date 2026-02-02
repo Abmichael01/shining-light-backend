@@ -14,21 +14,56 @@ from django.db.models import Sum
 def test_prereq():
     print("Testing Prerequisite Logic...")
     
-    # 1. Get Student
-    student = Student.objects.first()
+    # 1. Setup Data
+    from api.models import School, Class, Session, SessionTerm
+    from django.utils import timezone
+    
+    # Create School
+    school, _ = School.objects.get_or_create(
+        school_type='Junior Secondary',
+        defaults={'name': 'Test School'}
+    )
+    
+    # Create Class
+    class_model, _ = Class.objects.get_or_create(
+        name='JSS 1',
+        school=school,
+        defaults={'class_code': 'JSS1'}
+    )
+    
+    # Create Session/Term
+    session, _ = Session.objects.get_or_create(
+        name='2025/2026',
+        defaults={
+            'start_date': timezone.now().date(),
+            'end_date': timezone.now().date() + timezone.timedelta(days=365)
+        }
+    )
+    term = session.session_terms.first()
+    
+    # Create Student
+    student = Student.objects.create(
+        school=school,
+        class_model=class_model,
+        first_name="Test",
+        surname="Student"
+    )
     print(f"Student: {student.get_full_name()}")
     
-    # 2. Get Fees
-    jss_tuition = FeeType.objects.filter(name='JSS Tuition', school=student.school).last()
-    pta_fee = FeeType.objects.filter(name='PTA Fee', school=student.school).last()
+    # 2. Create Fees
+    jss_tuition = FeeType.objects.create(
+        name='JSS Tuition', 
+        school=school, 
+        amount=50000
+    )
+    pta_fee = FeeType.objects.create(
+        name='PTA Fee', 
+        school=school,
+        amount=5000
+    )
     
-    if not jss_tuition or not pta_fee:
-        print("Fees not found. Exiting.")
-        return
-
     # 3. Add Prereq (Tuition depends on PTA)
     print(f"Adding dependency: {jss_tuition.name} requires {pta_fee.name}")
-    jss_tuition.prerequisites.clear() # Clear first
     jss_tuition.prerequisites.add(pta_fee)
     jss_tuition.save()
     

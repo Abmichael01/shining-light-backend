@@ -94,6 +94,61 @@ class StaffEducationSerializer(serializers.ModelSerializer):
         return data
 
 
+
+class StaffSalarySerializer(serializers.ModelSerializer):
+    """Serializer for StaffSalary model"""
+    
+    staff_name = serializers.SerializerMethodField()
+    staff_registration_number = serializers.CharField(source='staff.registration_number', read_only=True, allow_null=True)
+    grade_number = serializers.IntegerField(source='salary_grade.grade_number', read_only=True)
+    monthly_amount = serializers.DecimalField(
+        source='salary_grade.monthly_amount',
+        max_digits=10,
+        decimal_places=2,
+        read_only=True
+    )
+    assigned_by_email = serializers.EmailField(source='assigned_by.email', read_only=True, allow_null=True)
+    
+    class Meta:
+        model = StaffSalary
+        fields = [
+            'id',
+            'staff',
+            'staff_name',
+            'staff_registration_number',
+            'staff_id',
+            'salary_grade',
+            'grade_number',
+            'monthly_amount',
+            'effective_date',
+            'notes',
+            'created_at',
+            'updated_at',
+            'assigned_by',
+            'assigned_by_email'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+        extra_kwargs = {
+            'staff': {'validators': []},
+        }
+    
+    
+    def create(self, validated_data):
+        """
+        create or update staff salary (OneToOne relationship)
+        """
+        staff = validated_data.pop('staff')
+        instance, created = StaffSalary.objects.update_or_create(
+            staff=staff,
+            defaults=validated_data
+        )
+        return instance
+
+    def get_staff_name(self, obj):
+        """Return staff member's full name"""
+        return obj.staff.get_full_name()
+
+
 class StaffListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for listing staff"""
     
@@ -164,6 +219,7 @@ class StaffSerializer(serializers.ModelSerializer):
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     children_ids = serializers.PrimaryKeyRelatedField(source='children', many=True, read_only=True)
     children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False, write_only=True)
+    current_salary = StaffSalarySerializer(read_only=True)
     
     class Meta:
         model = Staff
@@ -208,7 +264,8 @@ class StaffSerializer(serializers.ModelSerializer):
             'education_records',
             'created_at',
             'updated_at',
-            'created_by'
+            'created_by',
+            'current_salary'
         ]
         read_only_fields = ['id', 'staff_id', 'created_at', 'updated_at']
     
@@ -434,6 +491,10 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         return staff
 
 
+
+
+
+
 class SalaryGradeSerializer(serializers.ModelSerializer):
     """Serializer for SalaryGrade model (Global salary grades)"""
     
@@ -457,58 +518,7 @@ class SalaryGradeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-class StaffSalarySerializer(serializers.ModelSerializer):
-    """Serializer for StaffSalary model"""
-    
-    staff_name = serializers.SerializerMethodField()
-    staff_registration_number = serializers.CharField(source='staff.registration_number', read_only=True)
-    grade_number = serializers.IntegerField(source='salary_grade.grade_number', read_only=True)
-    monthly_amount = serializers.DecimalField(
-        source='salary_grade.monthly_amount',
-        max_digits=10,
-        decimal_places=2,
-        read_only=True
-    )
-    assigned_by_email = serializers.EmailField(source='assigned_by.email', read_only=True, allow_null=True)
-    
-    class Meta:
-        model = StaffSalary
-        fields = [
-            'id',
-            'staff',
-            'staff_name',
-            'staff_registration_number',
-            'staff_id',
-            'salary_grade',
-            'grade_number',
-            'monthly_amount',
-            'effective_date',
-            'notes',
-            'created_at',
-            'updated_at',
-            'assigned_by',
-            'assigned_by_email'
-        ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
-        extra_kwargs = {
-            'staff': {'validators': []},
-        }
-    
-    
-    def create(self, validated_data):
-        """
-        create or update staff salary (OneToOne relationship)
-        """
-        staff = validated_data.pop('staff')
-        instance, created = StaffSalary.objects.update_or_create(
-            staff=staff,
-            defaults=validated_data
-        )
-        return instance
 
-    def get_staff_name(self, obj):
-        """Return staff member's full name"""
-        return obj.staff.get_full_name()
 
 
 class SalaryPaymentSerializer(serializers.ModelSerializer):

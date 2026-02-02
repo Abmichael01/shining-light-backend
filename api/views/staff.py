@@ -532,6 +532,7 @@ class StaffSalaryViewSet(viewsets.ModelViewSet):
             'assigned_by'
         )
         
+        user = self.request.user
         if getattr(user, 'user_type', None) == 'staff':
             queryset = queryset.filter(staff__user=user)
         
