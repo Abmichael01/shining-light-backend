@@ -227,9 +227,9 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'], renderer_classes=[])
     def download_receipt(self, request, pk=None):
         """
-        Download payment receipt PDF
+        Download payment receipt as HTML (can be printed to PDF by browser)
         """
-        from api.utils.receipt_generator import generate_receipt_pdf
+        from api.utils.simple_receipt_generator import generate_receipt_html
         from django.http import HttpResponse
         import logging
         
@@ -239,10 +239,9 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             payment = self.get_object()
             
             logger.info(f"Generating receipt for payment {payment.id}")
-            pdf_file = generate_receipt_pdf(payment)
+            html_content = generate_receipt_html(payment)
             
-            response = HttpResponse(pdf_file.read(), content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
+            response = HttpResponse(html_content, content_type='text/html')
             return response
         except Exception as e:
             logger.error(f"Error generating receipt: {str(e)}", exc_info=True)
