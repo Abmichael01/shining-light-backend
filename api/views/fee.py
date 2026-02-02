@@ -231,14 +231,26 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         """
         from api.utils.receipt_generator import generate_receipt_pdf
         from django.http import HttpResponse
+        import logging
         
-        payment = self.get_object()
+        logger = logging.getLogger(__name__)
         
-        pdf_file = generate_receipt_pdf(payment)
-        
-        response = HttpResponse(pdf_file.read(), content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
-        return response
+        try:
+            payment = self.get_object()
+            
+            logger.info(f"Generating receipt for payment {payment.id}")
+            pdf_file = generate_receipt_pdf(payment)
+            
+            response = HttpResponse(pdf_file.read(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
+            return response
+        except Exception as e:
+            logger.error(f"Error generating receipt: {str(e)}", exc_info=True)
+            return HttpResponse(
+                f"Error generating receipt: {str(e)}", 
+                status=500,
+                content_type='text/plain'
+            )
     
     @action(detail=False, methods=['get'])
     def student_fees(self, request):

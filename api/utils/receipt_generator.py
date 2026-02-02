@@ -82,12 +82,22 @@ class ReceiptPDFGenerator:
         c.drawString(left_margin, y_position, "STUDENT INFORMATION")
         y_position -= 1.0*cm
         
-        biodata = getattr(self.student, 'biodata', None)
-        full_name = self.student.get_full_name().upper()
+        # Get student name with fallback
+        try:
+            full_name = self.student.get_full_name().upper()
+        except:
+            # Fallback to full_name field or construct from biodata
+            biodata = getattr(self.student, 'biodata', None)
+            if hasattr(self.student, 'full_name') and self.student.full_name:
+                full_name = self.student.full_name.upper()
+            elif biodata:
+                full_name = f"{biodata.surname} {biodata.first_name}".upper()
+            else:
+                full_name = "N/A"
         
         details = [
             ["Name:", full_name],
-            ["Admission No:", self.student.admission_number],
+            ["Admission No:", self.student.admission_number or "N/A"],
             ["Class:", self.student.class_model.name if self.student.class_model else "N/A"],
         ]
         
