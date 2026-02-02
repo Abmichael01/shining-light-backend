@@ -236,7 +236,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         
         pdf_file = generate_receipt_pdf(payment)
         
-        response = HttpResponse(pdf_file, content_type='application/pdf')
+        response = HttpResponse(pdf_file.read(), content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="receipt_{payment.receipt_number}.pdf"'
         return response
     
