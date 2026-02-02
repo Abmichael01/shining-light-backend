@@ -34,12 +34,21 @@ def generate_receipt_html(payment):
     session_name = payment.session.name if payment.session else "N/A"
     term_name = payment.session_term.term_name if payment.session_term else "N/A"
     
-    html = f"""
+    # Format payment date
+    payment_date_str = payment.payment_date.strftime('%B %d, %Y')
+    
+    # Format amount
+    amount_str = f"₦{payment.amount:,.2f}"
+    
+    # Get current datetime
+    generated_time = datetime.now().strftime('%B %d, %Y at %I:%M %p')
+    
+    html = """
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
-        <title>Payment Receipt - {payment.receipt_number}</title>
+        <title>Payment Receipt - {receipt_number}</title>
         <style>
             @media print {{
                 body {{ margin: 0; }}
@@ -166,9 +175,9 @@ def generate_receipt_html(payment):
     <body>
         <div class="receipt">
             <div class="header">
-                <div class="school-name">{school_name.upper()}</div>
+                <div class="school-name">{school_name_upper}</div>
                 <div class="receipt-title">PAYMENT RECEIPT</div>
-                <div class="receipt-number">Receipt No: {payment.receipt_number}</div>
+                <div class="receipt-number">Receipt No: {receipt_number}</div>
             </div>
             
             <div class="section">
@@ -179,7 +188,7 @@ def generate_receipt_html(payment):
                 </div>
                 <div class="info-row">
                     <div class="info-label">Admission Number:</div>
-                    <div class="info-value">{student.admission_number or 'N/A'}</div>
+                    <div class="info-value">{admission_number}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Class:</div>
@@ -191,19 +200,19 @@ def generate_receipt_html(payment):
                 <div class="section-title">PAYMENT DETAILS</div>
                 <div class="info-row">
                     <div class="info-label">Date:</div>
-                    <div class="info-value">{payment.payment_date.strftime('%B %d, %Y')}</div>
+                    <div class="info-value">{payment_date}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Fee Type:</div>
-                    <div class="info-value">{payment.fee_type.name}</div>
+                    <div class="info-value">{fee_type_name}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Payment Method:</div>
-                    <div class="info-value">{payment.get_payment_method_display()}</div>
+                    <div class="info-value">{payment_method}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">Reference Number:</div>
-                    <div class="info-value">{payment.reference_number or 'N/A'}</div>
+                    <div class="info-value">{reference_number}</div>
                 </div>
                 <div class="info-row">
                     <div class="info-label">School Session:</div>
@@ -217,12 +226,12 @@ def generate_receipt_html(payment):
             
             <div class="amount-box">
                 <div class="amount-label">AMOUNT PAID</div>
-                <div class="amount-value">₦{payment.amount:,.2f}</div>
+                <div class="amount-value">{amount}</div>
             </div>
             
             <div class="footer">
                 <p>This receipt is computer-generated and is valid without a signature.</p>
-                <p>Generated on {datetime.now().strftime('%B %d, %Y at %I:%M %p')}</p>
+                <p>Generated on {generated_time}</p>
             </div>
         </div>
         
@@ -234,6 +243,20 @@ def generate_receipt_html(payment):
         </script>
     </body>
     </html>
-    """
+    """.format(
+        receipt_number=payment.receipt_number,
+        school_name_upper=school_name.upper(),
+        student_name=student_name,
+        admission_number=student.admission_number or 'N/A',
+        class_name=class_name,
+        payment_date=payment_date_str,
+        fee_type_name=payment.fee_type.name,
+        payment_method=payment.get_payment_method_display(),
+        reference_number=payment.reference_number or 'N/A',
+        session_name=session_name,
+        term_name=term_name,
+        amount=amount_str,
+        generated_time=generated_time
+    )
     
     return html
