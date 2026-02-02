@@ -15,6 +15,7 @@ from api.serializers import (
 )
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
 from api.models import Class, Subject, Staff, Student
+from api.pagination import StandardResultsSetPagination
 
 
 class FeeTypeViewSet(viewsets.ModelViewSet):
@@ -24,6 +25,7 @@ class FeeTypeViewSet(viewsets.ModelViewSet):
     queryset = FeeType.objects.all()
     serializer_class = FeeTypeSerializer
     permission_classes = [IsSchoolAdmin]
+    pagination_class = StandardResultsSetPagination
     
     def get_queryset(self):
         """Filter queryset based on request parameters"""
@@ -87,6 +89,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     queryset = FeePayment.objects.all()
     serializer_class = FeePaymentSerializer
     permission_classes = [IsAdminOrStaffOrStudent]
+    pagination_class = StandardResultsSetPagination
     
     def get_permissions(self):
         """

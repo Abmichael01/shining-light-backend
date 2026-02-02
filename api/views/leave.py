@@ -5,6 +5,7 @@ from django.utils import timezone
 from api.models.leave import LeaveRequest
 from api.models.user import User
 from api.serializers.leave import LeaveRequestSerializer
+from api.pagination import StandardResultsSetPagination
 
 class LeaveRequestViewSet(viewsets.ModelViewSet):
     """
@@ -14,6 +15,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
     """
     serializer_class = LeaveRequestSerializer
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         user = self.request.user

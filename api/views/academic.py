@@ -46,6 +46,7 @@ from api.serializers import (
     TopicSerializer,
 )
 from api.serializers.exam import StudentExamResultSerializer
+from api.pagination import StandardResultsSetPagination
 
 
 class SchoolViewSet(viewsets.ModelViewSet):
@@ -435,6 +436,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
         "subject", "subject__class_model", "subject__class_model__school", "created_by"
     )
     permission_classes = [IsSchoolAdmin]
+    pagination_class = StandardResultsSetPagination
 
     def get_serializer_class(self):
         """Use different serializer for list vs detail"""
