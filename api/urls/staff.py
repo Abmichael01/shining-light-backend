@@ -10,7 +10,8 @@ from api.views.staff import (
     SalaryPaymentViewSet,
     LoanApplicationViewSet,
     LoanPaymentViewSet,
-    LoanTenureViewSet
+    LoanTenureViewSet,
+    StaffWalletTransactionViewSet
 )
 
 router = DefaultRouter()
@@ -23,6 +24,9 @@ router.register(r'staff-education', StaffEducationViewSet, basename='staff-educa
 router.register(r'salary-grades', SalaryGradeViewSet, basename='salary-grade')
 router.register(r'staff-salaries', StaffSalaryViewSet, basename='staff-salary')
 router.register(r'salary-payments', SalaryPaymentViewSet, basename='salary-payment')
+
+# Wallet & Transactions
+router.register(r'wallet-transactions', StaffWalletTransactionViewSet, basename='staff-wallet-transaction')
 
 # Loan management
 router.register(r'loan-applications', LoanApplicationViewSet, basename='loan-application')

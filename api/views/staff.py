@@ -1101,3 +1101,14 @@ class StaffBeneficiaryViewSet(viewsets.ModelViewSet):
         return Response({'error': 'Could not resolve account'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+
+class StaffWalletTransactionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for StaffWalletTransaction model
+    """
+    queryset = StaffWalletTransaction.objects.all()
+    serializer_class = StaffWalletTransactionSerializer
+    permission_classes = [IsSchoolAdmin]
+    
+    def get_queryset(self):
+        return StaffWalletTransaction.objects.select_related('wallet', 'wallet__staff').order_by('-created_at')
