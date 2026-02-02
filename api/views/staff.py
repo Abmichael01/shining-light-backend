@@ -663,9 +663,55 @@ class SalaryPaymentViewSet(viewsets.ModelViewSet):
             return Response(SalaryPaymentSerializer(payment).data)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    @action(detail=False, methods=['post'])
-    def bulk_create(self, request):
+    @action(detail=True, methods=['post'])
+    def reverse(self, request, pk=None):
+        """
+        Reverse a salary payment: debit wallet, delete transaction, delete payment.
+        """
+        from django.db import transaction
+        from api.models import StaffWallet, StaffWalletTransaction
+        from decimal import Decimal
+        
+        payment = self.get_object()
+        
+        try:
+            with transaction.atomic():
+                if payment.status == 'paid':
+                    # 1. Reverse Wallet Effect
+                    wallet = StaffWallet.objects.filter(staff=payment.staff).first()
+                    if wallet:
+                        # Find transaction to delete
+                        tx = None
+                        # Try exact reference first
+                        if payment.reference_number:
+                            tx = StaffWalletTransaction.objects.filter(wallet=wallet, reference=payment.reference_number).first()
+                        
+                        # Try bulk pattern
+                        if not tx:
+                             ref = f"SAL-{payment.year}-{payment.month}-{payment.staff.id}-{payment.id}"
+                             tx = StaffWalletTransaction.objects.filter(wallet=wallet, reference=ref).first()
+                             
+                        # Try mark_paid default pattern
+                        if not tx:
+                             ref = f"SAL-{payment.year}-{payment.month}-{payment.id}"
+                             tx = StaffWalletTransaction.objects.filter(wallet=wallet, reference=ref).first()
+                        
+                        amount_to_reverse = payment.net_amount
+                        
+                        if tx:
+                            amount_to_reverse = tx.amount
+                            tx.delete()
+                        
+                        # Deduct from wallet
+                        wallet.wallet_balance = Decimal(str(wallet.wallet_balance)) - Decimal(str(amount_to_reverse))
+                        wallet.save()
+                
+                # 2. Delete Payment Record
+                payment.delete()
+                
+            return Response({'message': 'Salary payment reversed successfully'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         """
         Create salary payments for multiple staff at once
         Expects: month, year, and optionally staff_ids (if not provided, creates for all active staff)
