@@ -100,12 +100,30 @@ class BulkMessagingView(views.APIView):
                     if phone: recipients.append(phone)
             else:
                 recipients = [s.user.email for s in students if s.user and s.user.email]
-        elif target_group == 'all_staff':
-            staff_list = Staff.objects.filter(user__is_active=True)
+        elif target_group in ['all_staff', 'teaching_staff', 'non_teaching_staff']:
+            query = {'user__is_active': True}
+            if target_group == 'teaching_staff':
+                query['staff_type'] = 'teaching'
+            elif target_group == 'non_teaching_staff':
+                query['staff_type'] = 'non_teaching'
+            
+            staff_list = Staff.objects.filter(**query)
+            
             if channel == 'sms':
                 recipients = [s.phone_number for s in staff_list if s.phone_number]
             else:
                 recipients = [s.user.email for s in staff_list if s.user and s.user.email]
+        elif target_group == 'specific_class':
+            class_id = request.data.get('class_id')
+            if not class_id:
+                return response.Response({"error": "class_id is required for specific_class target"}, status=status.HTTP_400_BAD_REQUEST)
+            students = Student.objects.filter(status='enrolled', class_model_id=class_id)
+            if channel == 'sms':
+                for s in students:
+                    phone = self._get_student_phone(s)
+                    if phone: recipients.append(phone)
+            else:
+                recipients = [s.user.email for s in students if s.user and s.user.email]
         elif target_group == 'custom':
             recipients = custom_targets
         else:

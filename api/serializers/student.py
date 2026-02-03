@@ -481,6 +481,7 @@ class StudentListSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     full_name = serializers.SerializerMethodField()
     passport_photo = serializers.SerializerMethodField()
+    primary_phone = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
@@ -488,7 +489,7 @@ class StudentListSerializer(serializers.ModelSerializer):
             'id', 'student_id', 'application_number', 'admission_number', 'full_name',
             'school', 'school_name', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
-            'passport_photo',
+            'passport_photo', 'primary_phone',
             'application_date', 'enrollment_date', 'created_at'
         ]
         read_only_fields = fields
@@ -496,6 +497,19 @@ class StudentListSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Get student's full name"""
         return obj.get_full_name()
+    
+    def get_primary_phone(self, obj):
+        """Get primary guardian phone number"""
+        try:
+            guardian = obj.guardians.filter(is_primary_contact=True).first()
+            if guardian:
+                return guardian.phone_number
+            guardian = obj.guardians.first()
+            if guardian:
+                return guardian.phone_number
+        except:
+            pass
+        return None
     
     def get_passport_photo(self, obj):
         """Return full URL for passport photo if available"""

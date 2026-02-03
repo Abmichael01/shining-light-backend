@@ -39,7 +39,10 @@ from .models import (
     PaymentPurpose,
     ApplicationSlip,
     Schedule,
-    ScheduleEntry
+    ScheduleEntry,
+    StaffWallet,
+    StaffWalletTransaction,
+    StaffBeneficiary
 )
 
 
@@ -1490,3 +1493,25 @@ class ApplicationSlipAdmin(admin.ModelAdmin):
         return obj.student.school.name
     get_school_name.short_description = 'School'
 
+
+from django.contrib import admin
+from .models import StaffWallet, StaffWalletTransaction, StaffBeneficiary
+
+@admin.register(StaffWallet)
+class StaffWalletAdmin(admin.ModelAdmin):
+    list_display = ['staff', 'wallet_balance', 'account_number', 'bank_name', 'created_at']
+    search_fields = ['staff__staff_id', 'staff__surname', 'account_number']
+    readonly_fields = ['paystack_customer_code', 'created_at', 'updated_at']
+
+@admin.register(StaffWalletTransaction)
+class StaffWalletTransactionAdmin(admin.ModelAdmin):
+    list_display = ['wallet', 'transaction_type', 'category', 'amount', 'status', 'created_at']
+    list_filter = ['transaction_type', 'category', 'status', 'created_at']
+    search_fields = ['reference', 'wallet__staff__staff_id']
+    readonly_fields = ['reference', 'created_at']
+
+@admin.register(StaffBeneficiary)
+class StaffBeneficiaryAdmin(admin.ModelAdmin):
+    list_display = ['staff', 'account_name', 'bank_name', 'account_number', 'is_verified', 'created_at']
+    list_filter = ['is_verified', 'bank_name']
+    search_fields = ['staff__staff_id', 'account_name', 'account_number']

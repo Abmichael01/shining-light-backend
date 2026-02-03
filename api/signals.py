@@ -77,4 +77,16 @@ def update_term_report_on_result_change(sender, instance, **kwargs):
             if not report.principal_report and matching_grade.principal_remark:
                 report.principal_report = matching_grade.principal_remark
     
+    
     report.save()
+
+
+from django.contrib.auth.signals import user_logged_in
+from api.utils.email import send_login_notification_email
+
+@receiver(user_logged_in)
+def on_user_logged_in(sender, request, user, **kwargs):
+    """
+    Send email notification when user logs in.
+    """
+    send_login_notification_email(user, request)

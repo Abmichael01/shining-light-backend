@@ -453,19 +453,86 @@ def send_bulk_email(recipient_list, subject, message_body):
     Send mass emails to a list of recipients.
     """
     try:
+        from django.utils.html import strip_tags
+        
         # Use send_mail which handles mass mailing efficiently or loop.
-        # send_mail with recipient_list is good for small-medium lists.
         # For very large lists, we should use send_mass_mail or a background task.
+        
+        plain_message = strip_tags(message_body)
         
         send_mail(
             subject=subject,
-            message=message_body,
+            message=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=recipient_list,
             fail_silently=False,
+            html_message=message_body
         )
         return True, f"Emails sent to {len(recipient_list)} recipients"
     except Exception as e:
         print(f"Error sending bulk email: {str(e)}")
         return False, str(e)
+
+
+def send_login_notification_email(user, request=None):
+    """
+    Send a notification email when a new login occurs.
+    """
+    try:
+        user_email = user.email
+        if not user_email:
+            return False
+
+        # Get device info from request if available
+        user_agent = 'Unknown Device'
+        ip_address = 'Unknown IP'
+        
+        if request:
+            user_agent = request.META.get('HTTP_USER_AGENT', 'Unknown Device')
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip_address = x_forwarded_for.split(',')[0]
+            else:
+                ip_address = request.META.get('REMOTE_ADDR', 'Unknown IP')
+
+        context = {
+            'user_name': user.get_full_name() if hasattr(user, 'get_full_name') else 'User',
+            'email': user_email,
+            'time': datetime.datetime.now().strftime("%B %d, %Y at %I:%M %p"),
+            'device': user_agent,
+            'ip': ip_address,
+            'year': datetime.datetime.now().year,
+        }
+
+        subject = 'New Login Alert - Shining Light School'
+
+        plain_message = f"""
+Dear {context['user_name']},
+
+A new login to your Shining Light School account was detected.
+
+Details:
+- Account: {context['email']}
+- Time: {context['time']}
+- Device: {context['device']}
+- IP Address: {context['ip']}
+
+If this was you, you can safely ignore this email.
+If you did not authorize this login, please contact support and change your password immediately.
+
+Best regards,
+Shining Light School Administration
+"""
+        
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user_email],
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Error sending login notification: {str(e)}")
+        return False
 
