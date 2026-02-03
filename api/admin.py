@@ -42,7 +42,8 @@ from .models import (
     ScheduleEntry,
     StaffWallet,
     StaffWalletTransaction,
-    StaffBeneficiary
+    StaffBeneficiary,
+    CommunicationTemplate
 )
 
 
@@ -1515,3 +1516,10 @@ class StaffBeneficiaryAdmin(admin.ModelAdmin):
     list_display = ['staff', 'account_name', 'bank_name', 'account_number', 'is_verified', 'created_at']
     list_filter = ['is_verified', 'bank_name']
     search_fields = ['staff__staff_id', 'account_name', 'account_number']
+
+@admin.register(CommunicationTemplate)
+class CommunicationTemplateAdmin(admin.ModelAdmin):
+    list_display = ['name', 'type', 'subject', 'created_at']
+    list_filter = ['type', 'created_at']
+    search_fields = ['name', 'subject', 'content']
+    readonly_fields = ['created_at', 'updated_at']
