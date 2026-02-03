@@ -76,6 +76,7 @@ urlpatterns = [
     
     # Messaging
     path('messaging/', include('api.urls.messaging')),
+    path('communication/', include('api.urls.communication')),
     
     # Centralized Payment Webhook
     path('payment/webhook/', paystack_webhook, name='central-paystack-webhook'),

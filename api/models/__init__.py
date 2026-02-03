@@ -56,6 +56,7 @@ from .scheduling import (
     Schedule,
     ScheduleEntry
 )
+from .communication import CommunicationTemplate
 from .leave import LeaveRequest
 from .assignment import Assignment, AssignmentSubmission
 

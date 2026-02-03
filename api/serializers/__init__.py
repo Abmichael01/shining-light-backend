@@ -57,7 +57,9 @@ from .fee import (
     FeePaymentSerializer,
     StudentFeeStatusSerializer,
     RecordFeePaymentSerializer
+    RecordFeePaymentSerializer
 )
+from .communication import CommunicationTemplateSerializer
 
 __all__ = [
     'UserSerializer', 
@@ -106,6 +108,7 @@ __all__ = [
     'RecordFeePaymentSerializer',
     'WithdrawalRequestSerializer',
     'StaffBeneficiarySerializer',
-    'StaffWalletTransactionSerializer'
+    'StaffWalletTransactionSerializer',
+    'CommunicationTemplateSerializer'
 ]
 
