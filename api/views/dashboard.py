@@ -261,11 +261,17 @@ def student_dashboard_stats(request):
             'error': 'Student profile not found for current user'
         }, status=status.HTTP_404_NOT_FOUND)
     
-    # Get current session and term
+    # Get current session (fallback to latest if none marked as current)
     current_session = Session.objects.filter(is_current=True).first()
+    if not current_session:
+        current_session = Session.objects.all().order_by('-start_date').first()
+        
     current_term = None
     if current_session:
+        # Get current term in the session (fallback to latest if none marked as current)
         current_term = current_session.session_terms.filter(is_current=True).first()
+        if not current_term:
+            current_term = current_session.session_terms.all().order_by('-start_date').first()
     
     # Get registered subjects for current term
     registered_subjects_count = 0
