@@ -74,6 +74,9 @@ urlpatterns = [
     # General File Upload
     path('common/upload/', FileUploadView.as_view(), name='file-upload'),
     
+    # Messaging
+    path('messaging/', include('api.urls.messaging')),
+    
     # Centralized Payment Webhook
     path('payment/webhook/', paystack_webhook, name='central-paystack-webhook'),
 ]

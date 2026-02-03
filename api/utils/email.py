@@ -447,3 +447,25 @@ def template_exists(template_name):
     except:
         return False
 
+
+def send_bulk_email(recipient_list, subject, message_body):
+    """
+    Send mass emails to a list of recipients.
+    """
+    try:
+        # Use send_mail which handles mass mailing efficiently or loop.
+        # send_mail with recipient_list is good for small-medium lists.
+        # For very large lists, we should use send_mass_mail or a background task.
+        
+        send_mail(
+            subject=subject,
+            message=message_body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipient_list,
+            fail_silently=False,
+        )
+        return True, f"Emails sent to {len(recipient_list)} recipients"
+    except Exception as e:
+        print(f"Error sending bulk email: {str(e)}")
+        return False, str(e)
+

@@ -345,3 +345,8 @@ EXTERNAL_RENDER_API_KEY = os.getenv('EXTERNAL_RENDER_API_KEY')
 # Paystack Configuration
 PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
 PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
+
+# Termii Configuration
+TERMII_API_KEY = os.getenv('TERMII_API_KEY')
+TERMII_SENDER_ID = os.getenv('TERMII_SENDER_ID', 'ShiningL')
+TERMII_BASE_URL = os.getenv('TERMII_BASE_URL', 'https://api.ng.termii.com/api')
