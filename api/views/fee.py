@@ -1,7 +1,7 @@
 """
 ViewSets for fee-related models
 """
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, renderers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import models
@@ -16,6 +16,15 @@ from api.serializers import (
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff, IsAdminOrStaffOrStudent
 from api.models import Class, Subject, Staff, Student
 from api.pagination import StandardResultsSetPagination
+
+class PDFRenderer(renderers.BaseRenderer):
+    media_type = 'application/pdf'
+    format = 'pdf'
+    charset = None
+    render_style = 'binary'
+
+    def render(self, data, media_type=None, renderer_context=None):
+        return data
 
 
 class FeeTypeViewSet(viewsets.ModelViewSet):
@@ -138,7 +147,8 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         # ... logic continues ...
         
         # Filter by student (Admin/Staff only logic, for student it's already filtered)
-        student_id = self.request.query_params.get('student')
+        # Check if request has query_params (DRF Request) to avoid AttributeError
+        student_id = getattr(self.request, 'query_params', self.request.GET).get('student')
         if student_id:
             # If student is checking, ensure they are querying themselves (redundant due to queryset filter but safer)
             if user_type == 'student' and hasattr(user, 'student_profile'):
@@ -149,40 +159,41 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(student_id=student_id)
         
         # Filter by fee type
-        fee_type_id = self.request.query_params.get('fee_type')
+        query_params = getattr(self.request, 'query_params', self.request.GET)
+        fee_type_id = query_params.get('fee_type')
         if fee_type_id:
             queryset = queryset.filter(fee_type_id=fee_type_id)
         
         # Filter by school
-        school_id = self.request.query_params.get('school')
+        school_id = query_params.get('school')
         if school_id:
             queryset = queryset.filter(fee_type__school_id=school_id)
         
         # Filter by session
-        session_id = self.request.query_params.get('session')
+        session_id = query_params.get('session')
         if session_id:
             queryset = queryset.filter(session_id=session_id)
         
         # Filter by session term
-        session_term_id = self.request.query_params.get('session_term')
+        session_term_id = query_params.get('session_term')
         if session_term_id:
             queryset = queryset.filter(session_term_id=session_term_id)
         
         # Filter by payment method
-        payment_method = self.request.query_params.get('payment_method')
+        payment_method = query_params.get('payment_method')
         if payment_method:
             queryset = queryset.filter(payment_method=payment_method)
         
         # Filter by date range
-        start_date = self.request.query_params.get('start_date')
-        end_date = self.request.query_params.get('end_date')
+        start_date = query_params.get('start_date')
+        end_date = query_params.get('end_date')
         if start_date:
             queryset = queryset.filter(payment_date__gte=start_date)
         if end_date:
             queryset = queryset.filter(payment_date__lte=end_date)
         
         # Search (by student name, admission number, or reference number)
-        search = self.request.query_params.get('search')
+        search = query_params.get('search')
         if search:
             queryset = queryset.filter(
                 models.Q(student__biodata__surname__icontains=search) |
@@ -224,7 +235,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    @action(detail=True, methods=['get'], renderer_classes=[])
+    @action(detail=True, methods=['get'], renderer_classes=[renderers.StaticHTMLRenderer, renderers.JSONRenderer])
     def download_receipt(self, request, pk=None):
         """
         Download payment receipt as HTML (can be printed to PDF by browser)
@@ -247,6 +258,42 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
             logger.error(f"Error generating receipt: {str(e)}", exc_info=True)
             return HttpResponse(
                 f"Error generating receipt: {str(e)}", 
+                status=500,
+                content_type='text/plain'
+            )
+
+    @action(detail=True, methods=['get'], renderer_classes=[PDFRenderer, renderers.JSONRenderer])
+    def download_receipt_pdf(self, request, pk=None):
+        """
+        Download payment receipt as PDF (Generated via HCTI)
+        """
+        from api.utils.simple_receipt_generator import generate_receipt_html
+        from api.views.reports import generate_pdf_from_html
+        from django.http import HttpResponse
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            payment = self.get_object()
+            
+            logger.info(f"Generating PDF receipt for payment {payment.id}")
+            # Generate the HTML first
+            html_content = generate_receipt_html(payment)
+            
+            # Convert to PDF using the shared helper
+            # Standard A4 portrait
+            pdf_data = generate_pdf_from_html(html_content, orientation='portrait')
+            
+            filename = f"Receipt-{payment.receipt_number}.pdf"
+            
+            response = HttpResponse(pdf_data, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            logger.error(f"Error generating receipt PDF: {str(e)}", exc_info=True)
+            return HttpResponse(
+                f"Error generating PDF receipt: {str(e)}", 
                 status=500,
                 content_type='text/plain'
             )

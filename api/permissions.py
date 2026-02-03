@@ -93,13 +93,15 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         if user_type in ['admin', 'staff']:
             return True
         
-        # Students can only access their own subjects
+        # Students can only access their own data, or public data
         if user_type == 'student':
-            # Check if the student subject belongs to the logged-in student
+            # If the object has a student field, ensure it matches the current user
             if hasattr(obj, 'student') and hasattr(obj.student, 'user'):
                 return obj.student.user == user
-        
-        return False
+            
+            # For other objects (like Assignments), we rely on has_permission ( SAFE_METHODS ) 
+            # and get_queryset for filtering
+            return request.method in permissions.SAFE_METHODS
 
 
 class IsApplicant(permissions.BasePermission):

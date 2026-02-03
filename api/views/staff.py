@@ -1,7 +1,7 @@
 """
 ViewSets for staff-related models
 """
-from rest_framework import viewsets, status, serializers
+from rest_framework import viewsets, permissions, status, renderers
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db import models
@@ -1156,7 +1156,56 @@ class StaffWalletTransactionViewSet(viewsets.ModelViewSet):
     """
     queryset = StaffWalletTransaction.objects.all()
     serializer_class = StaffWalletTransactionSerializer
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     
     def get_queryset(self):
-        return StaffWalletTransaction.objects.select_related('wallet', 'wallet__staff').order_by('-created_at')
+        queryset = StaffWalletTransaction.objects.select_related('wallet', 'wallet__staff').order_by('-created_at')
+        
+        user = self.request.user
+        if getattr(user, 'user_type', None) == 'staff':
+            queryset = queryset.filter(wallet__staff__user=user)
+            
+        return queryset
+
+    class PDFRenderer(renderers.BaseRenderer):
+        media_type = 'application/pdf'
+        format = 'pdf'
+        charset = None
+        render_style = 'binary'
+
+        def render(self, data, media_type=None, renderer_context=None):
+            return data
+
+    @action(detail=True, methods=['get'], renderer_classes=[PDFRenderer, renderers.JSONRenderer])
+    def download_receipt_pdf(self, request, pk=None):
+        """
+        Download wallet transaction receipt as PDF
+        """
+        from api.utils.wallet_receipt_generator import generate_wallet_receipt_html
+        from api.views.reports import generate_pdf_from_html
+        from django.http import HttpResponse
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            transaction = self.get_object()
+            
+            # Generate HTML
+            html_content = generate_wallet_receipt_html(transaction)
+            
+            # Convert to PDF
+            pdf_data = generate_pdf_from_html(html_content, orientation='portrait')
+            
+            filename = f"Receipt-{transaction.reference}.pdf"
+            
+            response = HttpResponse(pdf_data, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        except Exception as e:
+            logger.error(f"Error generating wallet receipt: {str(e)}", exc_info=True)
+            return HttpResponse(
+                f"Error generating PDF receipt: {str(e)}", 
+                status=500,
+                content_type='text/plain'
+            )

@@ -317,25 +317,21 @@ class ExamAdmin(admin.ModelAdmin):
 @admin.register(Assignment)
 class AssignmentAdmin(admin.ModelAdmin):
     """Admin interface for Assignment model"""
-    list_display = ['title', 'subject', 'status', 'question_count_display', 'due_date', 'created_by', 'created_at']
-    list_filter = ['status', 'subject__school', 'subject']
-    search_fields = ['title', 'subject__name', 'instructions']
+    list_display = ['title', 'subject', 'class_model', 'staff', 'is_published', 'question_count_display', 'due_date', 'created_at']
+    list_filter = ['is_published', 'class_model', 'subject']
+    search_fields = ['title', 'subject__name', 'description']
     ordering = ['-created_at']
-    readonly_fields = ['created_by', 'created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at']
 
     fieldsets = (
         (_('Basic Information'), {
-            'fields': ('title', 'subject', 'status', 'due_date')
+            'fields': ('title', 'description', 'staff', 'class_model', 'subject', 'is_published', 'due_date')
         }),
         (_('Questions'), {
             'fields': ('questions',)
         }),
-        (_('Instructions'), {
-            'fields': ('instructions',),
-            'classes': ('collapse',)
-        }),
         (_('Metadata'), {
-            'fields': ('created_by', 'created_at', 'updated_at'),
+            'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
@@ -346,10 +342,6 @@ class AssignmentAdmin(admin.ModelAdmin):
         return obj.question_count
     question_count_display.short_description = 'Questions'
 
-    def save_model(self, request, obj, form, change):
-        if not change and not obj.created_by:
-            obj.created_by = request.user
-        super().save_model(request, obj, form, change)
 
 
 @admin.register(ExamHall)

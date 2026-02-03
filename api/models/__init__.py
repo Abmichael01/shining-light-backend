@@ -11,7 +11,7 @@ from .academic import (
     Grade,
     Question,
     Exam,
-    Assignment,
+    Exam,
     StudentExam,
     StudentAnswer,
     Club,
@@ -57,6 +57,7 @@ from .scheduling import (
     ScheduleEntry
 )
 from .leave import LeaveRequest
+from .assignment import Assignment, AssignmentSubmission
 
 __all__ = [
     'User',
@@ -72,7 +73,7 @@ __all__ = [
     'Grade',
     'Question',
     'Exam',
-    'Assignment',
+    'Exam',
     'StudentExam',
     'StudentAnswer',
     'Club',
@@ -108,6 +109,8 @@ __all__ = [
     'Schedule',
     'ScheduleEntry',
     'StaffBeneficiary',
-    'LeaveRequest'
+    'LeaveRequest',
+    'Assignment',
+    'AssignmentSubmission'
 ]
 

@@ -53,6 +53,9 @@ urlpatterns = [
     # Leave endpoints
     path('', include('api.urls.leave')),
     
+    # Assignment endpoints
+    path('', include('api.urls.assignment')),
+    
     # Staff portal (self-service)
     path('staff-portal/me/', staff_me, name='staff-me'),
     path('staff-portal/wallet/', staff_wallet, name='staff-wallet'),

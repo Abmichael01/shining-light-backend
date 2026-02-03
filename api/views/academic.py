@@ -435,7 +435,7 @@ class QuestionViewSet(viewsets.ModelViewSet):
     queryset = Question.objects.all().select_related(
         "subject", "subject__class_model", "subject__class_model__school", "created_by"
     )
-    permission_classes = [IsSchoolAdmin]
+    permission_classes = [IsAdminOrStaff]
     pagination_class = StandardResultsSetPagination
 
     def get_serializer_class(self):
@@ -713,64 +713,6 @@ class ExamViewSet(viewsets.ModelViewSet):
         serializer = StudentExamResultSerializer(student_exams, many=True)
         return Response(serializer.data)
 
-
-class AssignmentViewSet(viewsets.ModelViewSet):
-    """ViewSet for Assignment CRUD operations (admin or staff)"""
-
-    queryset = (
-        Assignment.objects.select_related(
-            "subject", "subject__school", "subject__class_model", "created_by"
-        )
-        .prefetch_related("questions")
-        .all()
-        .order_by("-created_at")
-    )
-    serializer_class = AssignmentSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        # Filter by subject
-        subject = self.request.query_params.get("subject")
-        if subject:
-            queryset = queryset.filter(subject=subject)
-        # Filter by status
-        status_param = self.request.query_params.get("status")
-        if status_param:
-            queryset = queryset.filter(status=status_param)
-        # Search
-        search = self.request.query_params.get("search")
-        if search:
-            queryset = queryset.filter(
-                models.Q(title__icontains=search)
-                | models.Q(subject__name__icontains=search)
-                | models.Q(instructions__icontains=search)
-            )
-        return queryset
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        questions_data = request.data.get("questions", [])
-        assignment = serializer.save(created_by=request.user)
-        if questions_data:
-            assignment.questions.set(questions_data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
-
-    def update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data, partial=kwargs.get("partial", False)
-        )
-        serializer.is_valid(raise_exception=True)
-        questions_data = request.data.get("questions", None)
-        if questions_data is not None:
-            instance.questions.set(questions_data)
-        self.perform_update(serializer)
-        return Response(serializer.data)
 
 
 # Student Exam Serializers

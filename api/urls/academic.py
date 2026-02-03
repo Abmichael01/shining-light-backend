@@ -13,7 +13,6 @@ from api.views.academic import (
     ClubViewSet,
     ExamHallViewSet,
     ExamViewSet,
-    AssignmentViewSet,
     SchemeOfWorkViewSet,
     get_student_exams,
     get_student_exam_detail
@@ -33,7 +32,6 @@ router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'clubs', ClubViewSet, basename='club')
 router.register(r'exam-halls', ExamHallViewSet, basename='exam-hall')
 router.register(r'exams', ExamViewSet, basename='exam')
-router.register(r'assignments', AssignmentViewSet, basename='assignment')
 router.register(r'schemes', SchemeOfWorkViewSet, basename='scheme-of-work')
 
 # Add custom URL patterns for student exams

@@ -780,6 +780,7 @@ class Question(models.Model):
         ('essay', 'Essay'),
         ('fill_blank', 'Fill in the Blank'),
         ('short_answer', 'Short Answer'),
+        ('file_upload', 'File Upload'),
     ]
     
     DIFFICULTY_CHOICES = [
@@ -1139,67 +1140,7 @@ class Exam(models.Model):
         return self.status == 'active'
 
 
-class Assignment(models.Model):
-    """Teacher assignment configuration (simpler than exams)"""
-    id = models.CharField(
-        _('assignment ID'),
-        max_length=20,
-        primary_key=True,
-        help_text=_('Human-readable ID like ASM-IEE83U7')
-    )
-    STATUS_CHOICES = [
-        ('draft', 'Draft'),
-        ('published', 'Published'),
-        ('closed', 'Closed'),
-    ]
-    title = models.CharField(_('assignment title'), max_length=200)
-    subject = models.ForeignKey(
-        Subject,
-        on_delete=models.CASCADE,
-        related_name='assignments',
-        verbose_name=_('subject')
-    )
-    questions = models.ManyToManyField(
-        Question,
-        blank=True,
-        related_name='assignments',
-        verbose_name=_('questions'),
-        help_text=_('Select questions from the question bank')
-    )
-    due_date = models.DateField(_('due date'), null=True, blank=True)
-    instructions = models.TextField(_('instructions'), blank=True, null=True)
-    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='draft')
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name='created_assignments',
-        verbose_name=_('created by')
-    )
-    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
-    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
 
-    class Meta:
-        verbose_name = _('Assignment')
-        verbose_name_plural = _('Assignments')
-        ordering = ['-created_at']
-        indexes = [
-            models.Index(fields=['subject']),
-            models.Index(fields=['status', 'created_at']),
-        ]
-
-    def __str__(self):
-        return f"{self.title} ({self.subject.name})"
-
-    def save(self, *args, **kwargs):
-        if not self.id:
-            from ..utils.id_generator import generate_assignment_id
-            self.id = generate_assignment_id()
-        super().save(*args, **kwargs)
-
-    @property
-    def question_count(self):
-        return self.questions.count()
 
 class StudentExam(models.Model):
     """Student exam attempt/session"""
