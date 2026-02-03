@@ -38,9 +38,6 @@ from .staff import (
     StaffEducationSerializer,
     SalaryGradeSerializer,
     StaffSalarySerializer,
-    StaffEducationSerializer,
-    SalaryGradeSerializer,
-    StaffSalarySerializer,
     SalaryPaymentSerializer
 )
 from .loans import (
@@ -56,8 +53,7 @@ from .fee import (
     FeeTypeSerializer,
     FeePaymentSerializer,
     StudentFeeStatusSerializer,
-    RecordFeePaymentSerializer
-    RecordFeePaymentSerializer
+    RecordFeePaymentSerializer,
 )
 from .communication import CommunicationTemplateSerializer
 

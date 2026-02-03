@@ -11,7 +11,6 @@ from .academic import (
     Grade,
     Question,
     Exam,
-    Exam,
     StudentExam,
     StudentAnswer,
     Club,
@@ -74,7 +73,6 @@ __all__ = [
     'Grade',
     'Question',
     'Exam',
-    'Exam',
     'StudentExam',
     'StudentAnswer',
     'Club',
@@ -112,6 +110,7 @@ __all__ = [
     'StaffBeneficiary',
     'LeaveRequest',
     'Assignment',
-    'AssignmentSubmission'
+    'AssignmentSubmission',
+    'CommunicationTemplate'
 ]
 
