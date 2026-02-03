@@ -6,8 +6,23 @@ from django.template.loader import render_to_string
 from django.conf import settings
 from django.utils.crypto import get_random_string
 import datetime
+from django.utils.html import strip_tags
 
-
+def wrap_with_base_template(subject, content):
+    """
+    Wraps the provided HTML content in the school's professional base template.
+    """
+    context = {
+        'subject': subject,
+        'content': content,
+        'year': datetime.datetime.now().year,
+    }
+    try:
+        return render_to_string('emails/base_template.html', context)
+    except Exception as e:
+        print(f"Template rendering failed: {e}")
+        # Fallback to just the raw content if template missing
+        return content
 def generate_password(length=12):
     """
     Generate a secure random password
@@ -458,6 +473,9 @@ def send_bulk_email(recipient_list, subject, message_body):
         # Use send_mail which handles mass mailing efficiently or loop.
         # For very large lists, we should use send_mass_mail or a background task.
         
+        if not message_body.strip().startswith('<!DOCTYPE html>'):
+            message_body = wrap_with_base_template(subject, message_body)
+            
         plain_message = strip_tags(message_body)
         
         send_mail(
