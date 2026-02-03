@@ -5,9 +5,9 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
-from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff, Session, SessionTerm, StudentSubject
+from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff, Session, SessionTerm, StudentSubject, StudentAttendance
 from django.db import models
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncMonth
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -296,15 +296,31 @@ def student_dashboard_stats(request):
             due_date__gte=today
         ).count()
     
+    # Calculate Attendance Percentage
+    attendance_percentage = 100 # Default if no records
+    total_attendance_records = StudentAttendance.objects.filter(
+        student=student,
+        attendance_record__session_term=current_term
+    ).count() if current_term else 0
+    
+    if total_attendance_records > 0:
+        present_count = StudentAttendance.objects.filter(
+            student=student,
+            attendance_record__session_term=current_term,
+            status__in=['present', 'late']
+        ).count()
+        attendance_percentage = round((present_count / total_attendance_records) * 100, 1)
+    
     return Response({
         'current_class': student.class_model.name if student.class_model else None,
         'current_class_id': student.class_model.id if student.class_model else None,
-        'current_session': current_session.name if current_session else None,
+        'current_session': current_session.name if current_session else "No Active Session",
         'current_session_id': current_session.id if current_session else None,
-        'current_term': current_term.term_name if current_term else None,
+        'current_term': current_term.get_term_name_display() if current_term else "N/A",
         'current_term_id': current_term.id if current_term else None,
         'registered_subjects_count': registered_subjects_count,
         'pending_assignments': pending_assignments,
+        'attendance_percentage': attendance_percentage,
         'school_name': student.school.name if student.school else None,
         'department_name': student.department.name if student.department else None,
         'full_name': student.get_full_name(),
