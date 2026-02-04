@@ -39,6 +39,29 @@ class StudentViewSet(viewsets.ModelViewSet):
     ).all().order_by('-created_at')
     permission_classes = [IsAdminOrStaff]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
+
+    @action(detail=False, methods=['GET'], permission_classes=[IsAdminOrStaff])
+    def summary(self, request):
+        """Get summary statistics for all students"""
+        base_qs = Student.objects.all()
+        
+        total_students = base_qs.count()
+        
+        # Primary: Nursery + Primary
+        primary_count = base_qs.filter(
+            school__school_type__in=['Nursery', 'Primary']
+        ).count()
+        
+        # Secondary: Junior + Senior Secondary
+        secondary_count = base_qs.filter(
+            school__school_type__in=['Junior Secondary', 'Senior Secondary']
+        ).count()
+        
+        return Response({
+            'total': total_students,
+            'primary': primary_count,
+            'secondary': secondary_count
+        })
     
     def get_serializer_class(self):
         """Use different serializers for list and detail views"""

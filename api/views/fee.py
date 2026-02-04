@@ -99,6 +99,28 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
     serializer_class = FeePaymentSerializer
     permission_classes = [IsAdminOrStaffOrStudent]
     pagination_class = StandardResultsSetPagination
+
+    @action(detail=False, methods=['GET'], permission_classes=[IsAdminOrStaff])
+    def summary(self, request):
+        """Get summary statistics for all fee payments"""
+        queryset = self.get_queryset()
+        
+        # Totals
+        total_collected = queryset.aggregate(total=Sum('amount'))['total'] or 0
+        total_payments = queryset.count()
+        
+        # Today's collection
+        from django.utils import timezone
+        today = timezone.now().date()
+        today_collection = queryset.filter(payment_date=today).aggregate(total=Sum('amount'))['total'] or 0
+        today_count = queryset.filter(payment_date=today).count()
+        
+        return Response({
+            'total_collected': float(total_collected),
+            'total_payments': total_payments,
+            'today_collected': float(today_collection),
+            'today_count': today_count
+        })
     
     def get_permissions(self):
         """

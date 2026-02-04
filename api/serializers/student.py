@@ -477,6 +477,7 @@ class StudentListSerializer(serializers.ModelSerializer):
     """Condensed serializer for student lists"""
     student_id = serializers.CharField(source='id', read_only=True)
     school_name = serializers.CharField(source='school.name', read_only=True)
+    school_type = serializers.CharField(source='school.school_type', read_only=True)
     class_name = serializers.CharField(source='class_model.name', read_only=True)
     department_name = serializers.CharField(source='department.name', read_only=True, allow_null=True)
     full_name = serializers.SerializerMethodField()
@@ -487,7 +488,7 @@ class StudentListSerializer(serializers.ModelSerializer):
         model = Student
         fields = [
             'id', 'student_id', 'application_number', 'admission_number', 'full_name',
-            'school', 'school_name', 'class_model', 'class_name',
+            'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
             'passport_photo', 'primary_phone',
             'application_date', 'enrollment_date', 'created_at'
