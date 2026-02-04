@@ -42,10 +42,17 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['GET'], permission_classes=[IsAdminOrStaff])
     def summary(self, request):
-        """Get summary statistics for all students"""
-        base_qs = Student.objects.all()
+        """Get summary statistics for filtered students"""
+        # Reuse queryset logic for consistent filtering
+        base_qs = self.get_queryset()
         
         total_students = base_qs.count()
+        
+        # Status breakdown
+        from django.db.models import Count
+        status_counts = dict(
+            base_qs.values('status').annotate(count=Count('status')).values_list('status', 'count')
+        )
         
         # Primary: Nursery + Primary
         primary_count = base_qs.filter(
@@ -59,6 +66,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         
         return Response({
             'total': total_students,
+            'status_counts': status_counts,
             'primary': primary_count,
             'secondary': secondary_count
         })
@@ -75,10 +83,17 @@ class StudentViewSet(viewsets.ModelViewSet):
         """Filter students by various parameters"""
         queryset = super().get_queryset()
         
-        # Filter by status
+        # Filter by status (supports comma-separated values)
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
-            queryset = queryset.filter(status=status_filter)
+            status_list = status_filter.split(',')
+            queryset = queryset.filter(status__in=status_list)
+        
+        # Exclude statuses (supports comma-separated values)
+        exclude_status = self.request.query_params.get('exclude_status', None)
+        if exclude_status:
+            exclude_list = exclude_status.split(',')
+            queryset = queryset.exclude(status__in=exclude_list)
         
         # Filter by school
         school = self.request.query_params.get('school', None)
