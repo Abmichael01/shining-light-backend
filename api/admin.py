@@ -43,7 +43,8 @@ from .models import (
     StaffWallet,
     StaffWalletTransaction,
     StaffBeneficiary,
-    CommunicationTemplate
+    CommunicationTemplate,
+    BiometricStation
 )
 
 
@@ -892,11 +893,11 @@ class DocumentAdmin(admin.ModelAdmin):
 class BiometricAdmin(admin.ModelAdmin):
     """Admin interface for Biometric model"""
     
-    list_display = ['student', 'has_left_thumb', 'has_right_thumb', 'captured_at', 'captured_by']
+    list_display = ['student', 'has_left_thumb', 'has_right_thumb', 'captured_at', 'captured_by', 'preview_thumb']
     list_filter = ['captured_at']
     search_fields = ['student__application_number', 'student__admission_number']
     ordering = ['-captured_at']
-    readonly_fields = ['captured_at', 'captured_by']
+    readonly_fields = ['captured_at', 'captured_by', 'preview_thumb']
     
     fieldsets = (
         (_('Student'), {
@@ -909,6 +910,14 @@ class BiometricAdmin(admin.ModelAdmin):
             'fields': ('captured_by', 'captured_at', 'notes')
         }),
     )
+
+    def preview_thumb(self, obj):
+        """Display thumbnail of right thumb"""
+        from django.utils.html import format_html
+        if obj.right_thumb:
+            return format_html('<img src="{}" style="width: 50px; height: 50px;" />', obj.right_thumb.url)
+        return "No Image"
+    preview_thumb.short_description = "Preview"
     
     def has_left_thumb(self, obj):
         return bool(obj.left_thumb)
@@ -1523,3 +1532,7 @@ class CommunicationTemplateAdmin(admin.ModelAdmin):
     list_filter = ['type', 'created_at']
     search_fields = ['name', 'subject', 'content']
     readonly_fields = ['created_at', 'updated_at']
+@admin.register(BiometricStation)
+class BiometricStationAdmin(admin.ModelAdmin):
+    list_display = ['name', 'api_key', 'location', 'is_active', 'last_seen']
+    readonly_fields = ['api_key', 'last_seen', 'created_at']

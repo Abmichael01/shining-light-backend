@@ -73,10 +73,11 @@ AUTH_USER_MODEL = 'api.User'
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.APIKeyAuthentication',
         'api.authentication.CsrfEnforcedSessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny', # We handle permissions in views
     ],
 }
 

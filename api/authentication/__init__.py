@@ -1,8 +1,30 @@
-# Authentication package
 from rest_framework.authentication import SessionAuthentication, BaseAuthentication
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth.models import AnonymousUser
+from django.utils import timezone
 from api.services.cbt_session import CBTSessionService
+from api.models import BiometricStation
+
+class APIKeyAuthentication(BaseAuthentication):
+    """
+    Allows authentication via X-API-KEY header.
+    Requests using this method bypass CSRF checks.
+    """
+    def authenticate(self, request):
+        api_key = request.headers.get('X-API-KEY')
+        if not api_key:
+            return None
+
+        try:
+            station = BiometricStation.objects.get(api_key=api_key, is_active=True)
+            station.last_seen = timezone.now()
+            station.save()
+            return (AnonymousUser(), api_key) # Return AnonymousUser with auth=api_key
+        except BiometricStation.DoesNotExist:
+            raise AuthenticationFailed('Invalid API Key')
+
+    def authenticate_header(self, request):
+        return 'X-API-KEY'
 
 
 class CsrfEnforcedSessionAuthentication(SessionAuthentication):

@@ -58,6 +58,7 @@ from .scheduling import (
 from .communication import CommunicationTemplate
 from .leave import LeaveRequest
 from .assignment import Assignment, AssignmentSubmission
+from .biometrics import BiometricStation
 
 __all__ = [
     'User',
@@ -111,6 +112,7 @@ __all__ = [
     'LeaveRequest',
     'Assignment',
     'AssignmentSubmission',
-    'CommunicationTemplate'
+    'CommunicationTemplate',
+    'BiometricStation'
 ]
 

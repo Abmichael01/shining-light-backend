@@ -10,6 +10,9 @@ from api.views.webhook import paystack_webhook
 app_name = 'api'
 
 urlpatterns = [
+    # Biometrics (Must be before wildcard includes)
+    path('biometrics/', include('api.urls.biometrics')),
+
     # Custom login view (returns user data)
     path('auth/login/', LoginView.as_view(), name='login'),
     

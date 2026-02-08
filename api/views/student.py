@@ -33,7 +33,7 @@ class StudentViewSet(viewsets.ModelViewSet):
     """
     pagination_class = StandardResultsSetPagination
     queryset = Student.objects.select_related(
-        'school', 'class_model', 'department', 'club', 'user', 'biodata'
+        'school', 'class_model', 'department', 'club', 'user', 'biodata', 'biometric'
     ).prefetch_related(
         'guardians', 'documents', 'subject_registrations'
     ).all().order_by('-created_at')
@@ -113,14 +113,31 @@ class StudentViewSet(viewsets.ModelViewSet):
         # Search by name, admission number, or email
         search = self.request.query_params.get('search', None)
         if search:
-            queryset = queryset.filter(
-                models.Q(biodata__surname__icontains=search) |
-                models.Q(biodata__first_name__icontains=search) |
-                models.Q(biodata__other_names__icontains=search) |
-                models.Q(admission_number__icontains=search) |
-                models.Q(application_number__icontains=search) |
-                models.Q(user__email__icontains=search)
-            )
+            search_terms = search.split()
+            if len(search_terms) > 1:
+                # Handle cases like "Surname Firstname"
+                name_q = models.Q()
+                for term in search_terms:
+                    name_q &= (
+                        models.Q(biodata__surname__icontains=term) |
+                        models.Q(biodata__first_name__icontains=term) |
+                        models.Q(biodata__other_names__icontains=term)
+                    )
+                queryset = queryset.filter(
+                    name_q |
+                    models.Q(admission_number__icontains=search) |
+                    models.Q(application_number__icontains=search) |
+                    models.Q(user__email__icontains=search)
+                )
+            else:
+                queryset = queryset.filter(
+                    models.Q(biodata__surname__icontains=search) |
+                    models.Q(biodata__first_name__icontains=search) |
+                    models.Q(biodata__other_names__icontains=search) |
+                    models.Q(admission_number__icontains=search) |
+                    models.Q(application_number__icontains=search) |
+                    models.Q(user__email__icontains=search)
+                )
         
         return queryset
     

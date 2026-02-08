@@ -3,6 +3,7 @@ Dashboard statistics views
 """
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
 from api.models import Student, School, FeePayment, Class, Subject, Assignment, Staff, Session, SessionTerm, StudentSubject, StudentAttendance
@@ -194,7 +195,7 @@ def staff_dashboard_stats(request):
     today = datetime.now().date()
     new_assignments = Assignment.objects.filter(
         subject__in=assigned_subjects,
-        status='published',
+        is_published=True,
         due_date__isnull=False,
         due_date__lte=today
     ).count()
@@ -298,7 +299,7 @@ def student_dashboard_stats(request):
         today = datetime.now().date()
         pending_assignments = Assignment.objects.filter(
             subject_id__in=student_subjects,
-            status='published',
+            is_published=True,
             due_date__gte=today
         ).count()
     

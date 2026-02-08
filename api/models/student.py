@@ -547,9 +547,43 @@ class Biometric(models.Model):
         null=True,
         blank=True
     )
+    left_index = models.ImageField(
+        _('left index'),
+        upload_to='biometrics/%Y/%m/%d/',
+        null=True,
+        blank=True
+    )
     right_thumb = models.ImageField(
         _('right thumb'),
         upload_to='biometrics/%Y/%m/%d/',
+        null=True,
+        blank=True
+    )
+    right_index = models.ImageField(
+        _('right index'),
+        upload_to='biometrics/%Y/%m/%d/',
+        null=True,
+        blank=True
+    )
+    
+    # Raw template data (Base64)
+    left_thumb_template = models.TextField(
+        _('left thumb template'),
+        null=True,
+        blank=True
+    )
+    left_index_template = models.TextField(
+        _('left index template'),
+        null=True,
+        blank=True
+    )
+    right_thumb_template = models.TextField(
+        _('right thumb template'),
+        null=True,
+        blank=True
+    )
+    right_index_template = models.TextField(
+        _('right index template'),
         null=True,
         blank=True
     )

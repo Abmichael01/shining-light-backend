@@ -13,6 +13,7 @@ from api.serializers.student import CBTStudentProfileSerializer
 from django.utils import timezone
 from django.conf import settings
 from api.utils.exam_generator import generate_applicant_exam
+from decimal import Decimal
 import random
 import json
 import os
@@ -704,7 +705,7 @@ def submit_cbt_exam(request, exam_id):
             )
         
         # Get student record
-        from api.models import Student, StudentExam, StudentAnswer
+        from api.models import Student, StudentExam, StudentAnswer, StudentSubject
         try:
             student_obj = Student.objects.get(admission_number=student.admission_number)
         except Student.DoesNotExist:
@@ -804,6 +805,33 @@ def submit_cbt_exam(request, exam_id):
                     )
                     break
         
+        # update CA score or Exam score in StudentSubject
+        if not exam.is_applicant_exam and exam.subject:
+            try:
+                # Find the subject registration for the current session/term
+                student_subject = StudentSubject.objects.get(
+                    student=student_obj,
+                    subject=exam.subject,
+                    session_term=exam.session_term
+                )
+                
+                # Calculate scaled score based on percentage
+                # We use school-level max scores for the final grading record
+                if exam.exam_type == 'test':
+                    ca_max = float(student_obj.school.ca_max_score)
+                    student_subject.ca_score = round(Decimal(str(score)) / 100 * Decimal(str(ca_max)), 2)
+                    print(f"DEBUG: Updated CA score for {student_obj.admission_number}: {student_subject.ca_score}")
+                elif exam.exam_type == 'exam':
+                    exam_max = float(student_obj.school.exam_max_score)
+                    student_subject.exam_score = round(Decimal(str(score)) / 100 * Decimal(str(exam_max)), 2)
+                    print(f"DEBUG: Updated Exam score for {student_obj.admission_number}: {student_subject.exam_score}")
+                
+                student_subject.save()
+            except StudentSubject.DoesNotExist:
+                print(f"DEBUG: No StudentSubject found for {student_obj.admission_number} and subject {exam.subject.code}")
+            except Exception as e:
+                print(f"DEBUG: Failed to update StudentSubject result: {str(e)}")
+
         result = {
             'exam_id': exam_id,
             'exam_title': exam.title,

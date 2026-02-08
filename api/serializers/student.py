@@ -118,15 +118,22 @@ class BiometricSerializer(serializers.ModelSerializer):
     """Serializer for Biometric model"""
     captured_by_name = serializers.CharField(source='captured_by.email', read_only=True, allow_null=True)
     left_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    left_index = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     right_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    right_index = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     
     class Meta:
         model = Biometric
         fields = [
-            'id', 'student', 'left_thumb', 'right_thumb',
+            'id', 'student', 
+            'left_thumb', 'left_index', 'right_thumb', 'right_index',
+            'left_thumb_template', 'left_index_template', 'right_thumb_template', 'right_index_template',
             'captured_at', 'captured_by', 'captured_by_name', 'notes', 'updated_at'
         ]
-        read_only_fields = ['id', 'captured_at', 'updated_at', 'captured_by', 'captured_by_name']
+        read_only_fields = [
+            'id', 'captured_at', 'updated_at', 'captured_by', 'captured_by_name',
+            'left_thumb_template', 'left_index_template', 'right_thumb_template', 'right_index_template'
+        ]
 
     def create(self, validated_data):
         return self._save_with_base64(None, validated_data)
@@ -135,7 +142,7 @@ class BiometricSerializer(serializers.ModelSerializer):
         return self._save_with_base64(instance, validated_data)
 
     def _save_with_base64(self, instance, validated_data):
-        for field in ['left_thumb', 'right_thumb']:
+        for field in ['left_thumb', 'left_index', 'right_thumb', 'right_index']:
             file_data = validated_data.pop(field, None)
             if file_data:
                 if isinstance(file_data, str) and file_data.startswith('data:'):
@@ -154,7 +161,7 @@ class BiometricSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        for field in ['left_thumb', 'right_thumb']:
+        for field in ['left_thumb', 'left_index', 'right_thumb', 'right_index']:
             file_obj = getattr(instance, field, None)
             if file_obj and hasattr(file_obj, 'url'):
                 request = self.context.get('request')
