@@ -219,6 +219,7 @@ class StaffSerializer(serializers.ModelSerializer):
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
     children_ids = serializers.PrimaryKeyRelatedField(source='children', many=True, read_only=True)
     children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False, write_only=True)
+    children_details = serializers.SerializerMethodField()
     current_salary = StaffSalarySerializer(read_only=True)
     
     class Meta:
@@ -255,6 +256,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'number_of_children_in_school',
             'children_ids',
             'children',
+            'children_details',
             'account_name',
             'account_number',
             'bank_name',
@@ -272,6 +274,19 @@ class StaffSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Return staff member's full name"""
         return obj.get_full_name()
+
+    def get_children_details(self, obj):
+        """Return basic details for linked children"""
+        return [
+            {
+                'id': child.id,
+                'full_name': child.get_full_name(),
+                'admission_number': child.admission_number,
+                'application_number': child.application_number,
+                'class_name': child.class_model.name if child.class_model else None
+            }
+            for child in obj.children.all()
+        ]
 
     def update(self, instance, validated_data):
         passport_photo_data = validated_data.pop('passport_photo', None)
@@ -378,7 +393,9 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
     # Education records (nested)
     education_records = StaffEducationSerializer(many=True, required=False)
     id = serializers.CharField(source='staff_id', read_only=True)
+    children_ids = serializers.PrimaryKeyRelatedField(source='children', many=True, read_only=True)
     children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False)
+    children_details = serializers.SerializerMethodField()
     
     class Meta:
         model = Staff
@@ -409,7 +426,9 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             'bank_name',
             'passport_photo',
             'status',
+            'children_ids',
             'children',
+            'children_details',
             'education_records',
             'created_at'
         ]
@@ -494,6 +513,19 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             StaffEducation.objects.create(staff=staff, **edu_data)
         
         return staff
+
+    def get_children_details(self, obj):
+        """Return basic details for linked children"""
+        return [
+            {
+                'id': child.id,
+                'full_name': child.get_full_name(),
+                'admission_number': child.admission_number,
+                'application_number': child.application_number,
+                'class_name': child.class_model.name if child.class_model else None
+            }
+            for child in obj.children.all()
+        ]
 
 
 
