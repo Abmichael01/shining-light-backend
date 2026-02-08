@@ -378,7 +378,7 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
     # Education records (nested)
     education_records = StaffEducationSerializer(many=True, required=False)
     id = serializers.CharField(source='staff_id', read_only=True)
-    id = serializers.CharField(source='staff_id', read_only=True)
+    children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False)
     
     class Meta:
         model = Staff
@@ -409,12 +409,14 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
             'bank_name',
             'passport_photo',
             'status',
+            'children',
             'education_records',
             'created_at'
         ]
         read_only_fields = ['id', 'staff_id', 'created_at']
         extra_kwargs = {
             'passport_photo': {'required': False, 'allow_null': True},
+            'children': {'required': False},
         }
     
     def validate(self, data):
@@ -433,8 +435,8 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         email = validated_data.pop('email')
         password = validated_data.pop('password')
         education_records_data = validated_data.pop('education_records', [])
+        children_data = validated_data.pop('children', [])
         
-        # Handle base64 passport photo
         # Handle base64 passport photo
         passport_photo_data = validated_data.pop('passport_photo', None)
         
@@ -459,12 +461,15 @@ class StaffRegistrationSerializer(serializers.ModelSerializer):
         )
         
         # Create staff profile
-        # Create staff profile
         staff = Staff.objects.create(
             user=user,
             created_by=created_by,
             **validated_data
         )
+
+        # Link children
+        if children_data:
+            staff.children.set(children_data)
         
         # Create education records
         for i, edu_data in enumerate(education_records_data):
