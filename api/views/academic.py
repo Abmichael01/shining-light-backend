@@ -500,25 +500,27 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["get"])
     def stats(self, request):
-        """Get question bank statistics"""
-        total_questions = Question.objects.count()
-        verified_questions = Question.objects.filter(is_verified=True).count()
+        """Get question bank statistics with filters"""
+        queryset = self.get_queryset()
+        
+        total_questions = queryset.count()
+        verified_questions = queryset.filter(is_verified=True).count()
 
         # Count by difficulty
-        difficulty_counts = Question.objects.values("difficulty").annotate(
+        difficulty_counts = queryset.values("difficulty").annotate(
             count=models.Count("id")
         )
 
         # Count by type
-        type_counts = Question.objects.values("question_type").annotate(
+        type_counts = queryset.values("question_type").annotate(
             count=models.Count("id")
         )
 
         # Count topics
-        total_topics = Question.objects.values("topic_model").distinct().count()
+        total_topics = queryset.values("topic_model").distinct().count()
 
         # Count subjects with questions
-        total_subjects = Question.objects.values("subject").distinct().count()
+        total_subjects = queryset.values("subject").distinct().count()
 
         return Response(
             {
