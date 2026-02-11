@@ -428,6 +428,7 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
     school_name = serializers.CharField(source='school.name', read_only=True)
     current_exam_seat = serializers.SerializerMethodField()
     registered_subjects = serializers.SerializerMethodField()
+    passport_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
@@ -437,10 +438,23 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
             'full_name',
             'class_name',
             'school_name',
+            'passport_photo',
             'current_exam_seat',
             'registered_subjects'
         ]
         read_only_fields = fields
+
+    def get_passport_photo(self, obj):
+        """Return full URL for passport photo if available"""
+        try:
+            if obj.biodata and obj.biodata.passport_photo:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.biodata.passport_photo.url)
+                return obj.biodata.passport_photo.url
+        except:
+            pass
+        return None
 
     def get_full_name(self, obj):
         """Return student's full name"""

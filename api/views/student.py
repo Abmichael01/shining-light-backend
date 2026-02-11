@@ -81,35 +81,42 @@ class StudentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter students by various parameters"""
+        print(f"DEBUG: Initial Query Params: {self.request.query_params}")
         queryset = super().get_queryset()
-        
+        print(f"DEBUG: Initial queryset count: {queryset.count()}")
+
         # Filter by status (supports comma-separated values)
         status_filter = self.request.query_params.get('status', None)
         if status_filter:
             status_list = status_filter.split(',')
             queryset = queryset.filter(status__in=status_list)
-        
+            print(f"DEBUG: After status filter: {queryset.count()}")
+
         # Exclude statuses (supports comma-separated values)
         exclude_status = self.request.query_params.get('exclude_status', None)
         if exclude_status:
             exclude_list = exclude_status.split(',')
             queryset = queryset.exclude(status__in=exclude_list)
-        
+            print(f"DEBUG: After exclude_status filter: {queryset.count()}")
+
         # Filter by school
         school = self.request.query_params.get('school', None)
         if school:
             queryset = queryset.filter(school=school)
-        
+            print(f"DEBUG: After school filter ('{school}'): {queryset.count()}")
+
         # Filter by class
         class_model = self.request.query_params.get('class', None)
         if class_model:
             queryset = queryset.filter(class_model=class_model)
-        
+            print(f"DEBUG: After class filter ('{class_model}'): {queryset.count()}")
+
         # Filter by source
         source = self.request.query_params.get('source', None)
         if source:
             queryset = queryset.filter(source=source)
-        
+            print(f"DEBUG: After source filter: {queryset.count()}")
+
         # Search by name, admission number, or email
         search = self.request.query_params.get('search', None)
         if search:
@@ -138,7 +145,9 @@ class StudentViewSet(viewsets.ModelViewSet):
                     models.Q(application_number__icontains=search) |
                     models.Q(user__email__icontains=search)
                 )
-        
+            print(f"DEBUG: After search filter: {queryset.count()}")
+
+        print(f"DEBUG: Final queryset count: {queryset.count()}")
         return queryset
     
     @action(detail=False, methods=['post'])
