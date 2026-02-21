@@ -1,6 +1,7 @@
 from rest_framework import views, response, status, permissions
 from django.shortcuts import get_object_or_404
-from api.models import Student, Staff, User
+from django.utils import timezone
+from api.models import Student, Staff, User, Guardian, GuardianMessage
 from api.utils.sms import send_sms as termii_send_sms
 from api.utils.email import send_bulk_email
 import logging
@@ -159,3 +160,124 @@ class BulkMessagingView(views.APIView):
                 return response.Response({"error": res_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         return response.Response({"error": "Invalid channel"}, status=status.HTTP_400_BAD_REQUEST)
+
+class GuardianMessagingView(views.APIView):
+    """
+    Send messages specifically to guardians and record history.
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    def _get_guardian_contact(self, student, channel):
+        guardian = student.guardians.filter(is_primary_contact=True).first()
+        if not guardian:
+            guardian = student.guardians.first()
+        
+        if not guardian:
+            return None, None
+            
+        if channel == 'sms':
+            return guardian.phone_number, guardian
+        else:
+            return guardian.email, guardian
+
+    def post(self, request):
+        channel = request.data.get('channel')  # 'sms' or 'email'
+        student_ids = request.data.get('student_ids', [])
+        target_group = request.data.get('target_group')  # 'all_students', 'specific_class', 'custom'
+        class_id = request.data.get('class_id')
+        subject = request.data.get('subject', 'Shining Light School Notification')
+        message = request.data.get('message')
+
+        if not all([channel, message]):
+            return response.Response(
+                {"error": "channel and message are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        students = Student.objects.none()
+
+        # Determine students based on target params
+        if target_group == 'all_students':
+            students = Student.objects.filter(status='enrolled')
+        elif target_group == 'specific_class':
+            if not class_id:
+                return response.Response({"error": "class_id is required for specific_class target"}, status=status.HTTP_400_BAD_REQUEST)
+            students = Student.objects.filter(status='enrolled', class_model_id=class_id)
+        elif target_group == 'custom' or student_ids:
+            # If student_ids provided directly or via custom group
+            ids = student_ids or request.data.get('custom_targets', []) # In frontend we might send IDs in custom_targets
+            # Filter to ensure IDs are valid numbers/strings
+            valid_ids = [id for id in ids if str(id).isdigit()]
+            students = Student.objects.filter(id__in=valid_ids)
+        
+        if not students.exists():
+             return response.Response({"error": "No valid students found"}, status=status.HTTP_400_BAD_REQUEST)
+
+        success_count = 0
+        failure_count = 0
+        results = []
+
+        for student in students:
+            contact, guardian = self._get_guardian_contact(student, channel)
+            
+            if not contact:
+                GuardianMessage.objects.create(
+                    sender=request.user,
+                    student=student,
+                    channel=channel,
+                    subject=subject,
+                    content=message,
+                    status='failed',
+                    error_message="No guardian contact info found"
+                )
+                failure_count += 1
+                # Limit results size for bulk
+                if len(results) < 100:
+                    results.append({"student": student.id, "status": "failed", "reason": "No contact"})
+                continue
+
+            success = False
+            error_msg = None
+            
+            if channel == 'sms':
+                success, res_data = termii_send_sms(contact, message)
+                if not success:
+                    error_msg = str(res_data)
+            else:
+                success, res_msg = send_bulk_email([contact], subject, message)
+                if not success:
+                    error_msg = res_msg
+
+            if success:
+                GuardianMessage.objects.create(
+                    sender=request.user,
+                    student=student,
+                    recipient_guardian=guardian,
+                    channel=channel,
+                    subject=subject,
+                    content=message,
+                    status='sent',
+                    sent_at=timezone.now()
+                )
+                success_count += 1
+                if len(results) < 100:
+                    results.append({"student": student.id, "status": "sent"})
+            else:
+                GuardianMessage.objects.create(
+                    sender=request.user,
+                    student=student,
+                    recipient_guardian=guardian,
+                    channel=channel,
+                    subject=subject,
+                    content=message,
+                    status='failed',
+                    error_message=error_msg
+                )
+                failure_count += 1
+                if len(results) < 100:
+                    results.append({"student": student.id, "status": "failed", "reason": error_msg})
+
+        return response.Response({
+            "message": f"Processed {students.count()} messages. Success: {success_count}, Failure: {failure_count}",
+            "results": results
+        })

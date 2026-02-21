@@ -283,6 +283,12 @@ class SessionTerm(models.Model):
     start_date = models.DateField(_('start date'))
     end_date = models.DateField(_('end date'))
     is_current = models.BooleanField(_('current term'), default=False)
+    registration_deadline = models.DateField(
+        _('registration deadline'),
+        null=True,
+        blank=True,
+        help_text=_('Deadline for normal subject registration')
+    )
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
     class Meta:

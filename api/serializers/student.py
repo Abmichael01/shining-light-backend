@@ -200,7 +200,7 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             'openday_cleared', 'openday_cleared_at', 'openday_cleared_by',
             'openday_cleared_by_name', 'openday_clearance_notes', 'openday_clearance_checklist', 'can_open_day_clear',
             # Result fields
-            'ca_score', 'exam_score', 'total_score', 'current_term_score',
+            'ca_score', 'objective_score', 'theory_score', 'exam_score', 'total_score', 'current_term_score',
             'first_term_score', 'second_term_score',
             'grade', 'grade_name', 'grade_description',
             'position', 'teacher_comment',

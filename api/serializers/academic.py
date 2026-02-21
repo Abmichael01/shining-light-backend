@@ -465,22 +465,55 @@ class ExamSerializer(serializers.ModelSerializer):
         formatted_questions = []
         
         for question in questions:
+            # Helper for absolute URLs
+            request = self.context.get('request')
+            def get_image_url(image_field):
+                if image_field and hasattr(image_field, 'url'):
+                    try:
+                        if request:
+                            return request.build_absolute_uri(image_field.url)
+                        return image_field.url
+                    except Exception:
+                        return None
+                return None
+
             # Build options array from individual option fields
             options = []
             if question.option_a:
-                options.append({'id': 'a', 'text': question.option_a})
+                options.append({
+                    'id': 'a', 
+                    'text': question.option_a,
+                    'image': get_image_url(question.option_a_image)
+                })
             if question.option_b:
-                options.append({'id': 'b', 'text': question.option_b})
+                options.append({
+                    'id': 'b', 
+                    'text': question.option_b,
+                    'image': get_image_url(question.option_b_image)
+                })
             if question.option_c:
-                options.append({'id': 'c', 'text': question.option_c})
+                options.append({
+                    'id': 'c', 
+                    'text': question.option_c,
+                    'image': get_image_url(question.option_c_image)
+                })
             if question.option_d:
-                options.append({'id': 'd', 'text': question.option_d})
+                options.append({
+                    'id': 'd', 
+                    'text': question.option_d,
+                    'image': get_image_url(question.option_d_image)
+                })
             if question.option_e:
-                options.append({'id': 'e', 'text': question.option_e})
+                options.append({
+                    'id': 'e', 
+                    'text': question.option_e,
+                    'image': get_image_url(question.option_e_image)
+                })
             
             formatted_question = {
                 'id': str(question.id),
                 'question_text': question.question_text,
+                'question_image': get_image_url(question.question_image),
                 'question_type': question.question_type,
                 'options': options,
                 'correct_answer': question.correct_answer,

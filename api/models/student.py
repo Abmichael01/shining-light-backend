@@ -673,8 +673,30 @@ class StudentSubject(models.Model):
         blank=True,
         default=dict
     )
+
+    # Late Registration
+    is_late_registration = models.BooleanField(_('is late registration'), default=False)
+    late_fee_paid = models.BooleanField(_('late fee paid'), default=False)
     
     # Result/Assessment Scores
+    objective_score = models.DecimalField(
+        _('objective score'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_('CBT Objective score')
+    )
+    theory_score = models.DecimalField(
+        _('theory score'),
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text=_('Theory/Written examination score (max 40)')
+    )
     ca_score = models.DecimalField(
         _('CA score'),
         max_digits=5,
@@ -782,11 +804,22 @@ class StudentSubject(models.Model):
         return f"{self.student} - {self.subject} ({self.session})"
     
     def calculate_total(self):
-        """Calculate total score from CA and Exam"""
-        if self.ca_score is not None and self.exam_score is not None:
-            from decimal import Decimal
-            return Decimal(str(self.ca_score)) + Decimal(str(self.exam_score))
-        return None
+        """Calculate total score from CA and Exam (which is Objective + Theory)"""
+        ca = self.ca_score or 0
+        exam = self.exam_score or 0
+        from decimal import Decimal
+        return Decimal(str(ca)) + Decimal(str(exam))
+    
+    def calculate_exam_score(self):
+        """Calculate exam score from Objective and Theory components"""
+        # If both are None, keep existing exam_score
+        if self.objective_score is None and self.theory_score is None:
+            return self.exam_score
+        
+        obj = self.objective_score or 0
+        theory = self.theory_score or 0
+        from decimal import Decimal
+        return Decimal(str(obj)) + Decimal(str(theory))
     
     def calculate_grade(self):
         """Automatically determine grade based on total score"""
@@ -798,10 +831,18 @@ class StudentSubject(models.Model):
     def save(self, *args, **kwargs):
         """Auto-calculate total score and grade"""
         # Calculate total if CA and Exam are provided
+        # Update exam score from components if present
+        self.exam_score = self.calculate_exam_score()
+
         if self.ca_score is not None and self.exam_score is not None:
             self.total_score = self.calculate_total()
             
             # Auto-determine grade based on total
+            if self.total_score is not None:
+                self.grade = self.calculate_grade()
+        elif self.ca_score is not None or self.exam_score is not None:
+            # Partial scores: still calculate total if one is not none
+            self.total_score = self.calculate_total()
             if self.total_score is not None:
                 self.grade = self.calculate_grade()
         

@@ -242,6 +242,7 @@ class Schedule(models.Model):
     TYPE_CHOICES = [
         ('exam', 'Examination'),
         ('test', 'Test/Quiz'),
+        ('cbt_exam', 'CBT Examination'),
         ('event', 'School Event'),
         ('general', 'General Schedule'),
     ]
