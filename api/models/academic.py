@@ -1581,3 +1581,41 @@ class SchemeOfWork(models.Model):
     def __str__(self):
         return f"{self.subject.name} - {self.term} Week {self.week_number}: {self.topic}"
 
+
+class SystemSetting(models.Model):
+    """Global system settings"""
+    
+    result_download_fee = models.DecimalField(
+        _('result download fee'),
+        max_digits=10,
+        decimal_places=2,
+        default=1000.00,
+        help_text=_('Fee charged for re-downloading a result after the first time')
+    )
+    
+    # Announcements
+    show_announcement = models.BooleanField(_('show announcement'), default=False)
+    announcement_title = models.CharField(_('announcement title'), max_length=200, blank=True)
+    announcement_message = models.TextField(_('announcement message'), blank=True)
+    
+    # Maintenance
+    is_maintenance_mode = models.BooleanField(_('maintenance mode'), default=False)
+    maintenance_message = models.TextField(
+        _('maintenance message'), 
+        default='System is under maintenance.'
+    )
+    
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'System Setting'
+        verbose_name_plural = 'System Settings'
+        
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super(SystemSetting, self).save(*args, **kwargs)
+        
+    @classmethod
+    def load(cls):
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj

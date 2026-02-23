@@ -16,7 +16,8 @@ from .academic import (
     CBTExamCodeSerializer,
     ExamSerializer,
     AssignmentSerializer,
-    SchemeOfWorkSerializer
+    SchemeOfWorkSerializer,
+    SystemSettingSerializer
 )
 from .student import (
     StudentSerializer,
@@ -108,6 +109,7 @@ __all__ = [
     'StaffWalletTransactionSerializer',
     'StaffWalletTransactionSerializer',
     'CommunicationTemplateSerializer',
-    'BiometricStationSerializer'
+    'BiometricStationSerializer',
+    'SystemSettingSerializer'
 ]
 

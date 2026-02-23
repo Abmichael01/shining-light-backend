@@ -16,8 +16,9 @@ from .academic import (
     Club,
     ExamHall,
     CBTExamCode,
-    AdmissionSettings,
-    SchemeOfWork
+     AdmissionSettings,
+    SchemeOfWork,
+    SystemSetting
 )
 from .student import (
     Student,
@@ -114,5 +115,6 @@ __all__ = [
     'AssignmentSubmission',
     'CommunicationTemplate',
     'GuardianMessage',
-    'BiometricStation'
+    'BiometricStation',
+    'SystemSetting'
 ]

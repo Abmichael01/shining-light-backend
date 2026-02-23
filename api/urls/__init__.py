@@ -6,6 +6,7 @@ from api.views.dashboard import admin_dashboard_stats, student_growth_chart, pay
 from api.views.config import school_configs
 from api.views.upload import FileUploadView
 from api.views.webhook import paystack_webhook
+from api.views.system import SystemSettingViewSet
 
 app_name = 'api'
 
@@ -83,5 +84,8 @@ urlpatterns = [
     
     # Centralized Payment Webhook
     path('payment/webhook/', paystack_webhook, name='central-paystack-webhook'),
+    
+    # System Settings
+    path('system-settings/', SystemSettingViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update'}), name='system-settings'),
 ]
 

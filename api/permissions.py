@@ -1,6 +1,5 @@
 from rest_framework import permissions
 
-
 class IsSchoolAdmin(permissions.BasePermission):
     """
     Permission check for Admin users only.
@@ -9,7 +8,7 @@ class IsSchoolAdmin(permissions.BasePermission):
     
     def has_permission(self, request, view):
         user = request.user
-        if not user or not user.is_authenticated:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return False
 
         if getattr(user, 'is_superuser', False):
@@ -27,7 +26,7 @@ class IsSchoolAdminOrReadOnly(permissions.BasePermission):
     """
     
     def has_permission(self, request, view):
-        if not request.user or not request.user.is_authenticated:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return False
         
         # Read permissions for any authenticated user
@@ -35,7 +34,7 @@ class IsSchoolAdminOrReadOnly(permissions.BasePermission):
             return True
         
         # Write permissions only for admin
-        return request.user.user_type == 'admin'
+        return getattr(request.user, 'user_type', None) == 'admin'
 
 
 class IsAdminOrStaff(permissions.BasePermission):
@@ -46,13 +45,13 @@ class IsAdminOrStaff(permissions.BasePermission):
     
     def has_permission(self, request, view):
         user = request.user
-        if not user or not user.is_authenticated:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return False
         
         if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
             return True
         
-        return getattr(user, 'user_type', None) in ['admin', 'staff']
+        return getattr(user, 'user_type', None) in ['admin', 'staff', 'principal']
 
 
 class IsAdminOrStaffOrStudent(permissions.BasePermission):
@@ -64,7 +63,7 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
     
     def has_permission(self, request, view):
         user = request.user
-        if not user or not user.is_authenticated:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             return False
         
         if getattr(user, 'is_superuser', False) or getattr(user, 'is_staff', False):
@@ -73,7 +72,7 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         user_type = getattr(user, 'user_type', None)
         
         # Admin and staff have full access
-        if user_type in ['admin', 'staff']:
+        if user_type in ['admin', 'staff', 'principal']:
             return True
         
         # Students have read-only access (GET, HEAD, OPTIONS)
@@ -90,7 +89,7 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         user_type = getattr(user, 'user_type', None)
         
         # Admin and staff have full access
-        if user_type in ['admin', 'staff']:
+        if user_type in ['admin', 'staff', 'principal']:
             return True
         
         # Students can only access their own data, or public data
@@ -112,7 +111,7 @@ class IsApplicant(permissions.BasePermission):
     
     def has_permission(self, request, view):
         user = request.user
-        if not user or not user.is_authenticated:
+        if not hasattr(request, 'user') or not request.user.is_authenticated:
             print(f"❌ IsApplicant: User not authenticated")
             return False
         

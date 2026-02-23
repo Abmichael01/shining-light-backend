@@ -983,6 +983,10 @@ class TermReport(models.Model):
     total_students = models.PositiveIntegerField(_('total students in arm'), null=True, blank=True)
     total_students_grade = models.PositiveIntegerField(_('total students in set'), null=True, blank=True)
     
+    # Download tracking
+    download_count = models.PositiveIntegerField(_('download count'), default=0)
+    first_downloaded_at = models.DateTimeField(_('first downloaded at'), null=True, blank=True)
+    
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

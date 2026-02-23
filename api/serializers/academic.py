@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork, SystemSetting
 from django.core.files.base import ContentFile
 import base64
 import uuid
@@ -562,3 +562,8 @@ class SchemeOfWorkSerializer(serializers.ModelSerializer):
         fields = ['id', 'subject', 'term', 'week_number', 'topic', 'topic_id', 'topic_name', 'learning_objectives', 'resources', 'created_at', 'updated_at']
         read_only_fields = ['id', 'created_at', 'updated_at', 'topic_name']
 
+
+class SystemSettingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SystemSetting
+        fields = '__all__'
