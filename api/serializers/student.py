@@ -346,9 +346,23 @@ class StudentSerializer(serializers.ModelSerializer):
         """Update student instance with email and club handling"""
         # Handle email update
         email = validated_data.pop('email', None)
-        if email and instance.user:
-            instance.user.email = email
-            instance.user.save()
+        if email:
+            if instance.user:
+                instance.user.email = email
+                instance.user.save()
+            else:
+                # Create user for student if missing
+                from api.models import User
+                from api.utils.email import generate_password
+                password = generate_password()
+                user = User.objects.create_user(
+                    email=email,
+                    password=password,
+                    user_type='student'
+                )
+                instance.user = user
+                instance.save()
+                # Optionally send credentials but maybe admin just wants to set email for messaging
         
         # Handle club field separately
         club_data = validated_data.pop('club', None)
