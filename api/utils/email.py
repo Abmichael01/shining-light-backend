@@ -32,6 +32,48 @@ def generate_password(length=12):
     return get_random_string(length, chars)
 
 
+def get_student_recipient_emails(student):
+    """
+    Resolve the best email recipient(s) for a student.
+
+    Since most primary/secondary school students don't have their own
+    email, this prioritises guardian (parent) emails over the student's
+    own account email.
+
+    Resolution order:
+      1. Primary contact guardian email
+      2. Any guardian email (father -> mother -> guardian)
+      3. Student's own user account email (last resort)
+
+    Returns a list of at least one email address, or an empty list if
+    none found.
+    """
+    emails = []
+
+    try:
+        guardians = student.guardians.all()
+
+        # Priority 1: primary contact with an email
+        primary = guardians.filter(is_primary_contact=True).first()
+        if primary and primary.email:
+            emails.append(primary.email)
+
+        # Priority 2: any other guardian with an email (avoid duplicates)
+        for guardian in guardians.order_by('guardian_type'):
+            if guardian.email and guardian.email not in emails:
+                emails.append(guardian.email)
+    except Exception:
+        pass
+
+    # Last resort: student's own account email
+    if not emails:
+        student_email = student.user.email if hasattr(student, 'user') and student.user else None
+        if student_email:
+            emails.append(student_email)
+
+    return emails
+
+
 def send_student_registration_email(student, password, request=None):
     """
     Send welcome email to newly registered student with login credentials
@@ -42,18 +84,21 @@ def send_student_registration_email(student, password, request=None):
         request: HTTP request object (optional, for getting domain)
     """
     try:
-        # Get student email from user account
-        student_email = student.user.email if hasattr(student, 'user') and student.user else None
+        recipient_emails = get_student_recipient_emails(student)
         
-        if not student_email:
+        if not recipient_emails:
             print(f"Warning: No email found for student {student.admission_number}")
             return False
         
+        # Use the first (best) email for the login credentials line in the template.
+        # The user account email is what they use to log in.
+        student_login_email = student.user.email if hasattr(student, 'user') and student.user else recipient_emails[0]
+
         # Prepare context for template
         context = {
             'student_name': student.get_full_name(),
             'admission_number': student.admission_number,
-            'email': student_email,
+            'email': student_login_email,
             'password': password,
             'class_name': student.class_model.name if student.class_model else 'Not assigned',
             'school_name': student.school.name if student.school else 'Shining Light School',
@@ -69,9 +114,9 @@ def send_student_registration_email(student, password, request=None):
         plain_message = f"""
 Welcome to Shining Light School!
 
-Dear {context['student_name']},
+Dear Parent/Guardian of {context['student_name']},
 
-Your registration has been successfully completed.
+Your ward's registration has been successfully completed.
 
 Student Information:
 - Name: {context['student_name']}
@@ -79,29 +124,29 @@ Student Information:
 - Class: {context['class_name']}
 - School: {context['school_name']}
 
-Your Login Credentials:
+Login Credentials for Student Portal:
 - Email/Username: {context['email']}
 - Temporary Password: {context['password']}
 
 Please log in to the student portal at: {context['portal_url']}
 
-IMPORTANT: Change your password after your first login.
+IMPORTANT: Change the password after the first login.
 
 Best regards,
 Shining Light School Administration
         """
         
-        # Send email
+        # Send email to all resolved guardian/parent emails
         msg = EmailMultiAlternatives(
             subject=subject,
             body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[student_email]
+            to=recipient_emails
         )
         msg.attach_alternative(html_message, "text/html")
         msg.send()
         
-        print(f"Registration email sent to {student_email} for student {student.admission_number}")
+        print(f"Registration email sent to {recipient_emails} for student {student.admission_number}")
         return True
         
     except Exception as e:
@@ -394,21 +439,12 @@ def send_student_fee_receipt(payment):
     """
     try:
         student = payment.student
-        # Get email: Check student user first, then guardian user logic could be added here if needed
-        # For now, we assume student email or guardian email linked to student bio data?
-        # Simpler: Get student user email.
-        
-        recipient_email = None
-        if hasattr(student, 'user') and student.user:
-            recipient_email = student.user.email
-            
-        # Optional: Send to guardians too if available
-        # This requires more complex logic to fetch guardian emails. 
-        # For now, let's stick to student email as primary.
-        
-        if not recipient_email:
-             print(f"Warning: No email found for student {student.admission_number}")
-             return False
+
+        recipient_emails = get_student_recipient_emails(student)
+
+        if not recipient_emails:
+            print(f"Warning: No email found for student {student.admission_number}")
+            return False
             
         context = {
             'student_name': student.get_full_name(),
@@ -423,14 +459,14 @@ def send_student_fee_receipt(payment):
         subject = 'Payment Receipt - Shining Light School'
         
         plain_message = f"""
-Dear {context['student_name']},
+Dear Parent/Guardian of {context['student_name']},
 
-We have received your payment.
+We have received a payment for your ward.
 
 Payment Details:
 - Student: {context['student_name']} ({context['admission_number']})
 - Purpose: {context['purpose']}
-- Amount: ₦{context['amount']:,}
+- Amount: \u20a6{context['amount']:,}
 - Reference: {context['reference']}
 - Date: {context['date']}
 
@@ -444,7 +480,7 @@ Shining Light School Administration
             subject=subject,
             message=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[recipient_email],
+            recipient_list=recipient_emails,
             fail_silently=False,
         )
         return True
@@ -542,11 +578,20 @@ Best regards,
 Shining Light School Administration
 """
         
+        recipient_list = [user_email]
+        
+        # If user is a student, also notify guardians
+        if user.user_type == 'student' and hasattr(user, 'student_profile'):
+            student_recipients = get_student_recipient_emails(user.student_profile)
+            for email in student_recipients:
+                if email not in recipient_list:
+                    recipient_list.append(email)
+
         send_mail(
             subject=subject,
             message=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user_email],
+            recipient_list=recipient_list,
             fail_silently=False,
         )
         return True

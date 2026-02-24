@@ -3,7 +3,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from api.models import Student, Staff, User, Guardian, GuardianMessage
 from api.utils.sms import send_sms as termii_send_sms
-from api.utils.email import send_bulk_email
+from api.utils.email import send_bulk_email, get_student_recipient_emails
 import logging
 
 logger = logging.getLogger(__name__)
@@ -100,7 +100,8 @@ class BulkMessagingView(views.APIView):
                     phone = self._get_student_phone(s)
                     if phone: recipients.append(phone)
             else:
-                recipients = [s.user.email for s in students if s.user and s.user.email]
+                for s in students:
+                    recipients.extend(get_student_recipient_emails(s))
         elif target_group in ['all_staff', 'teaching_staff', 'non_teaching_staff']:
             query = {'user__is_active': True}
             if target_group == 'teaching_staff':
@@ -124,7 +125,8 @@ class BulkMessagingView(views.APIView):
                     phone = self._get_student_phone(s)
                     if phone: recipients.append(phone)
             else:
-                recipients = [s.user.email for s in students if s.user and s.user.email]
+                for s in students:
+                    recipients.extend(get_student_recipient_emails(s))
         elif target_group == 'custom':
             recipients = custom_targets
         else:
@@ -134,7 +136,7 @@ class BulkMessagingView(views.APIView):
             return response.Response({"error": "No valid recipients found"}, status=status.HTTP_400_BAD_REQUEST)
 
         # Remove duplicates and empty values
-        recipients = list(set([r for r in recipients if r]))
+        recipients = list(set([str(r).strip() for r in recipients if r]))
 
         if channel == 'sms':
             count = 0
@@ -167,18 +169,24 @@ class GuardianMessagingView(views.APIView):
     """
     permission_classes = [permissions.IsAdminUser]
 
-    def _get_guardian_contact(self, student, channel):
-        guardian = student.guardians.filter(is_primary_contact=True).first()
-        if not guardian:
-            guardian = student.guardians.first()
+    def _get_guardian_contacts(self, student, channel):
+        """
+        Get all valid contacts for a student's guardians.
+        Falls back to student user if no guardian exists.
+        """
+        guardians = student.guardians.all()
         
-        if not guardian:
-            return None, None
-            
         if channel == 'sms':
-            return guardian.phone_number, guardian
+            # For SMS, we usually want one primary recipient recorded
+            primary = guardians.filter(is_primary_contact=True).first() or guardians.first()
+            if primary:
+                return [primary.phone_number], primary
+            return [], None
         else:
-            return guardian.email, guardian
+            # For Email, we can get all guardian emails
+            emails = get_student_recipient_emails(student)
+            primary = guardians.filter(is_primary_contact=True).first() or guardians.first()
+            return emails, primary
 
     def post(self, request):
         channel = request.data.get('channel')  # 'sms' or 'email'
@@ -207,7 +215,8 @@ class GuardianMessagingView(views.APIView):
             # If student_ids provided directly or via custom group
             ids = student_ids or request.data.get('custom_targets', []) # In frontend we might send IDs in custom_targets
             # Filter to ensure IDs are valid numbers/strings
-            valid_ids = [id for id in ids if str(id).isdigit()]
+            # Handle list of strings or integers
+            valid_ids = [str(id) for id in ids if str(id).strip()]
             students = Student.objects.filter(id__in=valid_ids)
         
         if not students.exists():
@@ -218,9 +227,9 @@ class GuardianMessagingView(views.APIView):
         results = []
 
         for student in students:
-            contact, guardian = self._get_guardian_contact(student, channel)
+            contacts, primary_guardian = self._get_guardian_contacts(student, channel)
             
-            if not contact:
+            if not contacts:
                 GuardianMessage.objects.create(
                     sender=request.user,
                     student=student,
@@ -228,10 +237,9 @@ class GuardianMessagingView(views.APIView):
                     subject=subject,
                     content=message,
                     status='failed',
-                    error_message="No guardian contact info found"
+                    error_message=f"No guardian {channel} contact info found"
                 )
                 failure_count += 1
-                # Limit results size for bulk
                 if len(results) < 100:
                     results.append({"student": student.id, "status": "failed", "reason": "No contact"})
                 continue
@@ -240,11 +248,14 @@ class GuardianMessagingView(views.APIView):
             error_msg = None
             
             if channel == 'sms':
+                # Use only the first contact for SMS recorded in GuardianMessage
+                contact = contacts[0]
                 success, res_data = termii_send_sms(contact, message)
                 if not success:
                     error_msg = str(res_data)
             else:
-                success, res_msg = send_bulk_email([contact], subject, message)
+                # Use all recipient emails
+                success, res_msg = send_bulk_email(contacts, subject, message)
                 if not success:
                     error_msg = res_msg
 
@@ -252,7 +263,7 @@ class GuardianMessagingView(views.APIView):
                 GuardianMessage.objects.create(
                     sender=request.user,
                     student=student,
-                    recipient_guardian=guardian,
+                    recipient_guardian=primary_guardian,
                     channel=channel,
                     subject=subject,
                     content=message,
@@ -266,7 +277,7 @@ class GuardianMessagingView(views.APIView):
                 GuardianMessage.objects.create(
                     sender=request.user,
                     student=student,
-                    recipient_guardian=guardian,
+                    recipient_guardian=primary_guardian,
                     channel=channel,
                     subject=subject,
                     content=message,

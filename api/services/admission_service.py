@@ -367,10 +367,18 @@ Admissions Office
         from django.template.loader import render_to_string
         from datetime import datetime
         
+        from api.utils.email import get_student_recipient_emails
+        
         biodata = getattr(applicant, 'biodata', None)
         full_name = ""
         if biodata:
             full_name = f"{biodata.surname} {biodata.first_name}".strip()
+        
+        # Get recipients (guardians first)
+        recipient_emails = get_student_recipient_emails(applicant)
+        if not recipient_emails:
+            # Fallback to applicant user email if helper returns nothing (unlikely)
+            recipient_emails = [applicant.user.email]
         
         # Prepare email context
         context = {
@@ -393,7 +401,7 @@ Admissions Office
             subject=subject,
             body=html_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[applicant.user.email],
+            to=recipient_emails,
         )
         email.content_subtype = "html"
         
@@ -403,7 +411,7 @@ Admissions Office
         
         try:
             email.send(fail_silently=False)
-            print(f"✅ Slip email sent to {applicant.user.email}")
+            print(f"✅ Slip email sent to {recipient_emails}")
             return True
         except Exception as e:
             print(f"❌ Failed to send slip email: {str(e)}")
