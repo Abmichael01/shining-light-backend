@@ -1605,6 +1605,19 @@ class SystemSetting(models.Model):
         default='System is under maintenance.'
     )
     
+    # Portal Control
+    disable_staff_login = models.BooleanField(_('disable staff login'), default=False)
+    staff_maintenance_message = models.TextField(
+        _('staff maintenance message'),
+        default='Staff portal is temporarily unavailable.'
+    )
+    
+    disable_student_login = models.BooleanField(_('disable student login'), default=False)
+    student_maintenance_message = models.TextField(
+        _('student maintenance message'),
+        default='Student portal is temporarily unavailable.'
+    )
+    
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
