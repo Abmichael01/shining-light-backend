@@ -499,7 +499,7 @@ def template_exists(template_name):
         return False
 
 
-def send_bulk_email(recipient_list, subject, message_body):
+def send_bulk_email(recipient_list, subject, message_body, connection=None):
     """
     Send mass emails to a list of recipients.
     """
@@ -514,14 +514,19 @@ def send_bulk_email(recipient_list, subject, message_body):
             
         plain_message = strip_tags(message_body)
         
-        send_mail(
+        from django.core.mail import EmailMultiAlternatives
+        
+        email = EmailMultiAlternatives(
             subject=subject,
-            message=plain_message,
+            body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=recipient_list,
-            fail_silently=False,
-            html_message=message_body
+            to=[settings.DEFAULT_FROM_EMAIL],
+            bcc=recipient_list,
+            connection=connection
         )
+        email.attach_alternative(message_body, "text/html")
+        email.send(fail_silently=False)
+        
         return True, f"Emails sent to {len(recipient_list)} recipients"
     except Exception as e:
         print(f"Error sending bulk email: {str(e)}")

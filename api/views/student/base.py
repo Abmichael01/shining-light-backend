@@ -89,6 +89,10 @@ class StudentViewSet(StudentActionsMixin, viewsets.ModelViewSet):
         if source:
             queryset = queryset.filter(source=source)
 
+        department = self.request.query_params.get('department', None)
+        if department:
+            queryset = queryset.filter(department=department)
+
         search = self.request.query_params.get('search', None)
         if search:
             search_terms = search.split()

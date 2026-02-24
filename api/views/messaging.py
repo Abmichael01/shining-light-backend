@@ -4,6 +4,7 @@ from django.utils import timezone
 from api.models import Student, Staff, User, Guardian, GuardianMessage
 from api.utils.sms import send_sms as termii_send_sms
 from api.utils.email import send_bulk_email, get_student_recipient_emails
+from django.core.mail import get_connection
 import logging
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,10 @@ class BulkMessagingView(views.APIView):
         elif channel == 'email':
             success, res_msg = send_bulk_email(recipients, subject, message)
             if success:
-                return response.Response({"message": res_msg})
+                summary = f"Bulk email sent to {len(recipients)} resolved recipients."
+                if target_group == 'all_students':
+                     summary = f"Student broadcast sent to {len(recipients)} resolved parent/guardian emails."
+                return response.Response({"message": summary})
             else:
                 return response.Response({"error": res_msg}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
@@ -224,38 +228,53 @@ class GuardianMessagingView(views.APIView):
 
         success_count = 0
         failure_count = 0
+        missing_count = 0
         results = []
 
-        for student in students:
-            contacts, primary_guardian = self._get_guardian_contacts(student, channel)
-            
-            if not contacts:
-                GuardianMessage.objects.create(
-                    sender=request.user,
-                    student=student,
-                    channel=channel,
-                    subject=subject,
-                    content=message,
-                    status='failed',
-                    error_message=f"No guardian {channel} contact info found"
-                )
-                failure_count += 1
-                if len(results) < 100:
-                    results.append({"student": student.id, "status": "failed", "reason": "No contact"})
-                continue
+        connection = None
+        if channel == 'email':
+            connection = get_connection()
+            connection.open()
 
-            success = False
-            error_msg = None
-            
-            if channel == 'sms':
+        try:
+            for student in students:
+                contacts, primary_guardian = self._get_guardian_contacts(student, channel)
+                
+                if not contacts:
+                    GuardianMessage.objects.create(
+                        sender=request.user,
+                        student=student,
+                        channel=channel,
+                        subject=subject,
+                        content=message,
+                        status='failed',
+                        error_message="No contact info found"
+                    )
+                    failure_count += 1
+                    missing_count += 1
+                    continue
+
+                success = False
+                error_msg = None
+                student_name = student.get_full_name()
+                
+                if channel == 'sms':
+                    # ... (rest of logic)
                 # Use only the first contact for SMS recorded in GuardianMessage
                 contact = contacts[0]
-                success, res_data = termii_send_sms(contact, message)
+                # Personalize SMS
+                personalized_sms = f"Dear Parent of {student_name}: {message}"
+                if len(personalized_sms) > 160: # Truncate if too long for single SMS
+                     personalized_sms = personalized_sms[:157] + "..."
+                
+                success, res_data = termii_send_sms(contact, personalized_sms)
                 if not success:
                     error_msg = str(res_data)
             else:
                 # Use all recipient emails
-                success, res_msg = send_bulk_email(contacts, subject, message)
+                # Personalize Email
+                personalized_email = f"<h3>Dear Parent/Guardian of {student_name},</h3><br>{message}"
+                success, res_msg = send_bulk_email(contacts, subject, personalized_email, connection=connection)
                 if not success:
                     error_msg = res_msg
 
@@ -288,7 +307,15 @@ class GuardianMessagingView(views.APIView):
                 if len(results) < 100:
                     results.append({"student": student.id, "status": "failed", "reason": error_msg})
 
+        finally:
+            if connection:
+                connection.close()
+
+        res_msg = f"Processed {students.count()} families. Success: {success_count}, Failure: {failure_count}."
+        if missing_count > 0:
+            res_msg += f" {missing_count} students skipped due to missing contact info."
+
         return response.Response({
-            "message": f"Processed {students.count()} messages. Success: {success_count}, Failure: {failure_count}",
+            "message": res_msg,
             "results": results
         })

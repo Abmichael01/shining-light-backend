@@ -307,7 +307,8 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             # Nested data
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
-            'all_subjects_cleared', 'has_staff_parent', 'staff_parents_details'
+            'all_subjects_cleared', 'has_staff_parent', 'staff_parents_details',
+            'recipient_emails'
         ]
         read_only_fields = [
             'id', 'application_number', 'admission_number', 'full_name', 'passport_photo',
@@ -408,6 +409,11 @@ class StudentSerializer(serializers.ModelSerializer):
 
     def get_has_staff_parent(self, obj):
         return obj.staff_parents.exists()
+
+    def get_recipient_emails(self, obj):
+        """Get best email recipients (guardians -> student fallback)"""
+        from api.utils.email import get_student_recipient_emails
+        return get_student_recipient_emails(obj)
     
     def get_staff_parents_details(self, obj):
         return [
@@ -504,6 +510,7 @@ class StudentListSerializer(serializers.ModelSerializer):
     full_name = serializers.SerializerMethodField()
     passport_photo = serializers.SerializerMethodField()
     primary_phone = serializers.SerializerMethodField()
+    recipient_emails = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
@@ -511,7 +518,7 @@ class StudentListSerializer(serializers.ModelSerializer):
             'id', 'student_id', 'application_number', 'admission_number', 'full_name',
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
-            'passport_photo', 'primary_phone',
+            'passport_photo', 'primary_phone', 'recipient_emails',
             'application_date', 'enrollment_date', 'created_at'
         ]
         read_only_fields = fields
@@ -544,6 +551,11 @@ class StudentListSerializer(serializers.ModelSerializer):
         except:
             pass
         return None
+
+    def get_recipient_emails(self, obj):
+        """Get best email recipients (guardians -> student fallback)"""
+        from api.utils.email import get_student_recipient_emails
+        return get_student_recipient_emails(obj)
 
 
 class StudentRegistrationSerializer(serializers.Serializer):
