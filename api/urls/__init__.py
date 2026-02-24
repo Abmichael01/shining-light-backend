@@ -1,5 +1,5 @@
 from django.urls import path, include
-from api.views import LoginView, convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
+from api.views import LoginView, CheckAdminView, convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
 from api.views.staff import staff_me, staff_students, staff_student_detail_update, staff_wallet, staff_wallet_transactions
 from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
@@ -16,6 +16,7 @@ urlpatterns = [
 
     # Custom login view (returns user data)
     path('auth/login/', LoginView.as_view(), name='login'),
+    path('auth/check-admin/', CheckAdminView.as_view(), name='check-admin'),
     
     # Other dj-rest-auth endpoints (logout, user, password change)
     path('auth/', include('dj_rest_auth.urls')),
@@ -73,7 +74,6 @@ urlpatterns = [
     path('reports/convert-image/', convert_html_to_image, name='convert-html-to-image'),
     path('reports/convert-multi-pdf/', convert_multiple_html_to_pdf, name='convert-multiple-html-to-pdf'),
     path('reports/convert-multi-images-zip/', convert_multiple_html_to_images_zip, name='convert-multiple-html-to-images-zip'),
-    path('reports/convert-multi-images-zip/', convert_multiple_html_to_images_zip, name='convert-multiple-html-to-images-zip'),
 
     # General File Upload
     path('common/upload/', FileUploadView.as_view(), name='file-upload'),
@@ -86,6 +86,5 @@ urlpatterns = [
     path('payment/webhook/', paystack_webhook, name='central-paystack-webhook'),
     
     # System Settings
-    path('system-settings/', SystemSettingViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update'}), name='system-settings'),
+    path('system-settings/', SystemSettingViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'put': 'update'}), name='system-settings'),
 ]
-

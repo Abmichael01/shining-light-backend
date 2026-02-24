@@ -1,4 +1,4 @@
-from .auth import LoginView
+from .auth import LoginView, CheckAdminView
 from .academic import (
     SchoolViewSet, 
     SessionViewSet, 
@@ -24,6 +24,7 @@ from .reports import convert_html_to_pdf, convert_html_to_image, convert_multipl
 
 __all__ = [
     'LoginView', 
+    'CheckAdminView',
     'SchoolViewSet', 
     'SessionViewSet', 
     'SessionTermViewSet',

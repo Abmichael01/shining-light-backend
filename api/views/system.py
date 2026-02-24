@@ -36,3 +36,6 @@ class SystemSettingViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    def get_object(self):
+        return SystemSetting.load()
