@@ -11,6 +11,82 @@ from rest_framework.permissions import IsAuthenticated
 from api.permissions import IsSchoolAdmin
 
 class SubjectRegistrationMixin:
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated], url_path='check_late_registration')
+    def check_late_registration(self, request):
+        user = request.user
+        if getattr(user, 'user_type', None) != 'student':
+            return Response({'is_late': False, 'late_fee_paid': True})
+            
+        student_id = request.query_params.get('student')
+        session_id = request.query_params.get('session')
+        session_term_id = request.query_params.get('session_term')
+        
+        if not student_id or not session_term_id:
+            return Response({'error': 'student and session_term required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            student = Student.objects.get(id=student_id)
+        except Student.DoesNotExist:
+            return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        if user.student_profile.id != student.id:
+            return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+            
+        try:
+            session_term = SessionTerm.objects.get(id=session_term_id)
+        except SessionTerm.DoesNotExist:
+            return Response({'error': 'Session term not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        is_late = False
+        if session_term.registration_deadline and timezone.now().date() > session_term.registration_deadline:
+            is_late = True
+            
+        paid_late_fee = False
+        fee_type_id = None
+        amount = 0
+        
+        if is_late:
+            from api.models.fee.payment import FeePayment
+            paid_late_fee = FeePayment.objects.filter(
+                student_id=student.id, 
+                session_term_id=session_term.id, 
+                payment_purpose__code='late_registration'
+            ).exists()
+            
+            if not paid_late_fee:
+                from api.models.academic import SystemSetting
+                from api.models.fee.structure import FeeType, PaymentPurpose
+                
+                setting, _ = SystemSetting.objects.get_or_create(pk=1)
+                amount = setting.late_subject_registration_fee
+                
+                purpose, _ = PaymentPurpose.objects.get_or_create(
+                    code='late_registration',
+                    defaults={'name': 'Late Registration Fee', 'description': 'Fee for registering subjects after the deadline'}
+                )
+                
+                fee_type, created = FeeType.objects.get_or_create(
+                    school=student.school,
+                    name='Late Subject Registration Fee',
+                    defaults={
+                        'amount': amount,
+                        'is_mandatory': False,
+                        'is_recurring_per_term': True,
+                    }
+                )
+                if not created and fee_type.amount != amount:
+                    fee_type.amount = amount
+                    fee_type.save()
+                    
+                fee_type_id = fee_type.id
+                
+        return Response({
+            'is_late': is_late,
+            'late_fee_paid': paid_late_fee,
+            'fee_type_id': fee_type_id,
+            'amount': amount
+        })
+
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated], url_path='bulk_register')
     def bulk_register(self, request):
         student_id = request.data.get('student')
