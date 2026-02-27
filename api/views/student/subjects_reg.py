@@ -1,7 +1,7 @@
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db import transaction
+from django.db import transaction, models
 from django.utils import timezone
 from api.models import (
     Student, StudentSubject, SessionTerm, Subject
