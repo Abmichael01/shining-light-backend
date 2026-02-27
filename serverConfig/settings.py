@@ -347,7 +347,8 @@ EXTERNAL_RENDER_API_KEY = os.getenv('EXTERNAL_RENDER_API_KEY')
 PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
 PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
 
-# Termii Configuration
-TERMII_API_KEY = os.getenv('TERMII_API_KEY')
-TERMII_SENDER_ID = os.getenv('TERMII_SENDER_ID', 'ShiningL')
-TERMII_BASE_URL = os.getenv('TERMII_BASE_URL', 'https://api.ng.termii.com/api')
+# EbulkSMS Configuration
+EBULKSMS_USERNAME = os.getenv('EBULKSMS_USERNAME')
+EBULKSMS_API_KEY = os.getenv('EBULKSMS_API_KEY')
+EBULKSMS_SENDER_ID = os.getenv('EBULKSMS_SENDER_ID', 'ShiningL')
+EBULKSMS_API_URL = os.getenv('EBULKSMS_API_URL', 'https://api.ebulksms.com/sendsms.json')

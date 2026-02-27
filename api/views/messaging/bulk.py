@@ -1,7 +1,7 @@
 from rest_framework import views, response, status, permissions
 from django.shortcuts import get_object_or_404
 from api.models import Student, Staff
-from api.utils.sms import send_sms as termii_send_sms
+from api.utils.sms import send_sms, send_bulk_sms
 from api.utils.email import send_bulk_email, get_student_recipient_emails
 
 class SendSMSView(views.APIView):
@@ -48,7 +48,7 @@ class SendSMSView(views.APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        success, res_data = termii_send_sms(phone_number, message)
+        success, res_data = send_sms(phone_number, message)
         
         if success:
             return response.Response({
@@ -135,20 +135,19 @@ class BulkMessagingView(views.APIView):
         recipients = list(set([str(r).strip() for r in recipients if r]))
 
         if channel == 'sms':
-            count = 0
-            errors = []
-            for phone in recipients:
-                success, _ = termii_send_sms(phone, message)
-                if success:
-                    count += 1
-                else:
-                    errors.append(phone)
+            success, res_data = send_bulk_sms(recipients, message)
             
-            return response.Response({
-                "message": f"Successfully sent SMS to {count} recipients",
-                "failed_count": len(errors),
-                "failed_recipients": errors if len(errors) < 20 else "Too many to list"
-            })
+            if success:
+                # EbulkSMS returns total sent count in response occasionally, but we'll assume length of recipients if successful
+                return response.Response({
+                    "message": f"Successfully queued SMS to {len(recipients)} recipients via EbulkSMS",
+                    "details": res_data
+                })
+            else:
+                return response.Response({
+                    "error": "Failed to send bulk SMS via EbulkSMS",
+                    "details": res_data
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
         elif channel == 'email':
             success, res_msg = send_bulk_email(recipients, subject, message)

@@ -1,7 +1,7 @@
 from rest_framework import views, response, status, permissions
 from django.utils import timezone
 from api.models import Student, GuardianMessage
-from api.utils.sms import send_sms as termii_send_sms
+from api.utils.sms import send_bulk_sms
 from api.utils.email import send_bulk_email, get_student_recipient_emails
 from django.core.mail import get_connection
 
@@ -73,75 +73,114 @@ class GuardianMessagingView(views.APIView):
         if channel == 'email':
             connection = get_connection()
             connection.open()
+            
+        sms_recipients = []
+        sms_records = []
+        bulk_sms_text = f"Dear Parent/Guardian: {message}"
+        if len(bulk_sms_text) > 160:
+             bulk_sms_text = bulk_sms_text[:157] + "..."
 
         try:
             for student in students:
                 contacts, primary_guardian = self._get_guardian_contacts(student, channel)
                 
                 if not contacts:
-                    GuardianMessage.objects.create(
-                        sender=request.user,
-                        student=student,
-                        channel=channel,
-                        subject=subject,
-                        content=message,
-                        status='failed',
-                        error_message="No contact info found"
-                    )
+                    if channel == 'email':
+                        GuardianMessage.objects.create(
+                            sender=request.user,
+                            student=student,
+                            channel=channel,
+                            subject=subject,
+                            content=message,
+                            status='failed',
+                            error_message="No contact info found"
+                        )
+                    else:
+                        sms_records.append(GuardianMessage(
+                            sender=request.user,
+                            student=student,
+                            channel=channel,
+                            subject=subject,
+                            content=message,
+                            status='failed',
+                            error_message="No contact info found"
+                        ))
                     failure_count += 1
                     missing_count += 1
                     continue
 
-                success = False
-                error_msg = None
                 student_name = student.get_full_name()
                 
                 if channel == 'sms':
-                    # Use only the first contact for SMS
                     contact = contacts[0]
-                    # Personalize SMS
-                    personalized_sms = f"Dear Parent of {student_name}: {message}"
-                    if len(personalized_sms) > 160: # Truncate if too long for single SMS
-                         personalized_sms = personalized_sms[:157] + "..."
-                    
-                    success, res_data = termii_send_sms(contact, personalized_sms)
-                    if not success:
-                        error_msg = str(res_data)
+                    sms_recipients.append(contact)
+                    sms_records.append(GuardianMessage(
+                        sender=request.user,
+                        student=student,
+                        recipient_guardian=primary_guardian,
+                        channel=channel,
+                        subject=subject,
+                        content=message,
+                        status='pending'
+                    ))
                 else:
                     # Personalize Email
                     personalized_email = f"<h3>Dear Parent/Guardian of {student_name},</h3><br>{message}"
                     success, res_msg = send_bulk_email(contacts, subject, personalized_email, connection=connection)
-                    if not success:
-                        error_msg = res_msg
+                    
+                    if success:
+                        GuardianMessage.objects.create(
+                            sender=request.user,
+                            student=student,
+                            recipient_guardian=primary_guardian,
+                            channel=channel,
+                            subject=subject,
+                            content=message,
+                            status='sent',
+                            sent_at=timezone.now()
+                        )
+                        success_count += 1
+                        if len(results) < 100:
+                            results.append({"student": student.id, "status": "sent"})
+                    else:
+                        GuardianMessage.objects.create(
+                            sender=request.user,
+                            student=student,
+                            recipient_guardian=primary_guardian,
+                            channel=channel,
+                            subject=subject,
+                            content=message,
+                            status='failed',
+                            error_message=res_msg
+                        )
+                        failure_count += 1
+                        if len(results) < 100:
+                            results.append({"student": student.id, "status": "failed", "reason": res_msg})
 
-                if success:
-                    GuardianMessage.objects.create(
-                        sender=request.user,
-                        student=student,
-                        recipient_guardian=primary_guardian,
-                        channel=channel,
-                        subject=subject,
-                        content=message,
-                        status='sent',
-                        sent_at=timezone.now()
-                    )
-                    success_count += 1
-                    if len(results) < 100:
-                        results.append({"student": student.id, "status": "sent"})
-                else:
-                    GuardianMessage.objects.create(
-                        sender=request.user,
-                        student=student,
-                        recipient_guardian=primary_guardian,
-                        channel=channel,
-                        subject=subject,
-                        content=message,
-                        status='failed',
-                        error_message=error_msg
-                    )
-                    failure_count += 1
-                    if len(results) < 100:
-                        results.append({"student": student.id, "status": "failed", "reason": error_msg})
+            # Process bulk SMS after loop
+            if channel == 'sms' and sms_recipients:
+                success, res_data = send_bulk_sms(sms_recipients, bulk_sms_text)
+                now = timezone.now()
+                
+                for record in sms_records:
+                    if record.status == 'pending':
+                        if success:
+                            record.status = 'sent'
+                            record.sent_at = now
+                            success_count += 1
+                            if len(results) < 100:
+                                results.append({"student": record.student_id, "status": "sent"})
+                        else:
+                            record.status = 'failed'
+                            record.error_message = str(res_data)
+                            failure_count += 1
+                            if len(results) < 100:
+                                results.append({"student": record.student_id, "status": "failed", "reason": str(res_data)})
+                                
+                GuardianMessage.objects.bulk_create(sms_records)
+            elif channel == 'sms' and sms_records:
+                print("Bulk Failed Insert Records Only:", sms_records)
+                GuardianMessage.objects.bulk_create(sms_records)
 
         finally:
             if connection:
