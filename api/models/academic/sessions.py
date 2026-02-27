@@ -41,7 +41,7 @@ class Session(models.Model):
             }
         )
     
-    def create_next_term(self, term_name, start_date, end_date):
+    def create_next_term(self, term_name, start_date, end_date, registration_deadline=None):
         SessionTerm.objects.filter(session=self, is_current=True).update(is_current=False)
         session_term, created = SessionTerm.objects.get_or_create(
             session=self,
@@ -49,12 +49,15 @@ class Session(models.Model):
             defaults={
                 'start_date': start_date,
                 'end_date': end_date,
+                'registration_deadline': registration_deadline,
                 'is_current': True
             }
         )
         if not created:
             session_term.start_date = start_date
             session_term.end_date = end_date
+            if registration_deadline is not None:
+                session_term.registration_deadline = registration_deadline
             session_term.is_current = True
             session_term.save()
         return session_term

@@ -178,6 +178,7 @@ class SchemeOfWorkViewSet(viewsets.ModelViewSet):
         term_name = request.data.get("term_name")
         start_date = request.data.get("start_date")
         end_date = request.data.get("end_date")
+        registration_deadline = request.data.get("registration_deadline")
 
         if not all([term_name, start_date, end_date]):
             return Response(
@@ -186,7 +187,7 @@ class SchemeOfWorkViewSet(viewsets.ModelViewSet):
             )
 
         try:
-            session_term = session.create_next_term(term_name, start_date, end_date)
+            session_term = session.create_next_term(term_name, start_date, end_date, registration_deadline)
             return Response(
                 {
                     "detail": f"{term_name} started successfully",
