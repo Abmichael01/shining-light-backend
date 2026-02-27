@@ -350,5 +350,5 @@ PAYSTACK_PUBLIC_KEY = os.getenv('PAYSTACK_PUBLIC_KEY')
 # EbulkSMS Configuration
 EBULKSMS_USERNAME = os.getenv('EBULKSMS_USERNAME')
 EBULKSMS_API_KEY = os.getenv('EBULKSMS_API_KEY')
-EBULKSMS_SENDER_ID = os.getenv('EBULKSMS_SENDER_ID', 'ShiningL')
+EBULKSMS_SENDER_ID = os.getenv('EBULKSMS_SENDER_ID', 'Shining Light')
 EBULKSMS_API_URL = os.getenv('EBULKSMS_API_URL', 'https://api.ebulksms.com/sendsms.json')
