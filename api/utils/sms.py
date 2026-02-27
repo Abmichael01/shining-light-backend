@@ -20,10 +20,15 @@ def send_bulk_sms(phone_numbers, message):
     # Clean phone numbers (remove +, spaces). eBulkSMS can handle international formats.
     gsm_list = []
     for i, number in enumerate(phone_numbers):
-        clean_number = str(number).replace('+', '').replace(' ', '').strip()
-        # They usually want standard 234 formats if Nigerian without the +
-        if clean_number.startswith('0') and not clean_number.startswith('00'):
+        clean_number = str(number).replace('+', '').replace(' ', '').replace('-', '').strip()
+        
+        # Handle Nigerian format starting with 0 (e.g. 09160914217 -> 2349160914217)
+        if clean_number.startswith('0') and len(clean_number) == 11:
             clean_number = '234' + clean_number[1:]
+        # Handle Nigerian format omitting the 0 (e.g. 9160914217 -> 2349160914217)
+        elif len(clean_number) == 10 and clean_number.startswith(('7', '8', '9')):
+            clean_number = '234' + clean_number
+            
         gsm_list.append({
             "msidn": clean_number,
             "msgid": str(i)
