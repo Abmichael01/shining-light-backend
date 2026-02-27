@@ -139,8 +139,12 @@ class SubjectRegistrationMixin:
             
             unpaid_mandatory_fees = []
             for fee in mandatory_fees:
-                paid_amount = fee.get_student_total_paid(request.user.student_profile.id, session=session_id, session_term=session_term_id)
-                if paid_amount < fee.amount:
+                context = fee.get_payment_status_context(
+                    student=request.user.student_profile,
+                    session=session_id,
+                    session_term=session_term_id
+                )
+                if context['status'] != 'paid':
                     unpaid_mandatory_fees.append(fee.name)
             
             if unpaid_mandatory_fees:
