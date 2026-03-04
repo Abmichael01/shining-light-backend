@@ -25,10 +25,12 @@ class FileUploadView(APIView):
         
         # Generate Public URL
         if hasattr(settings, 'AWS_S3_ENDPOINT_URL') and settings.AWS_S3_ENDPOINT_URL:
-             # B2/S3 specific URL construction if needed, but default_storage.url should work if configured correctly
-             file_url = default_storage.url(saved_path)
+            # B2/S3: use the storage backend's URL which gives a proper absolute cloud URL
+            file_url = default_storage.url(saved_path)
         else:
-             # Local storage URL
-             file_url = request.build_absolute_uri(default_storage.url(saved_path))
+            # Local storage: return a relative URL (e.g. /media/uploads/xxx.png)
+            # so it resolves correctly in any environment (dev, staging, production)
+            # and never hardcodes localhost into stored HTML content
+            file_url = default_storage.url(saved_path)
 
         return Response({"url": file_url})
