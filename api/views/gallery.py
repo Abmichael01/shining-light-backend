@@ -15,25 +15,10 @@ class GalleryGroupViewSet(viewsets.ModelViewSet):
         return GalleryGroupSerializer
 
     def get_queryset(self):
-        queryset = super().get_queryset()
-        school_id = self.request.query_params.get('school', None)
-        
-        user = self.request.user
-        # If not superuser, strictly scope to the staff's school
-        if not getattr(user, 'is_superuser', False) and hasattr(user, 'staff_profile') and user.staff_profile.school:
-            queryset = queryset.filter(school=user.staff_profile.school)
-        elif school_id:
-            queryset = queryset.filter(school_id=school_id)
-            
-        return queryset
+        return super().get_queryset()
 
     def perform_create(self, serializer):
-        # Automatically set school if not provided and user is staff
-        user = self.request.user
-        if not serializer.validated_data.get('school') and hasattr(user, 'staff_profile') and user.staff_profile.school:
-            serializer.save(school=user.staff_profile.school)
-        else:
-            serializer.save()
+        serializer.save()
 
 class GalleryImageViewSet(viewsets.ModelViewSet):
     """ViewSet for managing gallery images with group and school scoping"""
@@ -44,11 +29,6 @@ class GalleryImageViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = super().get_queryset()
         group_id = self.request.query_params.get('group', None)
-        
-        user = self.request.user
-        # Scoping logic
-        if not getattr(user, 'is_superuser', False) and hasattr(user, 'staff_profile') and user.staff_profile.school:
-            queryset = queryset.filter(group__school=user.staff_profile.school)
         
         if group_id:
             queryset = queryset.filter(group_id=group_id)

@@ -18,7 +18,7 @@ class GalleryGroupSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = GalleryGroup
-        fields = ['id', 'name', 'description', 'school', 'is_system', 'image_count', 'created_at']
+        fields = ['id', 'name', 'description', 'is_system', 'image_count', 'created_at']
         read_only_fields = ['is_system', 'created_at']
 
 class GalleryGroupDetailSerializer(GalleryGroupSerializer):

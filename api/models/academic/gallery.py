@@ -5,21 +5,19 @@ from django.dispatch import receiver
 from .schools import School
 
 class GalleryGroup(models.Model):
-    """Groups for school gallery images"""
+    """Groups for global gallery images"""
     name = models.CharField(_('group name'), max_length=100)
     description = models.TextField(_('description'), blank=True, null=True)
-    school = models.ForeignKey(School, on_delete=models.CASCADE, related_name='gallery_groups', verbose_name=_('school'))
     is_system = models.BooleanField(_('system group'), default=False)
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
 
     class Meta:
         verbose_name = _('Gallery Group')
         verbose_name_plural = _('Gallery Groups')
-        unique_together = [['name', 'school']]
         ordering = ['-is_system', 'name']
 
     def __str__(self):
-        return f"{self.name} ({self.school.name})"
+        return self.name
 
 class GalleryImage(models.Model):
     """Individual images in the school gallery"""
@@ -36,14 +34,4 @@ class GalleryImage(models.Model):
     def __str__(self):
         return self.title or f"Image {self.id}"
 
-@receiver(post_save, sender=School)
-def create_default_gallery_groups(sender, instance, created, **kwargs):
-    """Ensure the 'Question Bank Photos' group exists for every school"""
-    GalleryGroup.objects.get_or_create(
-        name='Question Bank Photos',
-        school=instance,
-        defaults={
-            'description': 'Automatically created group for storing question-related images.',
-            'is_system': True
-        }
-    )
+# System will ensure initial groups via management commands or manual entry
