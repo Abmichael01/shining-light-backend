@@ -1,5 +1,31 @@
 from rest_framework import serializers
 from api.models import Question, Subject, Topic
+import re
+
+
+def make_absolute_media_urls(html, request):
+    """
+    Helper to convert relative /media/ paths in HTML strings to absolute URLs.
+    Uses re.sub with a callback for robust replacements.
+    """
+    if not html or not isinstance(html, str) or '/media/' not in html:
+        return html
+
+    # Build base URL from request (e.g., http://localhost:8007)
+    base_url = request.build_absolute_uri('/')[:-1]
+    
+    def replacer(match):
+        prefix = match.group(1) # src="
+        path = match.group(2)   # /media/path/to/img.jpg
+        suffix = match.group(3) # "
+        
+        if path.startswith('/media/'):
+            return f'{prefix}{base_url}{path}{suffix}'
+        return match.group(0)
+
+    # Match src="..." or src='...'
+    pattern = r'(src=["\'])([^"\']+)(["\'])'
+    return re.sub(pattern, replacer, html)
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -27,16 +53,23 @@ class QuestionSerializer(serializers.ModelSerializer):
             'subject_code',
             'topic_model',
             'topic_name',
+            'question_image',
             'option_a',
+            'option_a_image',
             'option_b',
+            'option_b_image',
             'option_c',
+            'option_c_image',
             'option_d',
+            'option_d_image',
             'option_e',
+            'option_e_image',
             'correct_answer',
             'explanation',
             'created_by',
             'created_by_name',
             'usage_count',
+            'is_verified',
             'created_at',
             'updated_at',
         ]
@@ -65,6 +98,22 @@ class QuestionSerializer(serializers.ModelSerializer):
         
         return data
     
+    def to_representation(self, instance):
+        """Absoluteify media URLs in HTML fields"""
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        
+        if request:
+            html_fields = [
+                'question_text', 'explanation', 
+                'option_a', 'option_b', 'option_c', 'option_d', 'option_e'
+            ]
+            for field in html_fields:
+                if data.get(field):
+                    data[field] = make_absolute_media_urls(data[field], request)
+        
+        return data
+
     def create(self, validated_data):
         """Create question with proper validation"""
         # Set created_by from request user
@@ -96,8 +145,21 @@ class QuestionListSerializer(serializers.ModelSerializer):
             'topic_model',
             'topic_name',
             'usage_count',
+            'is_verified',
+            'question_image',
             'created_at',
         ]
+
+    def to_representation(self, instance):
+        """Absoluteify media URLs in question_text and image fields"""
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        
+        if request:
+            if data.get('question_text'):
+                data['question_text'] = make_absolute_media_urls(data['question_text'], request)
+            
+        return data
 
 
 class QuestionCreateSerializer(serializers.ModelSerializer):
@@ -107,18 +169,25 @@ class QuestionCreateSerializer(serializers.ModelSerializer):
         model = Question
         fields = [
             'question_text',
+            'question_image',
             'question_type',
             'difficulty',
             'marks',
             'subject',
             'topic_model',
             'option_a',
+            'option_a_image',
             'option_b',
+            'option_b_image',
             'option_c',
+            'option_c_image',
             'option_d',
+            'option_d_image',
             'option_e',
+            'option_e_image',
             'correct_answer',
             'explanation',
+            'is_verified',
         ]
     
     def validate(self, data):

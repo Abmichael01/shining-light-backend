@@ -3,6 +3,31 @@ from api.models import School, Session, SessionTerm, Class, Department, SubjectG
 from django.core.files.base import ContentFile
 import base64
 import uuid
+import re
+
+
+def make_absolute_media_urls(html, request):
+    """
+    Helper to convert relative /media/ paths in HTML strings to absolute URLs.
+    """
+    if not html or not isinstance(html, str) or '/media/' not in html:
+        return html
+
+    # Build base URL from request (e.g., http://localhost:8007)
+    base_url = request.build_absolute_uri('/')[:-1]
+    
+    def replacer(match):
+        prefix = match.group(1) # src="
+        path = match.group(2)   # /media/path/to/img.jpg
+        suffix = match.group(3) # "
+        
+        if path.startswith('/media/'):
+            return f'{prefix}{base_url}{path}{suffix}'
+        return match.group(0)
+
+    # Match src="..." or src='...'
+    pattern = r'(src=["\'])([^"\']+)(["\'])'
+    return re.sub(pattern, replacer, html)
 
 
 class SchoolSerializer(serializers.ModelSerializer):
@@ -201,7 +226,7 @@ class SessionTermSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = SessionTerm
-        fields = ['id', 'session', 'term_name', 'term_order', 'start_date', 'end_date', 'registration_deadline', 'is_current', 'created_at']
+        fields = ['id', 'session', 'term_name', 'term_order', 'start_date', 'end_date', 'registration_deadline', 'is_current', 'is_subject_registration_open', 'created_at']
         read_only_fields = ['id', 'term_order', 'created_at']
 
 
@@ -297,6 +322,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
+        request = self.context.get('request')
         image_fields = [
             'question_image', 'option_a_image', 'option_b_image', 
             'option_c_image', 'option_d_image', 'option_e_image'
@@ -305,13 +331,23 @@ class QuestionSerializer(serializers.ModelSerializer):
         for field in image_fields:
             image_obj = getattr(instance, field, None)
             if image_obj and hasattr(image_obj, 'url'):
-                request = self.context.get('request')
                 if request:
                     data[field] = request.build_absolute_uri(image_obj.url)
                 else:
                     data[field] = image_obj.url
             else:
                 data[field] = None
+        
+        # Absoluteify media URLs in HTML fields
+        if request:
+            html_fields = [
+                'question_text', 'explanation', 
+                'option_a', 'option_b', 'option_c', 'option_d', 'option_e'
+            ]
+            for field in html_fields:
+                if data.get(field):
+                    data[field] = make_absolute_media_urls(data[field], request)
+                    
         return data
     
     def get_created_by_name(self, obj):
@@ -362,9 +398,26 @@ class QuestionListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'subject', 'subject_name', 'school_name', 'class_name', 'class_id',
             'topic_model', 'question_text', 'question_type', 'difficulty',
-            'is_verified', 'usage_count', 'created_at'
+            'is_verified', 'usage_count', 'question_image', 'created_at'
         ]
         read_only_fields = ['id', 'usage_count', 'created_at']
+
+    def to_representation(self, instance):
+        """Absoluteify media URLs in question_text and image fields"""
+        data = super().to_representation(instance)
+        request = self.context.get('request')
+        
+        if request:
+            if data.get('question_text'):
+                data['question_text'] = make_absolute_media_urls(data['question_text'], request)
+            
+            # Handle dedicated question_image field if it exists in data
+            # Though QuestionListSerializer doesn't include it currently, added just in case
+            image_obj = getattr(instance, 'question_image', None)
+            if image_obj and hasattr(image_obj, 'url'):
+                data['question_image'] = request.build_absolute_uri(image_obj.url)
+            
+        return data
 
 
 class ClubSerializer(serializers.ModelSerializer):
@@ -482,44 +535,44 @@ class ExamSerializer(serializers.ModelSerializer):
             if question.option_a:
                 options.append({
                     'id': 'a', 
-                    'text': question.option_a,
+                    'text': make_absolute_media_urls(question.option_a, request),
                     'image': get_image_url(question.option_a_image)
                 })
             if question.option_b:
                 options.append({
                     'id': 'b', 
-                    'text': question.option_b,
+                    'text': make_absolute_media_urls(question.option_b, request),
                     'image': get_image_url(question.option_b_image)
                 })
             if question.option_c:
                 options.append({
                     'id': 'c', 
-                    'text': question.option_c,
+                    'text': make_absolute_media_urls(question.option_c, request),
                     'image': get_image_url(question.option_c_image)
                 })
             if question.option_d:
                 options.append({
                     'id': 'd', 
-                    'text': question.option_d,
+                    'text': make_absolute_media_urls(question.option_d, request),
                     'image': get_image_url(question.option_d_image)
                 })
             if question.option_e:
                 options.append({
                     'id': 'e', 
-                    'text': question.option_e,
+                    'text': make_absolute_media_urls(question.option_e, request),
                     'image': get_image_url(question.option_e_image)
                 })
             
             formatted_question = {
                 'id': str(question.id),
-                'question_text': question.question_text,
+                'question_text': make_absolute_media_urls(question.question_text, request),
                 'question_image': get_image_url(question.question_image),
                 'question_type': question.question_type,
                 'options': options,
                 'correct_answer': question.correct_answer,
                 'marks': question.marks,
                 'difficulty': question.difficulty,
-                'explanation': question.explanation
+                'explanation': make_absolute_media_urls(question.explanation, request)
             }
             formatted_questions.append(formatted_question)
         

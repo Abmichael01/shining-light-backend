@@ -4,3 +4,4 @@ from .classes import Class, Department, Club, ExamHall
 from .curriculum import SubjectGroup, Subject, Topic, Grade, SchemeOfWork
 from .exams import Question, Exam, CBTExamCode
 from .cbt import StudentExam, StudentAnswer
+from .gallery import GalleryGroup, GalleryImage

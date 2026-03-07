@@ -24,16 +24,13 @@ class Command(BaseCommand):
         end_date = start_date + timedelta(days=4)  # 5 days total
 
         schedule = Schedule.objects.create(
-            name=f'Mid-Term Exam',
-            description='Sample exam timetable with 5 days of exams',
             schedule_type='exam',
             start_date=start_date,
             end_date=end_date,
-            session_term=session_term,
             is_active=True
         )
 
-        self.stdout.write(self.style.SUCCESS(f'Created schedule: {schedule.name}'))
+        self.stdout.write(self.style.SUCCESS(f'Created schedule: {schedule}'))
 
         # Get classes and subjects
         classes = Class.objects.all()[:6]  # Limit to 6 classes

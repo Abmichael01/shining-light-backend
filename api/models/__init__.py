@@ -18,7 +18,9 @@ from .academic import (
     CBTExamCode,
      AdmissionSettings,
     SchemeOfWork,
-    SystemSetting
+    SystemSetting,
+    GalleryGroup,
+    GalleryImage
 )
 from .student import (
     Student,
@@ -116,5 +118,7 @@ __all__ = [
     'CommunicationTemplate',
     'GuardianMessage',
     'BiometricStation',
-    'SystemSetting'
+    'SystemSetting',
+    'GalleryGroup',
+    'GalleryImage'
 ]

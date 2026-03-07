@@ -121,9 +121,15 @@ class SubjectRegistrationMixin:
                 pass
 
         is_late_global = False
-        if session_term_obj and session_term_obj.registration_deadline:
-            if timezone.now().date() > session_term_obj.registration_deadline:
-                is_late_global = True
+        if session_term_obj:
+            if not session_term_obj.is_subject_registration_open:
+                return Response(
+                    {'detail': 'Subject registration is not yet open for the current term.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            if session_term_obj.registration_deadline:
+                if timezone.now().date() > session_term_obj.registration_deadline:
+                    is_late_global = True
         
         if user_type == 'student':
             from api.models.fee import FeeType

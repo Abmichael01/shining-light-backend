@@ -17,6 +17,7 @@ from api.views.academic import (
     get_student_exams,
     get_student_exam_detail
 )
+from api.views.gallery import GalleryGroupViewSet, GalleryImageViewSet
 
 router = DefaultRouter()
 router.register(r'schools', SchoolViewSet, basename='school')
@@ -33,6 +34,8 @@ router.register(r'clubs', ClubViewSet, basename='club')
 router.register(r'exam-halls', ExamHallViewSet, basename='exam-hall')
 router.register(r'exams', ExamViewSet, basename='exam')
 router.register(r'schemes', SchemeOfWorkViewSet, basename='scheme-of-work')
+router.register(r'gallery-groups', GalleryGroupViewSet, basename='gallery-group')
+router.register(r'gallery-images', GalleryImageViewSet, basename='gallery-image')
 
 # Add custom URL patterns for student exams
 from django.urls import path

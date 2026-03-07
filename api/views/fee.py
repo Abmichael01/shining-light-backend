@@ -358,13 +358,16 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
              
         # 3. Filter Fee Types
         # Rules: For School, Active, and Applicable Class
-        fees_qs = FeeType.objects.filter(
-            school=student.school,
-            is_active=True
-        ).filter(
-            models.Q(applicable_classes__isnull=True) | 
-            models.Q(applicable_classes=student.class_model)
-        ).distinct()
+        base_fees = FeeType.objects.filter(school=student.school, is_active=True)
+        class_specific_fees = base_fees.filter(applicable_classes=student.class_model)
+        
+        # Fees that have AT LEAST one class assigned
+        fees_with_any_class = base_fees.filter(applicable_classes__isnull=False)
+        
+        # Global fees (assigned to NO classes at all)
+        global_fees = base_fees.exclude(id__in=fees_with_any_class)
+        
+        fees_qs = (class_specific_fees | global_fees).distinct()
         
         # Session/Term Filter: Active for Term OR Recurring
         if term_id:

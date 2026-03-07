@@ -99,6 +99,7 @@ class SessionTerm(models.Model):
     start_date = models.DateField(_('start date'))
     end_date = models.DateField(_('end date'))
     is_current = models.BooleanField(_('current term'), default=False)
+    is_subject_registration_open = models.BooleanField(_('subject registration open'), default=False)
     registration_deadline = models.DateField(_('registration deadline'), null=True, blank=True)
     created_at = models.DateTimeField(_('created at'), auto_now_add=True)
     
