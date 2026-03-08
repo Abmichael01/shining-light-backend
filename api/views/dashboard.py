@@ -318,6 +318,11 @@ def student_dashboard_stats(request):
         ).count()
         attendance_percentage = round((present_count / total_attendance_records) * 100, 1)
     
+    # Get passport photo URL
+    passport_photo = None
+    if student.biodata and student.biodata.passport_photo:
+        passport_photo = request.build_absolute_uri(student.biodata.passport_photo.url)
+    
     return Response({
         'current_class': student.class_model.name if student.class_model else None,
         'current_class_id': student.class_model.id if student.class_model else None,
@@ -332,5 +337,6 @@ def student_dashboard_stats(request):
         'department_name': student.department.name if student.department else None,
         'full_name': student.get_full_name(),
         'admission_number': student.admission_number,
+        'passport_photo': passport_photo,
     })
 

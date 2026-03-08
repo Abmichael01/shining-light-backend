@@ -62,5 +62,5 @@ def get_cbt_student_profile(request):
         student = Student.objects.select_related('school', 'class_model').prefetch_related(
             'subject_registrations__subject', 'subject_registrations__session_term'
         ).get(admission_number=request.user.admission_number)
-        return Response(CBTStudentProfileSerializer(student).data, status=status.HTTP_200_OK)
+        return Response(CBTStudentProfileSerializer(student, context={'request': request}).data, status=status.HTTP_200_OK)
     except Exception as e: return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
