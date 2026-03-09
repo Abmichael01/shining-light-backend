@@ -91,13 +91,21 @@ def submit_cbt_exam(request, exam_id):
         if student_answers_to_create:
             StudentAnswer.objects.bulk_create(student_answers_to_create)
         
-        student_subject = StudentSubject.objects.filter(student=student_obj, subject=exam.subject, is_active=True).first()
+        student_subject = StudentSubject.objects.filter(
+            student=student_obj, 
+            subject=exam.subject, 
+            session_term=exam.session_term,
+            is_active=True
+        ).first()
+
         if student_subject:
+            from decimal import Decimal
+            score_decimal = Decimal(str(round(score, 2)))
             # Map the CBT score to the correct field based on the Exam Type
             if exam.exam_type == 'test':
-                student_subject.ca_score = round(score, 2)
+                student_subject.ca_score = score_decimal
             elif exam.exam_type == 'exam':
-                student_subject.objective_score = round(score, 2)
+                student_subject.objective_score = score_decimal
             student_subject.save()
             
         return Response({
