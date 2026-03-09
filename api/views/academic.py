@@ -392,9 +392,9 @@ class TopicViewSet(viewsets.ModelViewSet):
         .order_by("subject", "name")
     )
     serializer_class = TopicSerializer
-    from api.permissions import IsSchoolAdminOrReadOnly
+    from api.permissions import IsAdminOrStaff
 
-    permission_classes = [IsSchoolAdminOrReadOnly]
+    permission_classes = [IsAdminOrStaff]
 
     def get_queryset(self):
         queryset = super().get_queryset()
