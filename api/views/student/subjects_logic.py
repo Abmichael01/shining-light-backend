@@ -43,6 +43,67 @@ class SubjectLogicMixin:
         student_subject.save()
         return Response(StudentSubjectSerializer(student_subject).data)
 
+    @action(detail=False, methods=['post'], url_path='upload-results-csv', permission_classes=[IsAdminOrStaff])
+    def upload_results_csv(self, request):
+        import csv
+        import io
+        from decimal import Decimal
+        
+        subject_id = request.data.get('subject')
+        session_id = request.data.get('session')
+        session_term_id = request.data.get('session_term')
+        file_obj = request.FILES.get('file')
+        
+        if not all([subject_id, session_id, session_term_id, file_obj]):
+            return Response({'error': 'Missing required fields or file'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            decoded_file = file_obj.read().decode('utf-8')
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+            
+            updated_count = 0
+            errors = []
+            
+            with transaction.atomic():
+                for row in reader:
+                    admission_number = row.get('Admission Number') or row.get('admission_number')
+                    exam_score = row.get('Exam Score') or row.get('exam_score') or row.get('Score') or row.get('score')
+                    remark = row.get('Remark') or row.get('remark')
+                    
+                    if not admission_number:
+                        continue
+                        
+                    try:
+                        # Find the student subject registration
+                        registration = StudentSubject.objects.filter(
+                            student__admission_number=admission_number,
+                            subject_id=subject_id,
+                            session_id=session_id,
+                            session_term_id=session_term_id
+                        ).first()
+                        
+                        if registration:
+                            if exam_score is not None and str(exam_score).strip():
+                                registration.exam_score = Decimal(str(exam_score).strip())
+                            if remark is not None:
+                                registration.teacher_comment = remark
+                            registration.save()
+                            updated_count += 1
+                        else:
+                            errors.append(f"No registration found for student {admission_number}")
+                    except Exception as e:
+                        errors.append(f"Error updating {admission_number}: {str(e)}")
+            
+            return Response({
+                'message': f'Successfully updated {updated_count} results',
+                'updated_count': updated_count,
+                'errors': errors
+            })
+            
+        except Exception as e:
+            return Response({'error': f'Failed to process CSV: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
     @action(detail=False, methods=['post'], permission_classes=[IsSchoolAdmin])
     def calculate_rankings(self, request):
         session_id, session_term_id = request.data.get('session'), request.data.get('session_term')
