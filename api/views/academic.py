@@ -25,6 +25,7 @@ from api.models import (
     Subject,
     SubjectGroup,
     Topic,
+    PastQuestion,
 )
 from api.permissions import IsAdminOrStaff, IsSchoolAdmin
 from api.serializers import (
@@ -44,6 +45,7 @@ from api.serializers import (
     SubjectGroupSerializer,
     SubjectSerializer,
     TopicSerializer,
+    PastQuestionSerializer,
 )
 from api.serializers.exam import StudentExamResultSerializer
 from api.pagination import StandardResultsSetPagination
@@ -850,3 +852,51 @@ def get_student_exam_detail(request, student_exam_id):
             {"error": f"Failed to fetch exam details: {str(e)}"},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
+
+
+class PastQuestionViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for PastQuestion CRUD operations
+    """
+
+    queryset = (
+        PastQuestion.objects.all()
+        .select_related("subject", "class_model", "session", "uploaded_by")
+        .order_by("-created_at")
+    )
+    serializer_class = PastQuestionSerializer
+    pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Filter by subject
+        subject = self.request.query_params.get("subject")
+        if subject:
+            queryset = queryset.filter(subject_id=subject)
+
+        # Filter by class (handle both 'class' and 'class_model')
+        class_id = self.request.query_params.get("class") or self.request.query_params.get("class_model")
+        if class_id:
+            queryset = queryset.filter(class_model_id=class_id)
+
+        # Filter by term
+        term = self.request.query_params.get("term")
+        if term:
+            queryset = queryset.filter(term=term)
+
+        # Filter by session
+        session = self.request.query_params.get("session")
+        if session:
+            queryset = queryset.filter(session_id=session)
+
+        # Search
+        search = self.request.query_params.get("search")
+        if search:
+            queryset = queryset.filter(title__icontains=search)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)

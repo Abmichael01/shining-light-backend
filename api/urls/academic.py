@@ -14,6 +14,7 @@ from api.views.academic import (
     ExamHallViewSet,
     ExamViewSet,
     SchemeOfWorkViewSet,
+    PastQuestionViewSet,
     get_student_exams,
     get_student_exam_detail
 )
@@ -34,6 +35,7 @@ router.register(r'clubs', ClubViewSet, basename='club')
 router.register(r'exam-halls', ExamHallViewSet, basename='exam-hall')
 router.register(r'exams', ExamViewSet, basename='exam')
 router.register(r'schemes', SchemeOfWorkViewSet, basename='scheme-of-work')
+router.register(r'past-questions', PastQuestionViewSet, basename='past-question')
 router.register(r'gallery-groups', GalleryGroupViewSet, basename='gallery-group')
 router.register(r'gallery-images', GalleryImageViewSet, basename='gallery-image')
 

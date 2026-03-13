@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork, SystemSetting
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork, SystemSetting, PastQuestion
 from django.core.files.base import ContentFile
 import base64
 import uuid
@@ -620,3 +620,31 @@ class SystemSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = SystemSetting
         fields = '__all__'
+
+
+class PastQuestionSerializer(serializers.ModelSerializer):
+    """Serializer for PastQuestion model"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    class_name = serializers.CharField(source='class_model.name', read_only=True)
+    school_name = serializers.CharField(source='subject.school.name', read_only=True)
+    session_name = serializers.CharField(source='session.name', read_only=True, allow_null=True)
+    uploaded_by_name = serializers.CharField(source='uploaded_by.email', read_only=True, allow_null=True)
+    
+    file_url = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = PastQuestion
+        fields = [
+            'id', 'title', 'subject', 'subject_name', 'class_model', 'class_name', 
+            'school_name', 'session', 'session_name', 'term', 'file', 'file_url', 
+            'uploaded_by', 'uploaded_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'uploaded_by']
+        
+    def get_file_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and hasattr(obj.file, 'url'):
+            if request:
+                return request.build_absolute_uri(obj.file.url)
+            return obj.file.url
+        return None

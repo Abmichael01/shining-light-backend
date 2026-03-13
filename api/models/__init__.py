@@ -18,6 +18,7 @@ from .academic import (
     CBTExamCode,
      AdmissionSettings,
     SchemeOfWork,
+    PastQuestion,
     SystemSetting,
     GalleryGroup,
     GalleryImage
@@ -84,6 +85,7 @@ __all__ = [
     'CBTExamCode',
     'AdmissionSettings',
     'SchemeOfWork',
+    'PastQuestion',
     'Student',
     'BioData',
     'Guardian',

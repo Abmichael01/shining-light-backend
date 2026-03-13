@@ -17,7 +17,8 @@ from .academic import (
     ExamSerializer,
     AssignmentSerializer,
     SchemeOfWorkSerializer,
-    SystemSettingSerializer
+    SystemSettingSerializer,
+    PastQuestionSerializer
 )
 from .student import (
     StudentSerializer,
@@ -110,6 +111,7 @@ __all__ = [
     'StaffWalletTransactionSerializer',
     'CommunicationTemplateSerializer',
     'BiometricStationSerializer',
-    'SystemSettingSerializer'
+    'SystemSettingSerializer',
+    'PastQuestionSerializer'
 ]
 

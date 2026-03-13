@@ -197,10 +197,11 @@ class Grade(models.Model):
             return cls.objects.filter(min_score__lte=score, max_score__gte=score).first()
 
 
+
+TERM_CHOICES = [('1st Term', '1st Term'), ('2nd Term', '2nd Term'), ('3rd Term', '3rd Term')]
+
 class SchemeOfWork(models.Model):
     """Weekly Scheme of Work for subjects"""
-    
-    TERM_CHOICES = [('1st Term', '1st Term'), ('2nd Term', '2nd Term'), ('3rd Term', '3rd Term')]
     
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='schemes_of_work', verbose_name=_('subject'))
     term = models.CharField(_('term'), max_length=20, choices=TERM_CHOICES)
@@ -221,3 +222,26 @@ class SchemeOfWork(models.Model):
     
     def __str__(self):
         return f"{self.subject.name} - {self.term} Week {self.week_number}: {self.topic}"
+
+
+class PastQuestion(models.Model):
+    """Past examination questions uploaded by admins"""
+    
+    title = models.CharField(_('title'), max_length=255)
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='past_questions', verbose_name=_('subject'))
+    class_model = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='past_questions', verbose_name=_('class'))
+    session = models.ForeignKey('Session', on_delete=models.SET_NULL, null=True, blank=True, related_name='past_questions', verbose_name=_('session'))
+    term = models.CharField(_('term'), max_length=20, choices=TERM_CHOICES)
+    file = models.FileField(_('file'), upload_to='past_questions/')
+    uploaded_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_past_questions', verbose_name=_('uploaded by'))
+    
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+    
+    class Meta:
+        verbose_name = _('Past Question')
+        verbose_name_plural = _('Past Questions')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.title} - {self.subject.name} ({self.term})"
