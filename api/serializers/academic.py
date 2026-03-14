@@ -636,7 +636,7 @@ class PastQuestionSerializer(serializers.ModelSerializer):
         model = PastQuestion
         fields = [
             'id', 'title', 'subject', 'subject_name', 'class_model', 'class_name', 
-            'school_name', 'session', 'session_name', 'term', 'file', 'file_url', 
+            'school_name', 'session', 'session_name', 'term', 'question_type', 'file', 'file_url', 
             'uploaded_by', 'uploaded_by_name', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'uploaded_by']

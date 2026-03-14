@@ -891,6 +891,11 @@ class PastQuestionViewSet(viewsets.ModelViewSet):
         if session:
             queryset = queryset.filter(session_id=session)
 
+        # Filter by question type
+        question_type = self.request.query_params.get("question_type")
+        if question_type:
+            queryset = queryset.filter(question_type=question_type)
+
         # Search
         search = self.request.query_params.get("search")
         if search:

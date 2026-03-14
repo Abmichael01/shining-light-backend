@@ -227,11 +227,18 @@ class SchemeOfWork(models.Model):
 class PastQuestion(models.Model):
     """Past examination questions uploaded by admins"""
     
+    QUESTION_TYPE_CHOICES = [
+        ('Objectives', 'Objectives'),
+        ('Theory', 'Theory'),
+        ('Practical', 'Practical'),
+    ]
+    
     title = models.CharField(_('title'), max_length=255)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='past_questions', verbose_name=_('subject'))
     class_model = models.ForeignKey(Class, on_delete=models.CASCADE, related_name='past_questions', verbose_name=_('class'))
     session = models.ForeignKey('Session', on_delete=models.SET_NULL, null=True, blank=True, related_name='past_questions', verbose_name=_('session'))
     term = models.CharField(_('term'), max_length=20, choices=TERM_CHOICES)
+    question_type = models.CharField(_('question type'), max_length=20, choices=QUESTION_TYPE_CHOICES, default='Objectives')
     file = models.FileField(_('file'), upload_to='past_questions/')
     uploaded_by = models.ForeignKey('User', on_delete=models.SET_NULL, null=True, blank=True, related_name='uploaded_past_questions', verbose_name=_('uploaded by'))
     
