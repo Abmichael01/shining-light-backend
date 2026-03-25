@@ -4,6 +4,7 @@ ViewSets for fee-related models
 from rest_framework import viewsets, status, renderers
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.conf import settings
 from django.db import models
 from django.db.models import Q, Sum, Count
 from api.models import FeeType, FeePayment, Student
@@ -499,7 +500,7 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         
         # Callback URL (Frontend URL)
         # Using port 3050 as specified
-        callback_url = f"http://localhost:3050/portals/student/fees/callback" 
+        callback_url = f"{settings.FRONTEND_URL}/portals/student/fees/callback"
         
         pass_metadata = {
             'fee_type_id': fee_type.id,

@@ -22,10 +22,12 @@ from api.models import (
     Student,
     StudentAnswer,
     StudentExam,
+    StudentSubject,
     Subject,
     SubjectGroup,
     Topic,
     PastQuestion,
+    BioData,
 )
 from api.permissions import IsAdminOrStaff, IsSchoolAdmin
 from api.serializers import (
@@ -266,6 +268,121 @@ class ClassViewSet(viewsets.ModelViewSet):
             )
 
         return queryset
+
+    @action(detail=True, methods=["get"])
+    def broadsheet(self, request, pk=None):
+        """Get the broadsheet for a specific class, session, and term"""
+        klass = self.get_object()
+        session_id = request.query_params.get("session_id")
+        term_id = request.query_params.get("term_id")
+
+        if not session_id:
+            current_session = Session.objects.filter(is_current=True).first()
+            session_id = current_session.id if current_session else None
+        
+        if not term_id and session_id:
+            current_term = SessionTerm.objects.filter(session_id=session_id, is_current=True).first()
+            term_id = current_term.id if current_term else None
+
+        # If term_id is still missing, try to find any active term in the current session
+        if not term_id and session_id:
+             current_term = SessionTerm.objects.filter(session_id=session_id).order_by('-is_current', '-start_date').first()
+             term_id = current_term.id if current_term else None
+
+        if not all([session_id, term_id]):
+            return Response({"error": "session_id and term_id are required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Get all subjects for this class
+        subjects = Subject.objects.filter(class_model=klass).order_by("order", "name")
+        subject_data = [{"id": s.id, "name": s.name, "code": s.code} for s in subjects]
+
+        # 2. Get all enrolled students for this class
+        students = Student.objects.filter(class_model=klass, status='enrolled').select_related("biodata").order_by("biodata__surname", "biodata__first_name")
+        
+        # 3. Get all results for these students and subjects in the session/term
+        registrations = StudentSubject.objects.filter(
+            student__in=students,
+            subject__in=subjects,
+            session_id=session_id,
+            session_term_id=term_id
+        ).select_related("student", "subject", "grade")
+
+        # Map results: student_id -> {subject_id -> score}
+        result_map = {}
+        for reg in registrations:
+            if reg.student_id not in result_map:
+                result_map[reg.student_id] = {}
+            result_map[reg.student_id][reg.subject_id] = {
+                "total": float(reg.total_score) if reg.total_score is not None else None,
+                "grade": reg.grade.grade_letter if reg.grade else None
+            }
+
+        # 4. Prepare student data with scores
+        student_results = []
+        for student in students:
+            scores = {}
+            total_earned = 0
+            subject_count = 0
+            
+            for subject in subjects:
+                res = result_map.get(student.id, {}).get(subject.id)
+                if res:
+                    scores[subject.id] = res
+                    if res["total"] is not None:
+                        total_earned += res["total"]
+                        subject_count += 1
+                else:
+                    scores[subject.id] = {"total": None, "grade": None}
+            
+            average = total_earned / subject_count if subject_count > 0 else 0
+            student_results.append({
+                "id": student.id,
+                "full_name": student.get_full_name(),
+                "admission_number": student.admission_number,
+                "scores": scores,
+                "average": round(float(average), 2),
+                "total_earned": round(float(total_earned), 2),
+                "subject_count": subject_count
+            })
+
+        # 5. Calculate class positions based on average
+        student_results.sort(key=lambda x: x["average"], reverse=True)
+        
+        current_rank = 0
+        current_avg = -1
+        for i, res in enumerate(student_results):
+            if res["average"] != current_avg:
+                current_rank = i + 1
+                current_avg = res["average"]
+            res["position_number"] = current_rank
+            
+            pos = current_rank
+            if 10 <= pos % 100 <= 20: suffix = 'th'
+            else: suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(pos % 10, 'th')
+            res["position"] = f"{pos}{suffix}"
+
+        # 6. Final response
+        try:
+            curr_session_name = Session.objects.get(id=session_id).name
+            curr_term_name = SessionTerm.objects.get(id=term_id).term_name
+        except:
+            curr_session_name = "N/A"
+            curr_term_name = "N/A"
+
+        return Response({
+            "class_metadata": {
+                "name": klass.name,
+                "school": klass.school.name,
+                "session": curr_session_name,
+                "term": curr_term_name
+            },
+            "subjects": subject_data,
+            "students": student_results,
+            "stats": {
+                "total_students": len(student_results),
+                "class_average": round(sum(s["average"] for s in student_results) / len(student_results), 2) if student_results else 0
+            }
+        })
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):

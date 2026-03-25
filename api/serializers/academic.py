@@ -641,6 +641,12 @@ class PastQuestionSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'uploaded_by']
         
+    def validate_file(self, value):
+        max_size = 10 * 1024 * 1024  # 10MB
+        if value.size > max_size:
+            raise serializers.ValidationError("File size must not exceed 10MB.")
+        return value
+
     def get_file_url(self, obj):
         request = self.context.get('request')
         if obj.file and hasattr(obj.file, 'url'):
