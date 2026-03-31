@@ -21,7 +21,8 @@ from .academic import (
     PastQuestion,
     SystemSetting,
     GalleryGroup,
-    GalleryImage
+    GalleryImage,
+    ResultPin
 )
 from .student import (
     Student,
@@ -122,5 +123,6 @@ __all__ = [
     'BiometricStation',
     'SystemSetting',
     'GalleryGroup',
-    'GalleryImage'
+    'GalleryImage',
+    'ResultPin'
 ]

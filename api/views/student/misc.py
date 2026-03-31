@@ -187,11 +187,9 @@ class TermReportViewSet(viewsets.ModelViewSet):
         
         user = self.request.user
         if getattr(user, 'user_type', None) == 'student':
-            try:
-                student = Student.objects.get(user=user)
-                queryset = queryset.filter(student=student)
-            except Student.DoesNotExist:
-                return queryset.none()
+            # Students cannot access this view directly anymore. 
+            # They MUST use the ResultPin.validate action.
+            return queryset.none()
         elif student_id:
             queryset = queryset.filter(student=student_id)
             

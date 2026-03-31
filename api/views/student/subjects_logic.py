@@ -131,10 +131,13 @@ class SubjectLogicMixin:
                     report, _ = TermReport.objects.get_or_create(student_id=st_id, session_id=session_id, session_term_id=session_term_id)
                     report.average_score, report.total_score = avg, regs.aggregate(models.Sum('total_score'))['total_score__sum']
                     curr_term = SessionTerm.objects.get(id=session_term_id)
-                    if '3rd' in curr_term.term_name or 'Third' in curr_term.term_name or curr_term.term_order == 3:
-                        prev_reports = TermReport.objects.filter(student_id=st_id, session_id=session_id).exclude(id=report.id)
-                        report.cumulative_average = (avg + sum(r.average_score for r in prev_reports if r.average_score)) / (1 + prev_reports.count())
-                    else: report.cumulative_average = None
+                    prev_reports = TermReport.objects.filter(student_id=st_id, session_id=session_id).exclude(id=report.id)
+                    
+                    if prev_reports.exists():
+                        all_avgs = [r.average_score for r in prev_reports if r.average_score] + [avg]
+                        report.cumulative_average = sum(all_avgs) / len(all_avgs)
+                    else:
+                        report.cumulative_average = avg
                     from api.models import Grade
                     grade_obj = Grade.get_grade_for_score(float(avg))
                     if grade_obj:

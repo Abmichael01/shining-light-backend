@@ -45,6 +45,12 @@ class FeePayment(models.Model):
         return f"{self.student.get_full_name()} - {self.fee_type.name} - ₦{self.amount:,.2f}"
     
     def save(self, *args, **kwargs):
+        # Default to student's current session/term if not provided
+        if not self.session and self.student.current_session:
+            self.session = self.student.current_session
+        if not self.session_term and self.student.current_term:
+            self.session_term = self.student.current_term
+            
         if not self.receipt_number:
             self.receipt_number = self._generate_receipt_number()
         super().save(*args, **kwargs)

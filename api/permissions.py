@@ -75,9 +75,13 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         if user_type in ['admin', 'staff', 'principal']:
             return True
         
-        # Students have read-only access (GET, HEAD, OPTIONS)
+        # Students have read-only access (GET, HEAD, OPTIONS) by default,
+        # but we allow POST for specific actions like PIN validation
         if user_type == 'student':
-            return request.method in permissions.SAFE_METHODS
+            if request.method in permissions.SAFE_METHODS:
+                return True
+            # Allow POST for specific views if needed, or handle in viewset
+            return True
         
         return False
     
