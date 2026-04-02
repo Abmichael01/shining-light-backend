@@ -1,11 +1,11 @@
 # Base image
-FROM python:3.11-slim-bullseye as builder
+FROM python:3.11-slim-bullseye AS builder
 
 # Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONPATH /app
-ENV PYTHONUNBUFFERED 1
-ENV POETRY_NO_INTERACTION=1 \
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
+    PYTHONUNBUFFERED=1 \
+    POETRY_NO_INTERACTION=1 \
     POETRY_VIRTUALENVS_IN_PROJECT=1 \
     POETRY_VIRTUALENVS_CREATE=1 \
     POETRY_CACHE_DIR=/tmp/poetry_cache
@@ -19,17 +19,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install poetry
-RUN pip install poetry==1.8.2
+# Install poetry (2.0+ required for [project] table support)
+RUN pip install poetry>=2.0.0
 
-# Copy only requirements to cache them in docker layer
-COPY pyproject.toml poetry.lock* ./
+# Copy dependency files
+COPY pyproject.toml poetry.lock ./
 
-# Install dependencies
+# Install dependencies using the lock file
 RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
 # Runtime stage
-FROM python:3.11-slim-bullseye as runtime
+FROM python:3.11-slim-bullseye AS runtime
 
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
