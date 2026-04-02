@@ -23,9 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install poetry>=2.0.0
 
 # Copy dependency files
-COPY pyproject.toml poetry.lock ./
+COPY pyproject.toml poetry.lock* ./
 
-# Install dependencies using the lock file
+# Debug: list files to verify what was copied
+RUN ls -la
+
+# Install dependencies using the lock file if available
 RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 
 # Runtime stage
