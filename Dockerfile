@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     python3-dev \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Install poetry (2.0+ required for [project] table support)
@@ -48,6 +49,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     libcairo2 \
     curl \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy virtual env from builder
