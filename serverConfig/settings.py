@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -148,6 +149,7 @@ CORS_ALLOWED_ORIGINS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -180,16 +182,13 @@ WSGI_APPLICATION = "serverConfig.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 if ENV == 'production':
-    # PostgreSQL configuration for production
+    # PostgreSQL configuration using DATABASE_URL
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.getenv('DB_NAME', 'shinninglight_db'),
-            "USER": os.getenv('DB_USER', 'postgres'),
-            "PASSWORD": os.getenv('DB_PASSWORD', ''),
-            "HOST": os.getenv('DB_HOST', 'localhost'),
-            "PORT": os.getenv('DB_PORT', '5432'),
-        }
+        "default": dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
+            conn_max_age=600,
+            conn_health_checks=True,
+        )
     }
 else:
     # SQLite configuration for development/local
@@ -327,8 +326,24 @@ if os.getenv('AWS_ACCESS_KEY_ID'):
         },
     }
     
-    # Override MEDIA_URL to point to B2
+    # Override MEDIA_URL to point to B2 if configured
     MEDIA_URL = f'{AWS_S3_ENDPOINT_URL}/{AWS_STORAGE_BUCKET_NAME}/media/'
+
+# Static files storage using WhiteNoise
+if not DEBUG:
+    if 'STORAGES' not in globals():
+        STORAGES = {
+            "default": {
+                "BACKEND": "django.core.files.storage.FileSystemStorage",
+            },
+            "staticfiles": {
+                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+            },
+        }
+    
+    STORAGES["staticfiles"] = {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    }
 
 # Frontend URL Configuration
 if ENV == 'production':

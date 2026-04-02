@@ -14,6 +14,7 @@ class FeeTypeSerializer(serializers.ModelSerializer):
 
     school_name = serializers.CharField(source="school.name", read_only=True)
     applicable_class_names = serializers.SerializerMethodField()
+    applicable_student_names = serializers.SerializerMethodField()
     created_by_email = serializers.EmailField(
         source="created_by.email", read_only=True, allow_null=True
     )
@@ -31,6 +32,10 @@ class FeeTypeSerializer(serializers.ModelSerializer):
             "school_name",
             "applicable_classes",
             "applicable_class_names",
+            "applicable_students",
+            "applicable_student_names",
+            "is_penalty",
+            "penalty_reason",
             "max_installments",
             "is_mandatory",
             "is_recurring_per_term",
@@ -51,6 +56,12 @@ class FeeTypeSerializer(serializers.ModelSerializer):
             return "All Classes"
         return ", ".join([c.name for c in obj.applicable_classes.all()])
 
+    def get_applicable_student_names(self, obj):
+        """Get names of applicable students"""
+        if not obj.applicable_students.exists():
+            return "No specific students"
+        return ", ".join([s.get_full_name() for s in obj.applicable_students.all()])
+
     def get_payment_count(self, obj):
         """Get total number of payments for this fee type"""
         return obj.payments.count()
@@ -60,18 +71,24 @@ class FeeTypeSerializer(serializers.ModelSerializer):
         total = obj.payments.aggregate(total=Sum("amount"))["total"]
         return float(total) if total else 0.0
 
-    def update(self, instance, validated_data):
-        applicable_classes = validated_data.pop("applicable_classes", None)
-        instance = super().update(instance, validated_data)
-        if applicable_classes is not None:
-            instance.applicable_classes.set(applicable_classes)
-        return instance
-
     def create(self, validated_data):
         applicable_classes = validated_data.pop("applicable_classes", [])
+        applicable_students = validated_data.pop("applicable_students", [])
         instance = super().create(validated_data)
         if applicable_classes:
             instance.applicable_classes.set(applicable_classes)
+        if applicable_students:
+            instance.applicable_students.set(applicable_students)
+        return instance
+
+    def update(self, instance, validated_data):
+        applicable_classes = validated_data.pop("applicable_classes", None)
+        applicable_students = validated_data.pop("applicable_students", None)
+        instance = super().update(instance, validated_data)
+        if applicable_classes is not None:
+            instance.applicable_classes.set(applicable_classes)
+        if applicable_students is not None:
+            instance.applicable_students.set(applicable_students)
         return instance
 
 

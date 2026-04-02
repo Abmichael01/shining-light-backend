@@ -147,5 +147,42 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         
         return queryset.order_by('-payment_date', '-created_at')
 
+    @action(detail=False, methods=['get'], url_path='clearance-status')
+    def clearance_status(self, request):
+        """Check if student has any unpaid penalty fees"""
+        user = request.user
+        if not hasattr(user, 'student_profile'):
+            return Response({"is_cleared": True, "unpaid_penalties": []})
+        
+        student = user.student_profile
+        
+        # Penalties can be assigned to the student directly OR their class
+        penalties = FeeType.objects.filter(
+            is_penalty=True,
+            is_active=True,
+            school=student.school
+        ).filter(
+            Q(applicable_classes=student.class_model) | 
+            Q(applicable_students=student)
+        ).distinct()
+
+        unpaid_penalties = []
+        for p in penalties:
+            status_context = p.get_payment_status_context(student)
+            if status_context['status'] != 'paid':
+                unpaid_penalties.append({
+                    'id': p.id,
+                    'name': p.name,
+                    'reason': p.penalty_reason or p.description,
+                    'amount': status_context['applicable_amount'],
+                    'remaining': status_context['amount_remaining'],
+                    'status': status_context['status']
+                })
+        
+        return Response({
+            "is_cleared": len(unpaid_penalties) == 0,
+            "unpaid_penalties": unpaid_penalties
+        })
+
     def perform_create(self, serializer):
         serializer.save(processed_by=self.request.user)

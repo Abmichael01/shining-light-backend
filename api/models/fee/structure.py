@@ -45,6 +45,11 @@ class FeeType(models.Model):
     prerequisites = models.ManyToManyField('self', symmetrical=False, blank=True, related_name='required_by')
     active_terms = models.ManyToManyField(SessionTerm, blank=True, related_name='active_fees')
     
+    # Penalty & Enforcement
+    is_penalty = models.BooleanField(default=False, help_text="If true, unpaid fee blocks student portal access")
+    applicable_students = models.ManyToManyField(Student, blank=True, related_name='penalty_fees')
+    penalty_reason = models.TextField(blank=True, help_text="Reason for the penalty (e.g. Broken window)")
+    
     class Meta:
         db_table = 'fee_types'
         ordering = ['school', 'name']
