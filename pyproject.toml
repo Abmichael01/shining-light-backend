@@ -1,5 +1,6 @@
 [project]
 name = "shining-light-backend"
+package-mode = false
 version = "0.1.0"
 description = "Shining Light School Management System"
 authors = [

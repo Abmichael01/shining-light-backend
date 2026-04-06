@@ -156,15 +156,19 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
         
         student = user.student_profile
         
-        # Penalties can be assigned to the student directly OR their class
-        penalties = FeeType.objects.filter(
+        # Penalties can be assigned to the student directly, their class, or everyone in the school (if no class/student specified)
+        base_penalties = FeeType.objects.filter(
             is_penalty=True,
             is_active=True,
             school=student.school
-        ).filter(
-            Q(applicable_classes=student.class_model) | 
-            Q(applicable_students=student)
-        ).distinct()
+        )
+        
+        global_ids = list(base_penalties.filter(applicable_classes__isnull=True, applicable_students__isnull=True).values_list('id', flat=True))
+        class_ids = list(base_penalties.filter(applicable_classes=student.class_model).values_list('id', flat=True))
+        student_ids = list(base_penalties.filter(applicable_students=student).values_list('id', flat=True))
+        
+        all_ids = set(global_ids + class_ids + student_ids)
+        penalties = FeeType.objects.filter(id__in=all_ids).distinct()
 
         unpaid_penalties = []
         for p in penalties:

@@ -133,15 +133,20 @@ class SubjectRegistrationMixin:
         
         if user_type == 'student':
             from api.models.fee import FeeType
-            mandatory_fees = FeeType.objects.filter(
+            base_mandatory = FeeType.objects.filter(
                 school_id=request.user.student_profile.school_id, is_active=True
             ).filter(
                 models.Q(is_mandatory=True) | models.Q(name__icontains='Tuition')
             ).filter(
-                models.Q(applicable_classes__isnull=True) | models.Q(applicable_classes=request.user.student_profile.class_model)
-            ).filter(
                 models.Q(active_terms__id=session_term_id) | models.Q(is_recurring_per_term=True)
-            ).distinct()
+            )
+            
+            global_ids = list(base_mandatory.filter(applicable_classes__isnull=True, applicable_students__isnull=True).values_list('id', flat=True))
+            class_ids = list(base_mandatory.filter(applicable_classes=request.user.student_profile.class_model).values_list('id', flat=True))
+            student_ids = list(base_mandatory.filter(applicable_students=request.user.student_profile).values_list('id', flat=True))
+            
+            all_mandatory_ids = set(global_ids + class_ids + student_ids)
+            mandatory_fees = FeeType.objects.filter(id__in=all_mandatory_ids).distinct()
             
             unpaid_mandatory_fees = []
             for fee in mandatory_fees:
