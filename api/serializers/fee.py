@@ -169,6 +169,9 @@ class StudentFeeStatusSerializer(serializers.Serializer):
     staff_children_amount = serializers.DecimalField(
         max_digits=10, decimal_places=2, allow_null=True
     )
+    is_staff_discount_applied = serializers.BooleanField(required=False, default=False)
+    is_locked = serializers.BooleanField(required=False, default=False)
+    locked_message = serializers.CharField(required=False, allow_blank=True, default="")
     payments = FeePaymentSerializer(many=True, read_only=True)
 
 

@@ -110,6 +110,7 @@ class SystemSetting(models.Model):
     """Global system settings"""
     result_download_fee = models.DecimalField(_('result download fee'), max_digits=10, decimal_places=2, default=1000.00)
     result_pin_price = models.DecimalField(_('result pin price'), max_digits=10, decimal_places=2, default=1500.00)
+    external_exam_access_fee = models.DecimalField(_('external exam access fee'), max_digits=10, decimal_places=2, default=1000.00)
     late_subject_registration_fee = models.DecimalField(_('late subject registration fee'), max_digits=10, decimal_places=2, default=500.00)
     show_announcement = models.BooleanField(_('show announcement'), default=False)
     announcement_title = models.CharField(_('announcement title'), max_length=200, blank=True)

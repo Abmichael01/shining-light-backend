@@ -1,4 +1,11 @@
 from .auth import UserSerializer, LoginSerializer
+from .external_exam import (
+    ExternalExamBodySerializer,
+    ExternalExamSerializer,
+    ExternalExamResultSerializer,
+    ExternalExamAccessSerializer,
+    StudentExternalExamSerializer,
+)
 from .academic import (
     SchoolSerializer, 
     SessionSerializer, 
@@ -112,6 +119,11 @@ __all__ = [
     'CommunicationTemplateSerializer',
     'BiometricStationSerializer',
     'SystemSettingSerializer',
-    'PastQuestionSerializer'
+    'PastQuestionSerializer',
+    'ExternalExamBodySerializer',
+    'ExternalExamSerializer',
+    'ExternalExamResultSerializer',
+    'ExternalExamAccessSerializer',
+    'StudentExternalExamSerializer',
 ]
 

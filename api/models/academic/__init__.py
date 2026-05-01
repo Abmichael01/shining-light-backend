@@ -6,3 +6,4 @@ from .exams import Question, Exam, CBTExamCode
 from .result_pin import ResultPin
 from .cbt import StudentExam, StudentAnswer
 from .gallery import GalleryGroup, GalleryImage
+from .external_exam import ExternalExamBody, ExternalExam, ExternalExamResult, ExternalExamAccess

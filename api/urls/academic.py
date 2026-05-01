@@ -16,6 +16,9 @@ from api.views.academic import (
     SchemeOfWorkViewSet,
     PastQuestionViewSet,
     ResultPinViewSet,
+    ExternalExamBodyViewSet,
+    ExternalExamViewSet,
+    StudentExternalExamViewSet,
     get_student_exams,
     get_student_exam_detail
 )
@@ -40,6 +43,9 @@ router.register(r'past-questions', PastQuestionViewSet, basename='past-question'
 router.register(r'gallery-groups', GalleryGroupViewSet, basename='gallery-group')
 router.register(r'gallery-images', GalleryImageViewSet, basename='gallery-image')
 router.register(r'result-pins', ResultPinViewSet, basename='result-pin')
+router.register(r'external-exam-bodies', ExternalExamBodyViewSet, basename='external-exam-body')
+router.register(r'external-exams', ExternalExamViewSet, basename='external-exam')
+router.register(r'student-external-exams', StudentExternalExamViewSet, basename='student-external-exam')
 
 # Add custom URL patterns for student exams
 from django.urls import path

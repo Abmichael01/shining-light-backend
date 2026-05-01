@@ -7,6 +7,7 @@ from .questions import QuestionViewSet
 from .schemes import SchemeOfWorkViewSet
 from .exams import ExamHallViewSet, ExamViewSet, PastQuestionViewSet, get_student_exams, get_student_exam_detail
 from .result_pin import ResultPinViewSet
+from .external_exam import ExternalExamBodyViewSet, ExternalExamViewSet, StudentExternalExamViewSet
 
 __all__ = [
     'SchoolViewSet',
@@ -27,4 +28,7 @@ __all__ = [
     'get_student_exams',
     'get_student_exam_detail',
     'ResultPinViewSet',
+    'ExternalExamBodyViewSet',
+    'ExternalExamViewSet',
+    'StudentExternalExamViewSet',
 ]

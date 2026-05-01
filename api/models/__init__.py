@@ -22,7 +22,11 @@ from .academic import (
     SystemSetting,
     GalleryGroup,
     GalleryImage,
-    ResultPin
+    ResultPin,
+    ExternalExamBody,
+    ExternalExam,
+    ExternalExamResult,
+    ExternalExamAccess,
 )
 from .student import (
     Student,
@@ -124,5 +128,9 @@ __all__ = [
     'SystemSetting',
     'GalleryGroup',
     'GalleryImage',
-    'ResultPin'
+    'ResultPin',
+    'ExternalExamBody',
+    'ExternalExam',
+    'ExternalExamResult',
+    'ExternalExamAccess',
 ]
