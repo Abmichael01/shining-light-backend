@@ -68,5 +68,5 @@ RUN mkdir -p /app/media /app/staticfiles
 
 EXPOSE 8000
 
-# Start Gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "serverConfig.wsgi:application"]
+# Apply pending database migrations before starting Gunicorn.
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 serverConfig.wsgi:application"]
