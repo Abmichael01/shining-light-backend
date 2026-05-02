@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from api.models import StudentSubject
+from decimal import Decimal, InvalidOperation
 
 class StudentSubjectSerializer(serializers.ModelSerializer):
     """Serializer for StudentSubject model with results"""
@@ -46,6 +47,55 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             'cleared_at', 'cleared_by', 'cleared_by_name',
             'openday_cleared_at', 'openday_cleared_by', 'openday_cleared_by_name', 'can_open_day_clear', 'subject_class_id'
         ]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        student = attrs.get('student') or getattr(self.instance, 'student', None)
+        if not student:
+            return attrs
+
+        def value_for(field_name):
+            value = attrs.get(field_name, getattr(self.instance, field_name, None))
+            if value in [None, '']:
+                return None
+            try:
+                return Decimal(str(value))
+            except (InvalidOperation, TypeError, ValueError):
+                raise serializers.ValidationError({field_name: 'Enter a valid score.'})
+
+        ca_score = value_for('ca_score')
+        objective_score = value_for('objective_score')
+        theory_score = value_for('theory_score')
+        exam_score = value_for('exam_score')
+
+        ca_max = Decimal(str(getattr(student.school, 'ca_max_score', 40) or 40))
+        exam_max = Decimal(str(getattr(student.school, 'exam_max_score', 60) or 60))
+
+        if ca_score is not None and (ca_score < 0 or ca_score > ca_max):
+            raise serializers.ValidationError({
+                'ca_score': f'CA score must be between 0 and {ca_max}.'
+            })
+
+        for field_name, score in [
+            ('objective_score', objective_score),
+            ('theory_score', theory_score),
+        ]:
+            if score is not None and score < 0:
+                raise serializers.ValidationError({
+                    field_name: 'Score cannot be negative.'
+                })
+
+        has_split_exam = objective_score is not None or theory_score is not None
+        combined_exam_score = (
+            (objective_score or Decimal('0')) + (theory_score or Decimal('0'))
+            if has_split_exam else exam_score
+        )
+        if combined_exam_score is not None and combined_exam_score > exam_max:
+            raise serializers.ValidationError({
+                'exam_score': f'Objective + theory score must not exceed {exam_max}.'
+            })
+
+        return attrs
 
     def get_can_open_day_clear(self, obj):
         """UI helper: whether current user can clear for Open Day for this subject."""

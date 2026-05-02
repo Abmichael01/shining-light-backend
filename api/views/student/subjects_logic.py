@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db import transaction, models
 from django.utils import timezone
+from decimal import Decimal
 from api.models import (
     Student, StudentSubject, SessionTerm, TermReport, 
     Subject as SubjectModelAlias
@@ -126,7 +127,12 @@ class SubjectLogicMixin:
             student_ids = list(StudentSubject.objects.filter(session_id=session_id, session_term_id=session_term_id, total_score__isnull=False).values_list('student_id', flat=True).distinct())
             for st_id in student_ids:
                 regs = StudentSubject.objects.filter(student_id=st_id, session_id=session_id, session_term_id=session_term_id, total_score__isnull=False)
-                avg = regs.aggregate(models.Avg('total_score'))['total_score__avg']
+                percentages = [
+                    percentage for percentage in
+                    (reg.calculate_percentage() for reg in regs)
+                    if percentage is not None
+                ]
+                avg = sum(percentages, Decimal('0')) / Decimal(len(percentages)) if percentages else None
                 if avg is not None:
                     report, _ = TermReport.objects.get_or_create(student_id=st_id, session_id=session_id, session_term_id=session_term_id)
                     report.average_score, report.total_score = avg, regs.aggregate(models.Sum('total_score'))['total_score__sum']

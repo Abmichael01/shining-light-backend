@@ -2,7 +2,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models.academic import Grade
 from .models.student import StudentSubject, TermReport
-from django.db.models import Avg, Sum
+from django.db.models import Sum
+from decimal import Decimal
 
 @receiver(post_save, sender=Grade)
 def update_reports_on_grade_change(sender, instance, **kwargs):
@@ -50,9 +51,17 @@ def update_term_report_on_result_change(sender, instance, **kwargs):
     if not results.exists():
         return
         
-    # Calculate totals
+    percentages = [
+        percentage for percentage in
+        (result.calculate_percentage() for result in results)
+        if percentage is not None
+    ]
+    average_score = None
+    if percentages:
+        average_score = sum(percentages, Decimal('0')) / Decimal(len(percentages))
+
+    # Calculate raw totals
     summary = results.aggregate(
-        avg_score=Avg('total_score'),
         total_sum=Sum('total_score')
     )
     
@@ -63,7 +72,7 @@ def update_term_report_on_result_change(sender, instance, **kwargs):
         session_term=term
     )
     
-    report.average_score = summary['avg_score']
+    report.average_score = average_score
     report.total_score = summary['total_sum']
     
     # Apply default remarks if they are currently empty

@@ -190,6 +190,25 @@ class StudentSubject(models.Model):
         exam = self.exam_score or 0
         from decimal import Decimal
         return Decimal(str(ca)) + Decimal(str(exam))
+
+    def get_score_maximum(self):
+        from decimal import Decimal
+
+        school = self.student.school if self.student_id else None
+        ca_max = getattr(school, 'ca_max_score', 40) or 40
+        exam_max = getattr(school, 'exam_max_score', 60) or 60
+        return Decimal(str(ca_max)) + Decimal(str(exam_max))
+
+    def calculate_percentage(self):
+        if self.total_score is None:
+            return None
+
+        from decimal import Decimal
+        score_maximum = self.get_score_maximum()
+        if score_maximum <= 0:
+            return None
+
+        return (Decimal(str(self.total_score)) / score_maximum) * Decimal('100')
     
     def calculate_exam_score(self):
         if self.objective_score is None and self.theory_score is None:
@@ -202,7 +221,9 @@ class StudentSubject(models.Model):
     def calculate_grade(self):
         if self.total_score is not None:
             from api.models.academic import Grade
-            return Grade.get_grade_for_score(float(self.total_score))
+            percentage = self.calculate_percentage()
+            if percentage is not None:
+                return Grade.get_grade_for_score(float(percentage))
         return None
     
     def save(self, *args, **kwargs):
