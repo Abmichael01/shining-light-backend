@@ -346,10 +346,12 @@ if not DEBUG:
     }
 
 # Frontend URL Configuration
-if ENV == 'production':
-    FRONTEND_URL = 'https://shininglightschoolsijebuode.com'
-else:
-    FRONTEND_URL = 'http://localhost:3050'
+DEFAULT_FRONTEND_URL = (
+    'https://shininglightschoolsijebuode.com'
+    if ENV == 'production'
+    else 'http://localhost:3050'
+)
+FRONTEND_URL = os.getenv('FRONTEND_URL', DEFAULT_FRONTEND_URL).rstrip('/')
 
 # Contact Email
 CONTACT_EMAIL = 'ict@shininglightschoolsijebuode.com'

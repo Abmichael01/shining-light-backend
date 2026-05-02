@@ -13,6 +13,10 @@ import uuid
 class PaystackMixin:
     """Mixin for Paystack related actions in FeePaymentViewSet"""
 
+    def _get_frontend_url(self):
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3050')
+        return (frontend_url or 'http://localhost:3050').rstrip('/')
+
     def _get_payment_student(self, request, student_id=None):
         student = getattr(request.user, 'student_profile', None)
         if student:
@@ -70,8 +74,7 @@ class PaystackMixin:
             return Response({'error': str(exc)}, status=400)
              
         reference = f"TREF-{uuid.uuid4().hex[:12].upper()}"
-        settings_obj = SystemSetting.load()
-        frontend_url = getattr(settings_obj, 'FRONTEND_URL', None) or getattr(settings, 'FRONTEND_URL', 'http://localhost:3050')
+        frontend_url = self._get_frontend_url()
         callback_url = f"{frontend_url}/portals/student/fees/callback"
         
         metadata = {
@@ -197,7 +200,7 @@ class PaystackMixin:
             return Response({'error': 'Result PIN price not configured.'}, status=400)
             
         reference = f"PIN-{uuid.uuid4().hex[:12].upper()}"
-        callback_url = f"{request.build_absolute_uri('/')[:-1].replace(':8007', ':3050')}/portals/student/results/callback"
+        callback_url = f"{self._get_frontend_url()}/portals/student/results/callback"
 
         metadata = {
             'is_pin_purchase': True, 'student_id': student.id, 'amount': float(amount),

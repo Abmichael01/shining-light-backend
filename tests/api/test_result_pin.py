@@ -1,5 +1,6 @@
 import pytest
 from unittest.mock import patch
+from django.test import override_settings
 from django.urls import reverse
 from api.models import (
     School, Student, Session, SessionTerm, 
@@ -84,6 +85,29 @@ class TestResultPinSystem:
         assert 'authorization_url' in response.data
         assert 'reference' in response.data
         assert float(response.data['amount']) == 1000.0
+
+    @override_settings(FRONTEND_URL="https://frontend.example.com/")
+    @patch('api.utils.paystack.Paystack.initialize_transaction')
+    def test_initialize_pin_purchase_uses_frontend_callback_url(
+        self,
+        mock_init,
+        authenticated_client,
+        student_profile,
+        pin_price_setting
+    ):
+        mock_init.return_value = {
+            'authorization_url': 'http://test.com',
+            'access_code': 'test_code'
+        }
+
+        response = authenticated_client.post(
+            reverse('api:fee-payment-initialize-pin-purchase')
+        )
+
+        assert response.status_code == 200
+        assert mock_init.call_args.kwargs['callback_url'] == (
+            'https://frontend.example.com/portals/student/results/callback'
+        )
 
     @patch('api.utils.paystack.Paystack.verify_transaction')
     def test_verify_pin_purchase_creates_pin(self, mock_verify, authenticated_client, student_profile, pin_price_setting):
