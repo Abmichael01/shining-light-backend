@@ -17,6 +17,7 @@ from .student import (
     GuardianViewSet,
     DocumentViewSet,
     BiometricViewSet,
+    ResultScoreSubmissionViewSet,
     StudentSubjectViewSet,
     TermReportViewSet
 )
@@ -40,6 +41,7 @@ __all__ = [
     'GuardianViewSet',
     'DocumentViewSet',
     'BiometricViewSet',
+    'ResultScoreSubmissionViewSet',
     'StudentSubjectViewSet',
     'TermReportViewSet',
     'convert_html_to_pdf',

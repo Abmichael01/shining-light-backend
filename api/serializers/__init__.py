@@ -35,6 +35,7 @@ from .student import (
     GuardianSerializer,
     DocumentSerializer,
     BiometricSerializer,
+    ResultScoreSubmissionSerializer,
     StudentSubjectSerializer,
     TermReportSerializer,
     CBTStudentProfileSerializer
@@ -94,6 +95,7 @@ __all__ = [
     'GuardianSerializer',
     'DocumentSerializer',
     'BiometricSerializer',
+    'ResultScoreSubmissionSerializer',
     'StudentSubjectSerializer',
     'TermReportSerializer',
     'CBTStudentProfileSerializer',
@@ -126,4 +128,3 @@ __all__ = [
     'ExternalExamAccessSerializer',
     'StudentExternalExamSerializer',
 ]
-

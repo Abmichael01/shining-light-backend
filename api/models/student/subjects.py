@@ -264,3 +264,53 @@ class StudentSubject(models.Model):
             exam_max = float(self.student.school.exam_max_score)
             if self.exam_score < 0 or self.exam_score > exam_max:
                 raise ValidationError({'exam_score': _(f'Exam score must be between 0 and {exam_max}')})
+
+
+class ResultScoreSubmission(models.Model):
+    """Pending teacher-entered score changes awaiting admin approval."""
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+
+    student_subject = models.ForeignKey(
+        StudentSubject,
+        on_delete=models.CASCADE,
+        related_name='score_submissions',
+        verbose_name=_('student subject'),
+    )
+    proposed_scores = models.JSONField(_('proposed scores'), default=dict)
+    status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='pending')
+    submitted_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='score_submissions',
+        verbose_name=_('submitted by'),
+    )
+    reviewed_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_score_submissions',
+        verbose_name=_('reviewed by'),
+    )
+    reviewed_at = models.DateTimeField(_('reviewed at'), null=True, blank=True)
+    rejection_reason = models.TextField(_('rejection reason'), blank=True)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+    class Meta:
+        verbose_name = _('Result Score Submission')
+        verbose_name_plural = _('Result Score Submissions')
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['submitted_by', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.student_subject} - {self.status}"

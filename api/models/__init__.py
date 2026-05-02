@@ -35,6 +35,7 @@ from .student import (
     Document,
     Biometric,
     StudentSubject,
+    ResultScoreSubmission,
     TermReport
 )
 from .staff import (
@@ -97,6 +98,7 @@ __all__ = [
     'Document',
     'Biometric',
     'StudentSubject',
+    'ResultScoreSubmission',
     'TermReport',
     'Staff',
     'StaffEducation',

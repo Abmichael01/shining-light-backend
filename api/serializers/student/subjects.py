@@ -1,9 +1,11 @@
 from rest_framework import serializers
-from api.models import StudentSubject
+from api.models import ResultScoreSubmission, StudentSubject, SystemSetting
 from decimal import Decimal, InvalidOperation
 
 class StudentSubjectSerializer(serializers.ModelSerializer):
     """Serializer for StudentSubject model with results"""
+    student_full_name = serializers.SerializerMethodField()
+    student_admission_number = serializers.CharField(source='student.admission_number', read_only=True, allow_null=True)
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
     subject_class_id = serializers.CharField(source='subject.class_model_id', read_only=True)
@@ -23,7 +25,8 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentSubject
         fields = [
-            'id', 'student', 'subject', 'subject_name', 'subject_code', 'subject_class_id',
+            'id', 'student', 'student_full_name', 'student_admission_number',
+            'subject', 'subject_name', 'subject_code', 'subject_class_id',
             'session', 'session_name', 'session_term', 'term_name',
             'is_active',
             'cleared', 'cleared_at', 'cleared_by', 'cleared_by_name',
@@ -40,6 +43,7 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             'id', 'registered_at', 'updated_at', 'total_score', 'current_term_score',
+            'student_full_name', 'student_admission_number',
             'subject_name', 'subject_code', 'session_name', 'term_name',
             'grade', 'grade_name', 'grade_description',
             'first_term_score', 'second_term_score',
@@ -71,6 +75,17 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
         ca_max = Decimal(str(getattr(student.school, 'ca_max_score', 40) or 40))
         exam_max = Decimal(str(getattr(student.school, 'exam_max_score', 60) or 60))
 
+        if 'ca_score' in attrs:
+            allow_ca_score_editing = self.context.get('allow_ca_score_editing')
+            if allow_ca_score_editing is None:
+                allow_ca_score_editing = SystemSetting.load().allow_ca_score_editing
+
+            previous_ca_score = getattr(self.instance, 'ca_score', None)
+            if not allow_ca_score_editing and ca_score != previous_ca_score:
+                raise serializers.ValidationError({
+                    'ca_score': 'CA score editing is currently disabled.'
+                })
+
         if ca_score is not None and (ca_score < 0 or ca_score > ca_max):
             raise serializers.ValidationError({
                 'ca_score': f'CA score must be between 0 and {ca_max}.'
@@ -96,6 +111,9 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             })
 
         return attrs
+
+    def get_student_full_name(self, obj):
+        return obj.student.get_full_name()
 
     def get_can_open_day_clear(self, obj):
         """UI helper: whether current user can clear for Open Day for this subject."""
@@ -139,3 +157,63 @@ class StudentSubjectSerializer(serializers.ModelSerializer):
             return other_reg.total_score if other_reg else None
         except Exception:
             return None
+
+
+class ResultScoreSubmissionSerializer(serializers.ModelSerializer):
+    student_subject_detail = StudentSubjectSerializer(source='student_subject', read_only=True)
+    student_name = serializers.SerializerMethodField()
+    student_admission_number = serializers.CharField(source='student_subject.student.admission_number', read_only=True, allow_null=True)
+    subject_name = serializers.CharField(source='student_subject.subject.name', read_only=True)
+    subject_code = serializers.CharField(source='student_subject.subject.code', read_only=True)
+    class_name = serializers.CharField(source='student_subject.subject.class_model.name', read_only=True)
+    session_name = serializers.CharField(source='student_subject.session.name', read_only=True)
+    term_name = serializers.CharField(source='student_subject.session_term.term_name', read_only=True, allow_null=True)
+    submitted_by_name = serializers.SerializerMethodField()
+    reviewed_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ResultScoreSubmission
+        fields = [
+            'id',
+            'student_subject',
+            'student_subject_detail',
+            'student_name',
+            'student_admission_number',
+            'subject_name',
+            'subject_code',
+            'class_name',
+            'session_name',
+            'term_name',
+            'proposed_scores',
+            'status',
+            'submitted_by',
+            'submitted_by_name',
+            'reviewed_by',
+            'reviewed_by_name',
+            'reviewed_at',
+            'rejection_reason',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_student_name(self, obj):
+        return obj.student_subject.student.get_full_name()
+
+    def get_submitted_by_name(self, obj):
+        user = obj.submitted_by
+        if not user:
+            return None
+        staff = getattr(user, 'staff_profile', None)
+        if staff:
+            return staff.get_full_name()
+        return getattr(user, 'email', None)
+
+    def get_reviewed_by_name(self, obj):
+        user = obj.reviewed_by
+        if not user:
+            return None
+        staff = getattr(user, 'staff_profile', None)
+        if staff:
+            return staff.get_full_name()
+        return getattr(user, 'email', None)

@@ -121,6 +121,8 @@ class SystemSetting(models.Model):
     staff_maintenance_message = models.TextField(_('staff maintenance message'), default='Staff portal is temporarily unavailable.')
     disable_student_login = models.BooleanField(_('disable student login'), default=False)
     student_maintenance_message = models.TextField(_('student maintenance message'), default='Student portal is temporarily unavailable.')
+    allow_ca_score_editing = models.BooleanField(_('allow CA score editing'), default=True)
+    require_result_entry_approval = models.BooleanField(_('require result entry approval'), default=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:

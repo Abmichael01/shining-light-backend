@@ -5,7 +5,7 @@ from .base import (
     BiometricSerializer,
     TermReportSerializer
 )
-from .subjects import StudentSubjectSerializer
+from .subjects import ResultScoreSubmissionSerializer, StudentSubjectSerializer
 from .main import (
     StudentSerializer,
     CBTStudentProfileSerializer,
