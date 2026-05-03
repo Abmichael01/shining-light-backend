@@ -16,10 +16,10 @@ class UserSerializer(serializers.ModelSerializer):
 class LoginSerializer(serializers.Serializer):
     """
     Serializer for login requests - compatible with dj-rest-auth
-    Uses email instead of username for authentication
+    Allows authentication using email, application number, or admission number
     """
     
-    email = serializers.EmailField(required=True)
+    username = serializers.CharField(required=True)
     password = serializers.CharField(
         required=True, 
         write_only=True, 
@@ -28,14 +28,15 @@ class LoginSerializer(serializers.Serializer):
     )
     
     def validate(self, attrs):
-        email = attrs.get('email')
+        username = attrs.get('username')
         password = attrs.get('password')
         
-        if email and password:
-            # Authenticate using email as username (our User model uses email)
+        if username and password:
+            # The custom MultiFieldModelBackend will handle looking up the user
+            # by email, application_number, or admission_number
             user = authenticate(
                 request=self.context.get('request'),
-                username=email,  # Django expects 'username' but our model uses email
+                username=username,
                 password=password
             )
             
@@ -47,7 +48,7 @@ class LoginSerializer(serializers.Serializer):
                 msg = _('User account is disabled.')
                 raise serializers.ValidationError(msg, code='authorization')
         else:
-            msg = _('Must include "email" and "password".')
+            msg = _('Must include "username" and "password".')
             raise serializers.ValidationError(msg, code='authorization')
         
         # This is required by dj-rest-auth

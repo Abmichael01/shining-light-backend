@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.db.models import Q
 from api.serializers import UserSerializer
 from api.models import User
 from api.models.academic import SystemSetting
@@ -24,28 +25,42 @@ class LoginView(DjRestAuthLoginView):
         """
         Before proceeding with login, check if the portal for this
         user type has been disabled by administrators.
-        We check early using the email field before full auth.
         """
-        email = request.data.get('email')
-        if email:
+        username = request.data.get('username') or request.data.get('email')
+        if username:
             try:
-                user = User.objects.get(email=email)
-                system_settings = SystemSetting.load()
+                # Try email lookup
+                user = User.objects.filter(email__iexact=username).first()
+                
+                # If not found, try application/admission number
+                if not user:
+                    from api.models import Student
+                    student = Student.objects.filter(
+                        Q(application_number__iexact=username) | 
+                        Q(admission_number__iexact=username) |
+                        Q(id__iexact=username)
+                    ).first()
+                    if student:
+                        user = student.user
 
-                # Admins are never restricted
-                if user.user_type != 'admin' and not user.is_superuser:
-                    if user.user_type == 'staff' and system_settings.disable_staff_login:
-                        raise PermissionDenied(
-                            system_settings.staff_maintenance_message or
-                            "Staff portal is temporarily unavailable."
-                        )
-                    if user.user_type == 'student' and system_settings.disable_student_login:
-                        raise PermissionDenied(
-                            system_settings.student_maintenance_message or
-                            "Student portal is temporarily unavailable."
-                        )
-            except User.DoesNotExist:
-                pass  # Let the normal login flow handle invalid credentials
+                if user:
+                    from api.models.academic import SystemSetting
+                    system_settings = SystemSetting.load()
+
+                    # Admins are never restricted
+                    if user.user_type != 'admin' and not user.is_superuser:
+                        if user.user_type == 'staff' and system_settings.disable_staff_login:
+                            raise PermissionDenied(
+                                system_settings.staff_maintenance_message or
+                                "Staff portal is temporarily unavailable."
+                            )
+                        if user.user_type == 'student' and system_settings.disable_student_login:
+                            raise PermissionDenied(
+                                system_settings.student_maintenance_message or
+                                "Student portal is temporarily unavailable."
+                            )
+            except Exception:
+                pass  # Let the normal login flow handle invalid credentials or errors
 
         return super().post(request, *args, **kwargs)
 
@@ -72,13 +87,28 @@ class CheckAdminView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get('email')
-        if not email:
-            return Response({'error': 'Email is required'}, status=400)
+        username = request.data.get('email') or request.data.get('username')
+        if not username:
+            return Response({'error': 'Username or Email is required'}, status=400)
 
         try:
-            user = User.objects.get(email=email)
-            is_admin = user.user_type == 'admin' or user.is_superuser
-            return Response({'is_admin': is_admin})
-        except User.DoesNotExist:
+            # Try email lookup
+            user = User.objects.filter(email__iexact=username).first()
+            
+            # If not found, try application/admission number
+            if not user:
+                from api.models import Student
+                student = Student.objects.filter(
+                    Q(application_number__iexact=username) | 
+                    Q(admission_number__iexact=username) |
+                    Q(id__iexact=username)
+                ).first()
+                if student:
+                    user = student.user
+
+            if user:
+                is_admin = user.user_type == 'admin' or user.is_superuser
+                return Response({'is_admin': is_admin})
+            return Response({'is_admin': False})
+        except Exception:
             return Response({'is_admin': False})

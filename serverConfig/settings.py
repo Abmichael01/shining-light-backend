@@ -258,6 +258,12 @@ USE_I18N = True
 USE_TZ = True
 
 
+# Authentication settings
+AUTHENTICATION_BACKENDS = [
+    'api.authentication.backends.MultiFieldModelBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
