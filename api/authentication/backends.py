@@ -17,24 +17,24 @@ class MultiFieldModelBackend(ModelBackend):
         user = None
         
         # 1. Try Email lookup (standard)
-        try:
-            user = User.objects.get(email__iexact=username)
-        except User.DoesNotExist:
+        user = User.objects.filter(email__iexact=username).first()
+        
+        if not user:
             # 2. Try Student Application Number
-            try:
-                student = Student.objects.get(application_number__iexact=username)
+            student = Student.objects.filter(application_number__iexact=username).first()
+            if student:
                 user = student.user
-            except Student.DoesNotExist:
+            else:
                 # 3. Try Student Admission Number
-                try:
-                    student = Student.objects.get(admission_number__iexact=username)
+                student = Student.objects.filter(admission_number__iexact=username).first()
+                if student:
                     user = student.user
-                except Student.DoesNotExist:
+                else:
                     # 4. Try Student ID (the primary key 'id' like STU-XXX)
-                    try:
-                        student = Student.objects.get(id__iexact=username)
+                    student = Student.objects.filter(id__iexact=username).first()
+                    if student:
                         user = student.user
-                    except Student.DoesNotExist:
+                    else:
                         return None
 
         if user and user.check_password(password) and self.user_can_authenticate(user):

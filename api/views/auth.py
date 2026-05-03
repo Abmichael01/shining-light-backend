@@ -6,7 +6,7 @@ from rest_framework.exceptions import PermissionDenied
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.db.models import Q
-from api.serializers import UserSerializer
+from api.serializers import UserSerializer, LoginSerializer
 from api.models import User
 from api.models.academic import SystemSetting
 
@@ -18,6 +18,7 @@ class LoginView(DjRestAuthLoginView):
     Extends dj-rest-auth LoginView to include user details.
     Also enforces portal-specific login restrictions from SystemSetting.
     """
+    serializer_class = LoginSerializer
     authentication_classes = []  # No authentication - prevents session/CSRF checks
     permission_classes = [AllowAny]  # Allow unauthenticated access to login
 

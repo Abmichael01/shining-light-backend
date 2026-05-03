@@ -117,7 +117,7 @@ Your Application Details for Future Login:
 - Password: {password}
 
 You are currently logged in. If you need to stop and continue later, you can use the credentials above to log in at:
-{settings.FRONTEND_URL}/portals/admission/login
+{settings.FRONTEND_URL}/portals/login
 
 Required Steps to Complete Your Application:
 1. Bio Data
