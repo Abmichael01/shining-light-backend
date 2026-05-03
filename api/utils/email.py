@@ -325,46 +325,46 @@ def send_withdrawal_status_email(withdrawal, status_type):
         subject = f'Withdrawal {status_type.title()} - Shining Light School'
         
         if status_type == 'success':
-            plain_message = f"""
-Dear {context['staff_name']},
-
-Your withdrawal of ₦{context['amount']:,} has been successfully processed via Paystack.
-
-Transaction Details:
-- Reference: {context['reference']}
-- Destination: {context['account_details']}
-- Status: Completed
-
-The funds should arrive in your bank account shortly.
-
-Best regards,
-Shining Light School Administration
+            content = f"""
+<p>Dear {context['staff_name']},</p>
+<p>Your withdrawal of <strong>₦{context['amount']:,}</strong> has been successfully processed.</p>
+<div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
+    <p style="margin: 5px 0;"><strong>Transaction Details:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Reference: {context['reference']}</li>
+        <li>Destination: {context['account_details']}</li>
+        <li>Status: <span style="color: #10b981; font-weight: bold;">Completed</span></li>
+    </ul>
+</div>
+<p>The funds should arrive in your bank account shortly.</p>
 """
+            plain_message = f"Dear {context['staff_name']}, Your withdrawal of ₦{context['amount']:,} has been successfully processed. Reference: {context['reference']}."
         else:
-            plain_message = f"""
-Dear {context['staff_name']},
-
-Your withdrawal of ₦{context['amount']:,} could not be processed.
-
-Transaction Details:
-- Reference: {context['reference']}
-- Destination: {context['account_details']}
-- Status: Failed
-- Reason: {context['reason']}
-
-Please contact administration or try again later.
-
-Best regards,
-Shining Light School Administration
+            content = f"""
+<p>Dear {context['staff_name']},</p>
+<p>Your withdrawal of <strong>₦{context['amount']:,}</strong> could not be processed.</p>
+<div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #fee2e2;">
+    <p style="margin: 5px 0;"><strong>Transaction Details:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Reference: {context['reference']}</li>
+        <li>Status: <span style="color: #ef4444; font-weight: bold;">Failed</span></li>
+        <li>Reason: {context['reason']}</li>
+    </ul>
+</div>
+<p>Please contact administration or try again later.</p>
 """
+            plain_message = f"Dear {context['staff_name']}, Your withdrawal of ₦{context['amount']:,} could not be processed. Reason: {context['reason']}."
         
-        send_mail(
+        html_message = wrap_with_base_template(subject, content)
+        
+        msg = EmailMultiAlternatives(
             subject=subject,
-            message=plain_message,
+            body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[staff_email],
-            fail_silently=False,
+            to=[staff_email]
         )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
         return True
     except Exception as e:
         print(f"Error sending withdrawal email: {str(e)}")
@@ -399,31 +399,32 @@ def send_staff_funding_receipt(wallet, amount, reference):
         
         subject = 'Wallet Funding Receipt - Shining Light School'
         
-        plain_message = f"""
-Dear {context['staff_name']},
-
-Your wallet has been successfully funded.
-
-Transaction Details:
-- Amount: ₦{context['amount']:,}
-- Reference: {context['reference']}
-- Date: {context['date']}
-
-Current Wallet Balance: ₦{context['balance']:,}
-
-Thank you for using Shining Light School Portal.
-
-Best regards,
-Shining Light School Administration
+        content = f"""
+<p>Dear {context['staff_name']},</p>
+<p>Your wallet has been successfully funded.</p>
+<div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
+    <p style="margin: 5px 0;"><strong>Transaction Details:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Amount: <strong>₦{context['amount']:,}</strong></li>
+        <li>Reference: {context['reference']}</li>
+        <li>Date: {context['date']}</li>
+    </ul>
+    <p style="margin: 15px 0 0 0; font-size: 18px;">Current Balance: <strong>₦{context['balance']:,}</strong></p>
+</div>
+<p>Thank you for using Shining Light School Portal.</p>
 """
+        plain_message = f"Dear {context['staff_name']}, Your wallet has been successfully funded with ₦{context['amount']:,}. Current Balance: ₦{context['balance']:,}."
         
-        send_mail(
+        html_message = wrap_with_base_template(subject, content)
+        
+        msg = EmailMultiAlternatives(
             subject=subject,
-            message=plain_message,
+            body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[staff_email],
-            fail_silently=False,
+            to=[staff_email]
         )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
         return True
     except Exception as e:
         print(f"Error sending funding receipt: {str(e)}")
@@ -458,31 +459,33 @@ def send_student_fee_receipt(payment):
         
         subject = 'Payment Receipt - Shining Light School'
         
-        plain_message = f"""
-Dear Parent/Guardian of {context['student_name']},
-
-We have received a payment for your ward.
-
-Payment Details:
-- Student: {context['student_name']} ({context['admission_number']})
-- Purpose: {context['purpose']}
-- Amount: \u20a6{context['amount']:,}
-- Reference: {context['reference']}
-- Date: {context['date']}
-
-This email serves as your official receipt.
-
-Best regards,
-Shining Light School Administration
+        content = f"""
+<p>Dear Parent/Guardian of {context['student_name']},</p>
+<p>We have received a payment for your ward.</p>
+<div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
+    <p style="margin: 5px 0;"><strong>Payment Details:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Student: {context['student_name']} ({context['admission_number']})</li>
+        <li>Purpose: {context['purpose']}</li>
+        <li>Amount: <strong>₦{context['amount']:,}</strong></li>
+        <li>Reference: {context['reference']}</li>
+        <li>Date: {context['date']}</li>
+    </ul>
+</div>
+<p>This email serves as your official receipt.</p>
 """
+        plain_message = f"Payment receipt for {context['student_name']}. Amount: ₦{context['amount']:,}. Purpose: {context['purpose']}. Reference: {context['reference']}."
         
-        send_mail(
+        html_message = wrap_with_base_template(subject, content)
+        
+        msg = EmailMultiAlternatives(
             subject=subject,
-            message=plain_message,
+            body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=recipient_emails,
-            fail_silently=False,
+            to=recipient_emails
         )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
         return True
     except Exception as e:
         print(f"Error sending fee receipt: {str(e)}")
@@ -565,23 +568,23 @@ def send_login_notification_email(user, request=None):
 
         subject = 'New Login Alert - Shining Light School'
 
-        plain_message = f"""
-Dear {context['user_name']},
-
-A new login to your Shining Light School account was detected.
-
-Details:
-- Account: {context['email']}
-- Time: {context['time']}
-- Device: {context['device']}
-- IP Address: {context['ip']}
-
-If this was you, you can safely ignore this email.
-If you did not authorize this login, please contact support and change your password immediately.
-
-Best regards,
-Shining Light School Administration
+        content = f"""
+<p>Dear {context['user_name']},</p>
+<p>A new login to your Shining Light School account was detected.</p>
+<div style="background-color: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ffedd5;">
+    <p style="margin: 5px 0;"><strong>Login Details:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Account: {context['email']}</li>
+        <li>Time: {context['time']}</li>
+        <li>Device: {context['device']}</li>
+        <li>IP Address: {context['ip']}</li>
+    </ul>
+</div>
+<p>If this was you, you can safely ignore this email. If you did not authorize this login, please change your password immediately.</p>
 """
+        plain_message = f"New login detected for {context['email']} at {context['time']} from {context['device']} ({context['ip']})."
+        
+        html_message = wrap_with_base_template(subject, content)
         
         recipient_list = [user_email]
         
@@ -592,13 +595,14 @@ Shining Light School Administration
                 if email not in recipient_list:
                     recipient_list.append(email)
 
-        send_mail(
+        msg = EmailMultiAlternatives(
             subject=subject,
-            message=plain_message,
+            body=plain_message,
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=recipient_list,
-            fail_silently=False,
+            to=recipient_list
         )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
         return True
     except Exception as e:
         print(f"Error sending login notification: {str(e)}")

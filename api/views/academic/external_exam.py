@@ -176,7 +176,7 @@ class StudentExternalExamViewSet(viewsets.ReadOnlyModelViewSet):
         if not student:
             return ExternalExam.objects.none()
         return ExternalExam.objects.filter(
-            applicable_class=student.current_class
+            applicable_class=student.class_model
         ).select_related('body', 'applicable_class')
 
     @action(detail=True, methods=['post'], url_path='request-access')

@@ -91,6 +91,9 @@ class DocumentSerializer(serializers.ModelSerializer):
                     validated_data['document_file'] = ContentFile(base64.b64decode(filestr), name=f'doc_{uuid.uuid4()}.{ext}')
                 except Exception:
                     pass
+            else:
+                # Restore the file object if it's already a file (from multipart upload)
+                validated_data['document_file'] = file_data
         elif file_data == "":
             validated_data['document_file'] = None
         
@@ -147,6 +150,9 @@ class BiometricSerializer(serializers.ModelSerializer):
                         validated_data[field] = ContentFile(base64.b64decode(filestr), name=f'thumb_{uuid.uuid4()}.{ext}')
                     except Exception:
                         pass
+                else:
+                    # Restore the file object if it's already a file (from multipart upload)
+                    validated_data[field] = file_data
             elif file_data == "":
                 validated_data[field] = None
         

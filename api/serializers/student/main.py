@@ -246,7 +246,7 @@ class StudentListSerializer(serializers.ModelSerializer):
             'school', 'school_name', 'school_type', 'class_model', 'class_name',
             'department', 'department_name', 'status', 'source',
             'passport_photo', 'primary_phone', 'recipient_emails',
-            'application_date', 'enrollment_date', 'created_at'
+            'application_date', 'application_submitted_at', 'enrollment_date', 'created_at'
         ]
         read_only_fields = fields
     

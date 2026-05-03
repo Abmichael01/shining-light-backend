@@ -73,27 +73,30 @@ class AdmissionService:
     def send_otp_email(email, otp, school_name="Shining Light Schools"):
         """Send OTP to applicant"""
         subject = f"Your Verification Code - {school_name}"
-        message = f"""
-Dear Applicant,
-
-Your verification code is: {otp}
-
-This code is valid for 10 minutes.
-Use this code to verify your email and complete your admission application.
-
-Request made for: {school_name}
-
-If you did not request this code, please ignore this email.
-        """.strip()
+        content = f"""
+<p>Dear Applicant,</p>
+<p>Your verification code for <strong>{school_name}</strong> is:</p>
+<div style="text-align: center; margin: 30px 0;">
+    <span style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #1a0c66; background-color: #f1f5f9; padding: 15px 30px; border-radius: 8px; border: 1px dashed #cbd5e1;">{otp}</span>
+</div>
+<p>This code is valid for <strong>10 minutes</strong>. Use it to verify your email and complete your admission application.</p>
+<p>If you did not request this code, please ignore this email.</p>
+"""
+        plain_message = f"Your verification code is: {otp}. It is valid for 10 minutes."
+        
+        from api.utils.email import wrap_with_base_template
+        html_message = wrap_with_base_template(subject, content)
         
         try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [email],
-                fail_silently=False,
+            from django.core.mail import EmailMultiAlternatives
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[email]
             )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send()
             print(f"✅ OTP email sent to {email}")
             return True
         except Exception as e:
@@ -107,41 +110,44 @@ If you did not request this code, please ignore this email.
         """
         subject = f"Admission Application Started - {applicant.school.name}"
         
-        message = f"""
-Dear Applicant,
-
-Congratulations! Your admission application to {applicant.school.name} has been successfully started.
-
-Your Application Details for Future Login:
-- Application Number: {applicant.application_number}
-- Password: {password}
-
-You are currently logged in. If you need to stop and continue later, you can use the credentials above to log in at:
-{settings.FRONTEND_URL}/portals/login
-
-Required Steps to Complete Your Application:
-1. Bio Data
-2. Guardian Information
-3. Upload Documents
-4. Pay Application Fee
-
-Once all steps are complete, you can submit your application.
-
-For any assistance, please contact us at {settings.CONTACT_EMAIL}
-
-Best regards,
-{applicant.school.name}
-Admissions Office
-        """.strip()
+        content = f"""
+<p>Dear Applicant,</p>
+<p>Congratulations! Your admission application to <strong>{applicant.school.name}</strong> has been successfully started.</p>
+<div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #dcfce7;">
+    <p style="margin: 5px 0;"><strong>Your Login Credentials:</strong></p>
+    <ul style="list-style: none; padding: 0;">
+        <li>Application Number: <strong>{applicant.application_number}</strong></li>
+        <li>Password: <strong>{password}</strong></li>
+    </ul>
+</div>
+<p>You can use these credentials to log in and continue your application at any time:</p>
+<p style="text-align: center;">
+    <a href="{settings.FRONTEND_URL}/portals/login" class="btn">Continue Application</a>
+</p>
+<p><strong>Required Steps:</strong></p>
+<ol>
+    <li>Bio Data</li>
+    <li>Guardian Information</li>
+    <li>Upload Documents</li>
+    <li>Pay Application Fee</li>
+</ol>
+<p>For any assistance, please contact us at {settings.CONTACT_EMAIL}</p>
+"""
+        plain_message = f"Your admission application has started. App Number: {applicant.application_number}, Password: {password}."
+        
+        from api.utils.email import wrap_with_base_template
+        html_message = wrap_with_base_template(subject, content)
         
         try:
-            send_mail(
-                subject,
-                message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user_email],
-                fail_silently=False,
+            from django.core.mail import EmailMultiAlternatives
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[user_email]
             )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send()
             print(f"✅ Welcome email sent to {user_email}")
             return True
         except Exception as e:
