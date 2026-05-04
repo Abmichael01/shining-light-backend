@@ -182,7 +182,7 @@ class PaystackMixin:
                             name="External Exam Access",
                             defaults={
                                 'school': student.school, 'amount': amount_paid,
-                                'description': f"Access fee for {exam.body_short_name} {exam.year}",
+                                'description': f"Access fee for {exam.body.short_name} {exam.year}",
                                 'is_active': True, 'is_mandatory': False
                             }
                         )
