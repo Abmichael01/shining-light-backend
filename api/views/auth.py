@@ -48,20 +48,34 @@ class LoginView(DjRestAuthLoginView):
                     from api.models.academic import SystemSetting
                     system_settings = SystemSetting.load()
 
-                    # Admins are never restricted
+                    # Admins and superusers are never restricted
                     if user.user_type != 'admin' and not user.is_superuser:
+                        # 1. Global Maintenance Mode (Blocks all non-admins)
+                        if system_settings.is_maintenance_mode:
+                            raise PermissionDenied(
+                                system_settings.maintenance_message or
+                                "System is under maintenance."
+                            )
+
+                        # 2. Portal-Specific Login Restrictions
                         if user.user_type == 'staff' and system_settings.disable_staff_login:
                             raise PermissionDenied(
                                 system_settings.staff_maintenance_message or
                                 "Staff portal is temporarily unavailable."
                             )
+                        
                         if user.user_type == 'student' and system_settings.disable_student_login:
                             raise PermissionDenied(
                                 system_settings.student_maintenance_message or
                                 "Student portal is temporarily unavailable."
                             )
+                        
+                        # 3. Applicant-specific restrictions (if any in future)
+                        # Currently they are covered by the global maintenance mode above.
+            except PermissionDenied:
+                raise
             except Exception:
-                pass  # Let the normal login flow handle invalid credentials or errors
+                pass  # Let the normal login flow handle invalid credentials or other errors
 
         return super().post(request, *args, **kwargs)
 
