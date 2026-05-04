@@ -237,7 +237,7 @@ class Command(BaseCommand):
                 'grade_letter': 'B',
                 'grade_name': 'B',
                 'min_score': 60,
-                'max_score': 69,
+                'max_score': 69.99,
                 'grade_description': 'Very Good',
                 'teacher_remark': 'Very good effort. You can do even better.',
                 'principal_remark': 'Commendable performance. Keep striving for excellence.'
@@ -246,7 +246,7 @@ class Command(BaseCommand):
                 'grade_letter': 'C',
                 'grade_name': 'C',
                 'min_score': 50,
-                'max_score': 59,
+                'max_score': 59.99,
                 'grade_description': 'Good',
                 'teacher_remark': 'Good work. Put in more effort to improve.',
                 'principal_remark': 'Satisfactory. More concentration required.'
@@ -255,7 +255,7 @@ class Command(BaseCommand):
                 'grade_letter': 'D',
                 'grade_name': 'D',
                 'min_score': 45,
-                'max_score': 49,
+                'max_score': 49.99,
                 'grade_description': 'Pass',
                 'teacher_remark': 'Fair performance. You need to work harder.',
                 'principal_remark': 'Below average. Significant improvement needed.'
@@ -264,7 +264,7 @@ class Command(BaseCommand):
                 'grade_letter': 'E',
                 'grade_name': 'E',
                 'min_score': 40,
-                'max_score': 44,
+                'max_score': 44.99,
                 'grade_description': 'Pass',
                 'teacher_remark': 'Weak performance. Requires urgent attention.',
                 'principal_remark': 'Poor performance. Extra coaching recommended.'
@@ -273,7 +273,7 @@ class Command(BaseCommand):
                 'grade_letter': 'F',
                 'grade_name': 'F',
                 'min_score': 0,
-                'max_score': 39,
+                'max_score': 39.99,
                 'grade_description': 'Fail',
                 'teacher_remark': 'Failed. Serious effort needed to improve.',
                 'principal_remark': 'Unsatisfactory. Requires immediate intervention.'

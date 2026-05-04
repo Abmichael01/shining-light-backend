@@ -16,17 +16,27 @@ def update_reports_on_grade_change(sender, instance, **kwargs):
         average_score__lte=instance.max_score
     )
     
+    all_grades = Grade.objects.all()
+    teacher_defaults = {g.teacher_remark for g in all_grades if g.teacher_remark}
+    ict_defaults = {g.ict_remark for g in all_grades if g.ict_remark}
+    principal_defaults = {g.principal_remark for g in all_grades if g.principal_remark}
+
     for report in reports:
         updated = False
-        if not report.class_teacher_report and instance.teacher_remark:
-            report.class_teacher_report = instance.teacher_remark
-            updated = True
-        if not report.ict_report and instance.ict_remark:
-            report.ict_report = instance.ict_remark
-            updated = True
-        if not report.principal_report and instance.principal_remark:
-            report.principal_report = instance.principal_remark
-            updated = True
+        if not report.class_teacher_report or report.class_teacher_report in teacher_defaults:
+            if instance.teacher_remark:
+                report.class_teacher_report = instance.teacher_remark
+                updated = True
+        
+        if not report.ict_report or report.ict_report in ict_defaults:
+            if instance.ict_remark:
+                report.ict_report = instance.ict_remark
+                updated = True
+                
+        if not report.principal_report or report.principal_report in principal_defaults:
+            if instance.principal_remark:
+                report.principal_report = instance.principal_remark
+                updated = True
         
         if updated:
             report.save()
@@ -75,17 +85,30 @@ def update_term_report_on_result_change(sender, instance, **kwargs):
     report.average_score = average_score
     report.total_score = summary['total_sum']
     
-    # Apply default remarks if they are currently empty
+    # Apply default remarks if they are currently empty or if they match a default remark
     if report.average_score is not None:
         matching_grade = Grade.get_grade_for_score(float(report.average_score))
         if matching_grade:
-            if not report.class_teacher_report and matching_grade.teacher_remark:
-                report.class_teacher_report = matching_grade.teacher_remark
-            if not report.ict_report and matching_grade.ict_remark:
-                report.ict_report = matching_grade.ict_remark
-            if not report.principal_report and matching_grade.principal_remark:
-                report.principal_report = matching_grade.principal_remark
-    
+            # Get all existing default remarks to check if we can overwrite the current one
+            all_grades = Grade.objects.all()
+            teacher_defaults = {g.teacher_remark for g in all_grades if g.teacher_remark}
+            ict_defaults = {g.ict_remark for g in all_grades if g.ict_remark}
+            principal_defaults = {g.principal_remark for g in all_grades if g.principal_remark}
+
+            # Update class teacher report
+            if not report.class_teacher_report or report.class_teacher_report in teacher_defaults:
+                if matching_grade.teacher_remark:
+                    report.class_teacher_report = matching_grade.teacher_remark
+            
+            # Update ICT report
+            if not report.ict_report or report.ict_report in ict_defaults:
+                if matching_grade.ict_remark:
+                    report.ict_report = matching_grade.ict_remark
+            
+            # Update principal report
+            if not report.principal_report or report.principal_report in principal_defaults:
+                if matching_grade.principal_remark:
+                    report.principal_report = matching_grade.principal_remark
     
     report.save()
 

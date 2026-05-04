@@ -189,12 +189,19 @@ class Grade(models.Model):
     
     @classmethod
     def get_grade_for_score(cls, score):
-        try:
-            return cls.objects.get(min_score__lte=score, max_score__gte=score)
-        except cls.DoesNotExist:
+        """
+        Finds the appropriate grade for a given score.
+        Uses a robust logic that finds the highest grade where min_score <= score,
+        effectively eliminating gaps between ranges.
+        """
+        if score is None:
             return None
-        except cls.MultipleObjectsReturned:
-            return cls.objects.filter(min_score__lte=score, max_score__gte=score).first()
+            
+        # Round score to 2 decimal places for consistent comparison
+        score = float(round(float(score), 2))
+        
+        # Find the highest grade where min_score is less than or equal to the score
+        return cls.objects.filter(min_score__lte=score).order_by('-min_score').first()
 
 
 

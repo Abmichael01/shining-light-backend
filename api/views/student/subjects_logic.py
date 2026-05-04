@@ -395,8 +395,17 @@ class SubjectLogicMixin:
                     from api.models import Grade
                     grade_obj = Grade.get_grade_for_score(float(avg))
                     if grade_obj:
-                        if not report.class_teacher_report: report.class_teacher_report = grade_obj.teacher_remark
-                        if not report.principal_report: report.principal_report = grade_obj.principal_remark
+                        all_grades = Grade.objects.all()
+                        teacher_defaults = {g.teacher_remark for g in all_grades if g.teacher_remark}
+                        principal_defaults = {g.principal_remark for g in all_grades if g.principal_remark}
+
+                        if not report.class_teacher_report or report.class_teacher_report in teacher_defaults:
+                            if grade_obj.teacher_remark:
+                                report.class_teacher_report = grade_obj.teacher_remark
+                        
+                        if not report.principal_report or report.principal_report in principal_defaults:
+                            if grade_obj.principal_remark:
+                                report.principal_report = grade_obj.principal_remark
                     report.save()
 
             all_reports = TermReport.objects.filter(session_id=session_id, session_term_id=session_term_id, average_score__isnull=False).select_related('student__class_model')
