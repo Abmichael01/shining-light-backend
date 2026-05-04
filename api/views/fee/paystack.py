@@ -165,6 +165,14 @@ class PaystackMixin:
                         )
                         
                         pin_record = ResultPin.objects.create(payment=payment, student=student)
+                        
+                        # Send Email and SMS with the PIN
+                        try:
+                            from api.utils.email import send_result_pin_receipt
+                            send_result_pin_receipt(student, pin_record, amount_paid)
+                        except Exception as e:
+                            print(f"Failed to send PIN notification: {e}")
+                            
                         return Response({
                             'status': 'success', 'message': 'PIN purchased',
                             'pin': pin_record.pin, 'serial': pin_record.serial_number, 'amount': amount_paid

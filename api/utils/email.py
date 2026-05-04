@@ -492,6 +492,67 @@ def send_student_fee_receipt(payment):
         return False
 
 
+def send_result_pin_receipt(student, pin_record, amount):
+    """
+    Send receipt and PIN details for Result PIN purchase via Email and SMS
+    """
+    try:
+        from api.utils.sms import send_sms
+        recipient_emails = get_student_recipient_emails(student)
+
+        # 1. Send Email
+        if recipient_emails:
+            context = {
+                'student_name': student.get_full_name(),
+                'admission_number': student.admission_number,
+                'pin': pin_record.pin,
+                'serial': pin_record.serial_number,
+                'amount': amount,
+                'date': datetime.datetime.now().strftime("%B %d, %Y"),
+                'year': datetime.datetime.now().year,
+            }
+            
+            subject = 'Result PIN Purchase - Shining Light School'
+            
+            content = f"""
+    <p>Dear Parent/Guardian of {context['student_name']},</p>
+    <p>Your Result Checking PIN has been successfully generated.</p>
+    <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e2e8f0;">
+        <p style="margin: 5px 0;"><strong>PIN Details:</strong></p>
+        <ul style="list-style: none; padding: 0; font-size: 16px;">
+            <li>PIN: <strong style="color: #0f172a; font-size: 20px; letter-spacing: 2px;">{context['pin']}</strong></li>
+            <li>Serial Number: {context['serial']}</li>
+            <li>Student: {context['student_name']} ({context['admission_number']})</li>
+            <li>Amount Paid: <strong>₦{context['amount']:,}</strong></li>
+            <li>Date: {context['date']}</li>
+        </ul>
+    </div>
+    <p>You can use this PIN to check the student's results on the portal.</p>
+    """
+            plain_message = f"Result PIN for {context['student_name']}. PIN: {context['pin']}. Serial: {context['serial']}. Amount: ₦{context['amount']:,}."
+            
+            html_message = wrap_with_base_template(subject, content)
+            
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=recipient_emails
+            )
+            msg.attach_alternative(html_message, "text/html")
+            msg.send()
+
+        # 2. Send SMS to Primary Guardian
+        primary_guardian = student.guardians.filter(is_primary_contact=True).first()
+        if primary_guardian and primary_guardian.phone_number:
+            sms_message = f"Shining Light School: Result PIN for {student.get_full_name()} is {pin_record.pin}. S/N: {pin_record.serial_number}."
+            send_sms(primary_guardian.phone_number, sms_message)
+            
+        return True
+    except Exception as e:
+        print(f"Error sending PIN receipt: {str(e)}")
+        return False
+
 def template_exists(template_name):
     """Check if a template file exists"""
     from django.template.loader import get_template
