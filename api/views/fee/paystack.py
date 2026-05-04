@@ -191,7 +191,7 @@ class PaystackMixin:
                             student=student, fee_type=fee_type, amount=amount_paid,
                             session=payment_session, session_term=payment_term,
                             payment_method='online', payment_date=timezone.now().date(),
-                            reference_number=reference, notes=f"External Exam Access ({exam.body_short_name})",
+                            reference_number=reference, notes=f"External Exam Access ({exam.body.short_name})",
                             processed_by=request.user
                         )
 
@@ -256,7 +256,7 @@ class PaystackMixin:
             'exam_id': exam.id,
             'amount': float(amount),
             'custom_fields': [
-                {'display_name': "Payment For", 'variable_name': "payment_for", 'value': f"Access to {exam.body_short_name} {exam.year}"},
+                {'display_name': "Payment For", 'variable_name': "payment_for", 'value': f"Access to {exam.body.short_name} {exam.year}"},
                 {'display_name': "Student", 'variable_name': "student", 'value': student.get_full_name()}
             ]
         }
