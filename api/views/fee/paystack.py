@@ -5,7 +5,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from api.models import (
-    FeeType, FeePayment, Student, SystemSetting, ResultPin, Session, SessionTerm
+    FeeType, FeePayment, Student, SystemSetting, ResultPin, Session, SessionTerm,
+    ExternalExam, ExternalExamAccess
 )
 from api.utils.paystack import Paystack
 import uuid
@@ -169,7 +170,43 @@ class PaystackMixin:
                             'pin': pin_record.pin, 'serial': pin_record.serial_number, 'amount': amount_paid
                         })
 
-                    # 2. Handle Regular Fee Payment
+                    # 3. Handle External Exam Access
+                    if metadata.get('is_external_exam_access'):
+                        exam_id = metadata.get('exam_id')
+                        try:
+                            exam = ExternalExam.objects.get(id=exam_id)
+                        except ExternalExam.DoesNotExist:
+                            return Response({'error': 'Exam not found'}, status=404)
+
+                        fee_type, _ = FeeType.objects.get_or_create(
+                            name="External Exam Access",
+                            defaults={
+                                'school': student.school, 'amount': amount_paid,
+                                'description': f"Access fee for {exam.body_short_name} {exam.year}",
+                                'is_active': True, 'is_mandatory': False
+                            }
+                        )
+
+                        payment = FeePayment.objects.create(
+                            student=student, fee_type=fee_type, amount=amount_paid,
+                            session=payment_session, session_term=payment_term,
+                            payment_method='online', payment_date=timezone.now().date(),
+                            reference_number=reference, notes=f"External Exam Access ({exam.body_short_name})",
+                            processed_by=request.user
+                        )
+
+                        # Grant access
+                        ExternalExamAccess.objects.get_or_create(
+                            student=student, exam=exam,
+                            defaults={'payment': payment}
+                        )
+
+                        return Response({
+                            'status': 'success', 'message': 'Access granted',
+                            'exam_id': exam_id, 'amount': amount_paid
+                        })
+
+                    # 4. Handle Regular Fee Payment
                     if not fee_type_id: fee_type_id = metadata.get('fee_type_id')
                     fee_type = FeeType.objects.get(id=fee_type_id)
                     payment = FeePayment.objects.create(
@@ -183,6 +220,59 @@ class PaystackMixin:
             except Exception as e:
                 return Response({'error': f'Failed: {str(e)}'}, status=500)
         return Response({'error': 'Verification failed'}, status=400)
+
+    @action(detail=False, methods=['post'])
+    def initialize_external_exam_payment(self, request):
+        user = request.user
+        student = getattr(user, 'student_profile', None)
+        exam_id = request.data.get('exam_id')
+
+        if not student:
+            return Response({'error': 'Only students can request access.'}, status=400)
+        
+        if not exam_id:
+            return Response({'error': 'Exam ID is required.'}, status=400)
+
+        try:
+            exam = ExternalExam.objects.get(id=exam_id)
+        except ExternalExam.DoesNotExist:
+            return Response({'error': 'Exam not found.'}, status=404)
+
+        if ExternalExamAccess.objects.filter(student=student, exam=exam).exists():
+            return Response({'error': 'Access already granted.'}, status=400)
+
+        settings_obj = SystemSetting.load()
+        amount = settings_obj.external_exam_access_fee
+        
+        if not amount or amount <= 0:
+            return Response({'error': 'Access fee not configured.'}, status=400)
+            
+        reference = f"EXT-{uuid.uuid4().hex[:12].upper()}"
+        callback_url = f"{self._get_frontend_url()}/portals/student/external-results"
+
+        metadata = {
+            'is_external_exam_access': True, 
+            'student_id': student.id, 
+            'exam_id': exam.id,
+            'amount': float(amount),
+            'custom_fields': [
+                {'display_name': "Payment For", 'variable_name': "payment_for", 'value': f"Access to {exam.body_short_name} {exam.year}"},
+                {'display_name': "Student", 'variable_name': "student", 'value': student.get_full_name()}
+            ]
+        }
+        
+        paystack = Paystack()
+        response = paystack.initialize_transaction(
+            email=user.email, amount=float(amount), reference=reference,
+            callback_url=callback_url, metadata=metadata
+        )
+        
+        if response:
+            return Response({
+                'authorization_url': response['authorization_url'],
+                'reference': reference, 'amount': float(amount)
+            })
+        return Response({'error': 'Failed to initialize payment'}, status=500)
 
     @action(detail=False, methods=['post'])
     def initialize_pin_purchase(self, request):
