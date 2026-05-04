@@ -49,9 +49,12 @@ class ExternalExamViewSet(viewsets.ModelViewSet):
         if not student_id:
             return Response({'error': 'student_id is required.'}, status=400)
 
-        try:
-            student = Student.objects.get(id=student_id)
-        except Student.DoesNotExist:
+        # Try ID first, then admission number
+        student = Student.objects.filter(id=student_id).first()
+        if not student:
+            student = Student.objects.filter(admission_number=student_id).first()
+        
+        if not student:
             return Response({'error': 'Student not found.'}, status=404)
 
         grades = None
@@ -99,56 +102,67 @@ class ExternalExamViewSet(viewsets.ModelViewSet):
             try:
                 with zipfile.ZipFile(zip_file) as zf:
                     for filename in zf.namelist():
-                        name, ext = os.path.splitext(filename)
+                        if filename.endswith('/'): continue # Skip directories
+                        
+                        base_filename = os.path.basename(filename)
+                        name, ext = os.path.splitext(base_filename)
                         if ext.lower() not in ['.pdf', '.jpg', '.jpeg', '.png']:
                             continue
+                        
                         admission_number = name.strip()
                         try:
                             student = Student.objects.get(admission_number=admission_number)
+                            
+                            file_data = zf.read(filename)
+                            result, created = ExternalExamResult.objects.get_or_create(
+                                exam=exam, student=student
+                            )
+                            result.result_file.save(base_filename, ContentFile(file_data), save=True)
+                            if created:
+                                created_count += 1
+                            else:
+                                updated_count += 1
                         except Student.DoesNotExist:
-                            errors.append(f'{filename}: admission number not found')
-                            continue
+                            errors.append(f'{filename}: admission number {admission_number} not found')
+                        except Exception as e:
+                            errors.append(f'{filename}: error processing: {str(e)}')
+            except zipfile.BadZipFile:
+                return Response({'error': 'Invalid zip file.'}, status=400)
+            except Exception as e:
+                return Response({'error': f'ZIP processing failed: {str(e)}'}, status=500)
 
-                        file_data = zf.read(filename)
+        if csv_file:
+            try:
+                decoded = csv_file.read().decode('utf-8-sig')
+                reader = csv.DictReader(io.StringIO(decoded))
+                # Group rows by admission_number
+                student_grades: dict = {}
+                for row in reader:
+                    adm = row.get('admission_number', '').strip()
+                    subject = row.get('subject', '').strip()
+                    grade = row.get('grade', '').strip()
+                    if not adm or not subject or not grade:
+                        continue
+                    student_grades.setdefault(adm, []).append({'subject': subject, 'grade': grade})
+
+                for admission_number, grades in student_grades.items():
+                    try:
+                        student = Student.objects.get(admission_number=admission_number)
                         result, created = ExternalExamResult.objects.get_or_create(
                             exam=exam, student=student
                         )
-                        result.result_file.save(filename, ContentFile(file_data), save=True)
+                        result.grades = grades
+                        result.save()
                         if created:
                             created_count += 1
                         else:
                             updated_count += 1
-            except zipfile.BadZipFile:
-                return Response({'error': 'Invalid zip file.'}, status=400)
-
-        if csv_file:
-            decoded = csv_file.read().decode('utf-8')
-            reader = csv.DictReader(io.StringIO(decoded))
-            # Group rows by admission_number
-            student_grades: dict = {}
-            for row in reader:
-                adm = row.get('admission_number', '').strip()
-                subject = row.get('subject', '').strip()
-                grade = row.get('grade', '').strip()
-                if not adm or not subject or not grade:
-                    continue
-                student_grades.setdefault(adm, []).append({'subject': subject, 'grade': grade})
-
-            for admission_number, grades in student_grades.items():
-                try:
-                    student = Student.objects.get(admission_number=admission_number)
-                except Student.DoesNotExist:
-                    errors.append(f'{admission_number}: not found')
-                    continue
-                result, created = ExternalExamResult.objects.get_or_create(
-                    exam=exam, student=student
-                )
-                result.grades = grades
-                result.save()
-                if created:
-                    created_count += 1
-                else:
-                    updated_count += 1
+                    except Student.DoesNotExist:
+                        errors.append(f'{admission_number}: not found')
+                    except Exception as e:
+                        errors.append(f'{admission_number}: error: {str(e)}')
+            except Exception as e:
+                return Response({'error': f'CSV processing failed: {str(e)}'}, status=500)
 
         return Response({
             'created': created_count,
