@@ -99,6 +99,12 @@ class Student(models.Model):
         choices=APPLICATION_STATUS_CHOICES,
         default='applicant'
     )
+    
+    wants_mock_exam = models.BooleanField(
+        _('wants to do mock exam'),
+        default=False,
+        help_text=_('Whether the applicant wants to participate in the optional mock exam')
+    )
     source = models.CharField(
         _('source'),
         max_length=30,

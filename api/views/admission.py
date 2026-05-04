@@ -11,6 +11,7 @@ from django.contrib.auth import authenticate
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework_simplejwt.tokens import RefreshToken
+import datetime
 
 from api.models import (
     Student, BioData, Guardian, Document, AdmissionSettings,
@@ -299,7 +300,9 @@ def applicant_biodata(request):
             try:
                 biodata = BioData.objects.get(student=student)
                 serializer = BioDataSerializer(biodata)
-                return Response(serializer.data)
+                data = serializer.data
+                data['wants_mock_exam'] = student.wants_mock_exam
+                return Response(data)
             except BioData.DoesNotExist:
                 return Response(
                     {'error': 'Biodata not found'},
@@ -316,10 +319,18 @@ def applicant_biodata(request):
             if serializer.is_valid():
                 biodata = serializer.save(student=student)
                 
+                # Handle wants_mock_exam update on student
+                wants_mock_exam = request.data.get('wants_mock_exam')
+                if wants_mock_exam is not None:
+                    student.wants_mock_exam = str(wants_mock_exam).lower() == 'true'
+                    student.save(update_fields=['wants_mock_exam'])
+                
                 # Update checklist
                 AdmissionService.update_checklist_item(student, 'biodata_complete', True)
                 
-                return Response(serializer.data, status=status.HTTP_200_OK)
+                data = serializer.data
+                data['wants_mock_exam'] = student.wants_mock_exam
+                return Response(data, status=status.HTTP_200_OK)
             
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -975,3 +986,98 @@ class PaymentPurposeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = PaymentPurpose.objects.filter(is_active=True)
     serializer_class = PaymentPurposeSerializer
     permission_classes = [AllowAny]
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def count_filtered_applicants(request):
+    """
+    Get count of applicants matching filters for notification
+    """
+    filters = request.data.get('filters', {})
+    # Only target applicants, not enrolled students
+    applicant_statuses = ['applicant', 'under_review', 'accepted', 'rejected']
+    queryset = Student.objects.filter(status__in=applicant_statuses)
+
+    if filters.get('status') and filters['status'] != 'all':
+        queryset = queryset.filter(status=filters['status'])
+    if filters.get('class_id') and filters['class_id'] != 'all':
+        queryset = queryset.filter(class_model_id=filters['class_id'])
+    if filters.get('school_id') and filters['school_id'] != 'all':
+        queryset = queryset.filter(school_id=filters['school_id'])
+    if filters.get('paid_for_mock'):
+        queryset = queryset.filter(wants_mock_exam=True, application_checklist__payment_complete=True)
+
+    return Response({'count': queryset.count()})
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def notify_applicants(request):
+    """
+    Send notifications to applicants based on filters or selection
+    """
+    student_ids = request.data.get('student_ids', [])
+    filters = request.data.get('filters', {})
+    message_type = request.data.get('message_type', 'Notification')
+    exam_date = request.data.get('exam_date')
+    exam_time = request.data.get('exam_time')
+    additional_message = request.data.get('message', '')
+
+    applicant_statuses = ['applicant', 'under_review', 'accepted', 'rejected']
+    queryset = Student.objects.filter(status__in=applicant_statuses)
+
+    if student_ids:
+        queryset = queryset.filter(id__in=student_ids)
+    else:
+        # Apply filters
+        if filters.get('status') and filters['status'] != 'all':
+            queryset = queryset.filter(status=filters['status'])
+        if filters.get('class_id') and filters['class_id'] != 'all':
+            queryset = queryset.filter(class_model_id=filters['class_id'])
+        if filters.get('school_id') and filters['school_id'] != 'all':
+            queryset = queryset.filter(school_id=filters['school_id'])
+        if filters.get('paid_for_mock'):
+            queryset = queryset.filter(wants_mock_exam=True, application_checklist__payment_complete=True)
+
+    students = queryset.select_related('user').prefetch_related('guardians')
+    
+    if not students.exists():
+        return Response({'error': 'No recipients found for the selected criteria'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Resolve emails
+    from api.utils.email import get_student_recipient_emails, send_bulk_email
+    
+    recipient_emails = []
+    for student in students:
+        emails = get_student_recipient_emails(student)
+        recipient_emails.extend(emails)
+    
+    recipient_emails = list(set(recipient_emails)) # De-duplicate
+
+    if not recipient_emails:
+        return Response({'error': 'No email addresses found for selected recipients'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Construct subject and message
+    subject = f"{message_type} - Shining Light School"
+    
+    context = {
+        'message_type': message_type,
+        'exam_date': exam_date,
+        'exam_time': exam_time,
+        'additional_message': additional_message,
+        'year': datetime.datetime.now().year,
+    }
+    
+    try:
+        from django.template.loader import render_to_string
+        content = render_to_string('emails/applicant_notification.html', context)
+    except Exception as e:
+        print(f"Template rendering failed: {e}")
+        # Fallback to simple content if template missing
+        content = f"Your {message_type} is scheduled for {exam_date} at {exam_time}. {additional_message}"
+
+    success, msg = send_bulk_email(recipient_emails, subject, content)
+    
+    if success:
+        return Response({'success': True, 'message': msg, 'recipient_count': len(recipient_emails)})
+    else:
+        return Response({'error': f'Failed to send notification: {msg}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

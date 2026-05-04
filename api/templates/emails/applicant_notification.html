@@ -1,0 +1,74 @@
+{% extends 'emails/base_template.html' %}
+
+{% block content %}
+<div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+    <div style="margin-bottom: 32px;">
+        <h2 style="color: #1a0c66; margin-top: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em;">
+            {{ message_type }}
+        </h2>
+        
+        <p style="margin-top: 16px; font-size: 16px; color: #1f2937;">
+            Dear Parent/Guardian,
+        </p>
+        
+        <p style="font-size: 16px; color: #1f2937; margin-top: 16px;">
+            {% if message_type == 'Reminder on Pending Admission Submission' %}
+                We hope this email finds you well. We noticed that you have started your ward's admission application but are yet to finalize the submission. 
+            {% elif message_type == 'General Notice' %}
+                We have an important update regarding the admission process for your ward. Please see the details below:
+            {% else %}
+                This is to inform you that a <strong>{{ message_type }}</strong> has been scheduled for your ward. Please find the details below:
+            {% endif %}
+        </p>
+        
+        {% if exam_date or exam_time %}
+        <div style="margin: 24px 0; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                {% if exam_date %}
+                <tr>
+                    <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-transform: uppercase; font-weight: 600;">Date</td>
+                </tr>
+                <tr>
+                    <td style="padding-bottom: 16px; color: #111827; font-size: 18px; font-weight: 700;">{{ exam_date }}</td>
+                </tr>
+                {% endif %}
+                
+                {% if exam_time %}
+                <tr>
+                    <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-transform: uppercase; font-weight: 600;">Time</td>
+                </tr>
+                <tr>
+                    <td style="color: #111827; font-size: 18px; font-weight: 700;">{{ exam_time }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+        {% endif %}
+
+        {% if additional_message %}
+        <div style="margin-top: 24px;">
+            <p style="margin: 0; color: #1f2937; font-size: 16px; white-space: pre-line;">
+                {{ additional_message }}
+            </p>
+        </div>
+        {% endif %}
+
+        {% if message_type != 'Reminder on Pending Admission Submission' and message_type != 'General Notice' %}
+        <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 15px; color: #111827;">
+                <strong>Important Instructions:</strong>
+            </p>
+            <ul style="padding-left: 20px; margin-top: 12px; color: #4b5563; font-size: 15px;">
+                <li style="margin-bottom: 10px;">Please ensure your ward is present at the school premises at least 30 minutes before the scheduled time.</li>
+                <li style="margin-bottom: 10px;">Ensure all necessary materials (stationery, etc.) are available.</li>
+                <li>Verify your ward's exam center upon arrival.</li>
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+
+    <p style="font-size: 14px; color: #9ca3af; text-align: center; margin-top: 32px;">
+        This is an automated notification from Shining Light School Management.
+    </p>
+</div>
+{% endblock %}

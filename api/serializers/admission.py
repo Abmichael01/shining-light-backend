@@ -192,13 +192,14 @@ class ApplicantDashboardSerializer(serializers.ModelSerializer):
     documents = DocumentSerializer(many=True, read_only=True)
     school_name = serializers.CharField(source='school.name', read_only=True)
     class_name = serializers.CharField(source='class_model.name', read_only=True)
+    mock_exam_fee = serializers.SerializerMethodField()
     
     class Meta:
         model = Student
         fields = [
             'id', 'application_number', 'seat_number', 'status',
             'school', 'school_name', 'class_model', 'class_name',
-            'application_date', 'application_submitted_at',
+            'application_date', 'application_submitted_at', 'wants_mock_exam', 'mock_exam_fee',
             'checklist', 'biodata', 'guardians', 'documents'
         ]
         read_only_fields = fields
@@ -218,6 +219,11 @@ class ApplicantDashboardSerializer(serializers.ModelSerializer):
                 checklist.get('payment_complete', False)
             ])
         }
+    
+    def get_mock_exam_fee(self, obj):
+        """Get the current mock exam fee from system settings"""
+        from api.models import SystemSetting
+        return SystemSetting.load().mock_exam_fee
 
 
 class ApplicationSubmissionSerializer(serializers.Serializer):
@@ -266,3 +272,5 @@ class PaymentStatusSerializer(serializers.Serializer):
     required_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     payment_date = serializers.DateTimeField(read_only=True, required=False)
     receipt_number = serializers.CharField(read_only=True, required=False)
+    wants_mock_exam = serializers.BooleanField(read_only=True)
+    mock_exam_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)

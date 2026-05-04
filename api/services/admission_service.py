@@ -339,6 +339,12 @@ class AdmissionService:
         except PaymentPurpose.DoesNotExist:
             admission_purpose = None
         
+        # Add mock exam fee if requested
+        if applicant.wants_mock_exam:
+            from api.models import SystemSetting
+            sys_settings = SystemSetting.load()
+            required_amount += sys_settings.mock_exam_fee
+        
         # Check for payment
         payment_query = FeePayment.objects.filter(
             student=applicant
@@ -348,16 +354,17 @@ class AdmissionService:
             payment_query = payment_query.filter(payment_purpose=admission_purpose)
         
         total_paid = sum([p.amount for p in payment_query])
-        has_paid = total_paid >= required_amount if required_amount > 0 else True
         
         latest_payment = payment_query.order_by('-payment_date').first()
         
         return {
-            'has_paid': has_paid,
+            'has_paid': total_paid >= required_amount and required_amount > 0,
             'amount_paid': total_paid,
             'required_amount': required_amount,
             'payment_date': latest_payment.payment_date if latest_payment else None,
-            'receipt_number': latest_payment.receipt_number if latest_payment else None
+            'receipt_number': latest_payment.receipt_number if latest_payment else None,
+            'wants_mock_exam': applicant.wants_mock_exam,
+            'mock_exam_fee': SystemSetting.load().mock_exam_fee if applicant.wants_mock_exam else 0
         }
     
     @staticmethod

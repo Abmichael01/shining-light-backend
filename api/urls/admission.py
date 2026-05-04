@@ -25,6 +25,8 @@ from api.views.admission import (
     paystack_webhook,
     submit_application,
     application_slip,
+    notify_applicants,
+    count_filtered_applicants,
 )
 
 # Create router for viewsets
@@ -66,4 +68,8 @@ urlpatterns = [
     # Submission
     path('submit/', submit_application, name='admission-submit'),
     path('slip/', application_slip, name='admission-slip'),
+    
+    # Notifications
+    path('notify-applicants/', notify_applicants, name='admission-notify-applicants'),
+    path('count-filtered-applicants/', count_filtered_applicants, name='admission-count-filtered-applicants'),
 ]

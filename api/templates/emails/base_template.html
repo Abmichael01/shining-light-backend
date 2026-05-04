@@ -85,7 +85,9 @@
 
         <!-- Main Content Section -->
         <div class="content">
-            {{ content|safe }}
+            {% block content %}
+                {{ content|safe }}
+            {% endblock %}
         </div>
 
         <!-- Footer Section -->
