@@ -98,9 +98,14 @@ class IsAdminOrStaffOrStudent(permissions.BasePermission):
         
         # Students can only access their own data, or public data
         if user_type == 'student':
-            # If the object has a student field, ensure it matches the current user
+            # 1. If the object has a student field, ensure it matches the current user
             if hasattr(obj, 'student') and hasattr(obj.student, 'user'):
                 return obj.student.user == user
+            
+            # 2. Allow actions on ExternalExam (like request-access)
+            from api.models import ExternalExam
+            if isinstance(obj, ExternalExam):
+                return True
             
             # For other objects (like Assignments), we rely on has_permission ( SAFE_METHODS ) 
             # and get_queryset for filtering
