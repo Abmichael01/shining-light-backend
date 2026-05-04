@@ -4,10 +4,33 @@ from django.core.files.base import ContentFile
 import base64
 import uuid
 
+class HybridFileField(serializers.FileField):
+    """
+    A custom field that handles both standard file uploads (Multipart)
+    and base64-encoded strings (Data URLs).
+    """
+    def to_internal_value(self, data):
+        # If it's a base64 string, we handle it
+        if isinstance(data, str) and data.startswith('data:'):
+            try:
+                format, filestr = data.split(';base64,')
+                ext = format.split('/')[-1]
+                if ext == 'plain':
+                    ext = 'txt'
+                return ContentFile(
+                    base64.b64decode(filestr), 
+                    name=f'upload_{uuid.uuid4().hex[:8]}.{ext}'
+                )
+            except Exception:
+                raise serializers.ValidationError("Invalid base64 data format")
+        
+        # Otherwise, let the standard FileField handle it (multipart)
+        return super().to_internal_value(data)
+
 class BioDataSerializer(serializers.ModelSerializer):
     """Serializer for BioData model"""
     age = serializers.SerializerMethodField()
-    passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    passport_photo = HybridFileField(required=False, allow_null=True)
     
     class Meta:
         model = BioData
@@ -61,7 +84,7 @@ class GuardianSerializer(serializers.ModelSerializer):
 class DocumentSerializer(serializers.ModelSerializer):
     """Serializer for Document model"""
     verified_by_name = serializers.CharField(source='verified_by.email', read_only=True, allow_null=True)
-    document_file = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    document_file = HybridFileField(required=False, allow_null=True)
     
     class Meta:
         model = Document
@@ -71,35 +94,6 @@ class DocumentSerializer(serializers.ModelSerializer):
             'uploaded_at', 'updated_at'
         ]
         read_only_fields = ['id', 'uploaded_at', 'updated_at', 'verified_by', 'verified_at', 'verified_by_name', 'student']
-
-    def create(self, validated_data):
-        return self._save_with_base64(None, validated_data)
-
-    def update(self, instance, validated_data):
-        return self._save_with_base64(instance, validated_data)
-
-    def _save_with_base64(self, instance, validated_data):
-        file_data = validated_data.pop('document_file', None)
-        
-        if file_data:
-            if isinstance(file_data, str) and file_data.startswith('data:'):
-                try:
-                    format, filestr = file_data.split(';base64,')
-                    ext = format.split('/')[-1]
-                    if ext == 'plain': # Fix for some data URLs
-                        ext = 'txt'
-                    validated_data['document_file'] = ContentFile(base64.b64decode(filestr), name=f'doc_{uuid.uuid4()}.{ext}')
-                except Exception:
-                    pass
-            else:
-                # Restore the file object if it's already a file (from multipart upload)
-                validated_data['document_file'] = file_data
-        elif file_data == "":
-            validated_data['document_file'] = None
-        
-        if instance:
-            return super().update(instance, validated_data)
-        return super().create(validated_data)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -115,10 +109,10 @@ class DocumentSerializer(serializers.ModelSerializer):
 class BiometricSerializer(serializers.ModelSerializer):
     """Serializer for Biometric model"""
     captured_by_name = serializers.CharField(source='captured_by.email', read_only=True, allow_null=True)
-    left_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    left_index = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    right_thumb = serializers.CharField(required=False, allow_blank=True, allow_null=True)
-    right_index = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    left_thumb = HybridFileField(required=False, allow_null=True)
+    left_index = HybridFileField(required=False, allow_null=True)
+    right_thumb = HybridFileField(required=False, allow_null=True)
+    right_index = HybridFileField(required=False, allow_null=True)
     
     class Meta:
         model = Biometric
@@ -132,33 +126,6 @@ class BiometricSerializer(serializers.ModelSerializer):
             'id', 'captured_at', 'updated_at', 'captured_by', 'captured_by_name',
             'left_thumb_template', 'left_index_template', 'right_thumb_template', 'right_index_template'
         ]
-
-    def create(self, validated_data):
-        return self._save_with_base64(None, validated_data)
-
-    def update(self, instance, validated_data):
-        return self._save_with_base64(instance, validated_data)
-
-    def _save_with_base64(self, instance, validated_data):
-        for field in ['left_thumb', 'left_index', 'right_thumb', 'right_index']:
-            file_data = validated_data.pop(field, None)
-            if file_data:
-                if isinstance(file_data, str) and file_data.startswith('data:'):
-                    try:
-                        format, filestr = file_data.split(';base64,')
-                        ext = format.split('/')[-1]
-                        validated_data[field] = ContentFile(base64.b64decode(filestr), name=f'thumb_{uuid.uuid4()}.{ext}')
-                    except Exception:
-                        pass
-                else:
-                    # Restore the file object if it's already a file (from multipart upload)
-                    validated_data[field] = file_data
-            elif file_data == "":
-                validated_data[field] = None
-        
-        if instance:
-            return super().update(instance, validated_data)
-        return super().create(validated_data)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
