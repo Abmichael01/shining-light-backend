@@ -372,6 +372,11 @@ class SubjectLogicMixin:
                         reg.position, reg.highest_score, reg.lowest_score, reg.subject_average = current_pos, stats['max_score'], stats['min_score'], stats['avg_score']
                         reg.save(); last_score = reg.total_score
 
+            from api.models import Grade
+            all_grades = list(Grade.objects.all())
+            teacher_defaults = {g.teacher_remark for g in all_grades if g.teacher_remark}
+            principal_defaults = {g.principal_remark for g in all_grades if g.principal_remark}
+
             student_ids = list(StudentSubject.objects.filter(session_id=session_id, session_term_id=session_term_id, total_score__isnull=False).values_list('student_id', flat=True).distinct())
             for st_id in student_ids:
                 regs = StudentSubject.objects.filter(student_id=st_id, session_id=session_id, session_term_id=session_term_id, total_score__isnull=False)
@@ -384,21 +389,16 @@ class SubjectLogicMixin:
                 if avg is not None:
                     report, _ = TermReport.objects.get_or_create(student_id=st_id, session_id=session_id, session_term_id=session_term_id)
                     report.average_score, report.total_score = avg, regs.aggregate(models.Sum('total_score'))['total_score__sum']
-                    curr_term = SessionTerm.objects.get(id=session_term_id)
-                    prev_reports = TermReport.objects.filter(student_id=st_id, session_id=session_id).exclude(id=report.id)
                     
+                    prev_reports = TermReport.objects.filter(student_id=st_id, session_id=session_id).exclude(id=report.id)
                     if prev_reports.exists():
                         all_avgs = [r.average_score for r in prev_reports if r.average_score] + [avg]
                         report.cumulative_average = sum(all_avgs) / len(all_avgs)
                     else:
                         report.cumulative_average = avg
-                    from api.models import Grade
+                    
                     grade_obj = Grade.get_grade_for_score(float(avg))
                     if grade_obj:
-                        all_grades = Grade.objects.all()
-                        teacher_defaults = {g.teacher_remark for g in all_grades if g.teacher_remark}
-                        principal_defaults = {g.principal_remark for g in all_grades if g.principal_remark}
-
                         if not report.class_teacher_report or report.class_teacher_report in teacher_defaults:
                             if grade_obj.teacher_remark:
                                 report.class_teacher_report = grade_obj.teacher_remark
