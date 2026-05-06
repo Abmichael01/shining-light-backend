@@ -29,7 +29,8 @@ from api.serializers.admission import (
     ApplicationSubmissionSerializer,
     ApplicationSlipSerializer,
     PaymentPurposeSerializer,
-    PaymentStatusSerializer
+    PaymentStatusSerializer,
+    AdmissionBankTransferSerializer
 )
 from api.serializers.student import BioDataSerializer, GuardianSerializer, DocumentSerializer
 from api.services.admission_service import AdmissionService
@@ -595,6 +596,92 @@ def initialize_payment(request):
             {'error': f'Failed to initialize payment: {str(e)}'},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsApplicant])
+def submit_bank_transfer(request):
+    """
+    Submit bank transfer proof for verification
+    """
+    try:
+        student = Student.objects.get(user=request.user)
+        amount = request.data.get('amount')
+        reference = request.data.get('reference', '')
+        screenshot = request.FILES.get('screenshot')
+        
+        if not amount or not screenshot:
+            return Response(
+                {'error': 'Amount and screenshot are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        transfer = AdmissionService.submit_bank_transfer(
+            applicant=student,
+            amount=amount,
+            reference=reference,
+            screenshot=screenshot
+        )
+        
+        serializer = AdmissionBankTransferSerializer(transfer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+    except Student.DoesNotExist:
+        return Response({'error': 'Student not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def list_bank_transfers(request):
+    """
+    List all bank transfer submissions (Admin only)
+    """
+    status_filter = request.query_params.get('status', 'pending')
+    transfers = AdmissionBankTransfer.objects.all()
+    
+    if status_filter:
+        transfers = transfers.filter(status=status_filter)
+        
+    serializer = AdmissionBankTransferSerializer(transfers, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def verify_bank_transfer(request, pk):
+    """
+    Verify or reject a bank transfer (Admin only)
+    """
+    try:
+        transfer_status = request.data.get('status')
+        rejection_reason = request.data.get('rejection_reason', '')
+        
+        if transfer_status not in ['confirmed', 'rejected']:
+            return Response(
+                {'error': 'Invalid status. Must be confirmed or rejected'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        transfer = AdmissionService.verify_bank_transfer(
+            transfer_id=pk,
+            status=transfer_status,
+            verified_by=request.user,
+            rejection_reason=rejection_reason
+        )
+        
+        serializer = AdmissionBankTransferSerializer(transfer)
+        return Response(serializer.data)
+        
+    except AdmissionBankTransfer.DoesNotExist:
+        return Response({'error': 'Transfer not found'}, status=status.HTTP_404_NOT_FOUND)
+    except ValueError as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])

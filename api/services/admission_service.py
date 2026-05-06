@@ -9,7 +9,10 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.db import transaction
-from api.models import Student, BioData, Guardian, FeePayment, AdmissionSettings, ApplicationSlip, PaymentPurpose
+from api.models import (
+    Student, BioData, Guardian, FeePayment, AdmissionSettings, 
+    ApplicationSlip, PaymentPurpose, AdmissionBankTransfer, SystemSetting
+)
 from api.models.user import User
 
 
@@ -357,6 +360,20 @@ class AdmissionService:
         
         latest_payment = payment_query.order_by('-payment_date').first()
         
+        # Check for pending bank transfers
+        pending_transfer = AdmissionBankTransfer.objects.filter(
+            student=applicant,
+            status='pending'
+        ).first()
+        
+        # Get bank details from system settings
+        sys_settings = SystemSetting.load()
+        bank_details = {
+            'bank_name': sys_settings.bank_name,
+            'account_name': sys_settings.account_name,
+            'account_number': sys_settings.account_number,
+        }
+        
         return {
             'has_paid': total_paid >= required_amount and required_amount > 0,
             'amount_paid': total_paid,
@@ -364,8 +381,86 @@ class AdmissionService:
             'payment_date': latest_payment.payment_date if latest_payment else None,
             'receipt_number': latest_payment.receipt_number if latest_payment else None,
             'wants_mock_exam': applicant.wants_mock_exam,
-            'mock_exam_fee': SystemSetting.load().mock_exam_fee if applicant.wants_mock_exam else 0
+            'mock_exam_fee': sys_settings.mock_exam_fee if applicant.wants_mock_exam else 0,
+            'has_pending_transfer': pending_transfer is not None,
+            'pending_transfer_amount': pending_transfer.amount if pending_transfer else 0,
+            'bank_details': bank_details
         }
+    
+    @staticmethod
+    def submit_bank_transfer(applicant, amount, reference, screenshot):
+        """
+        Submit a bank transfer proof for verification
+        """
+        # Check if already has a pending transfer
+        existing_pending = AdmissionBankTransfer.objects.filter(
+            student=applicant,
+            status='pending'
+        ).exists()
+        
+        if existing_pending:
+            raise ValueError("You already have a pending transfer verification.")
+            
+        return AdmissionBankTransfer.objects.create(
+            student=applicant,
+            amount=amount,
+            reference=reference,
+            screenshot=screenshot,
+            status='pending'
+        )
+        
+    @staticmethod
+    @transaction.atomic
+    def verify_bank_transfer(transfer_id, status, verified_by, rejection_reason=''):
+        """
+        Verify or reject a bank transfer
+        """
+        transfer = AdmissionBankTransfer.objects.get(id=transfer_id)
+        
+        if transfer.status != 'pending':
+            raise ValueError(f"Transfer is already {transfer.status}")
+            
+        transfer.status = status
+        transfer.verified_by = verified_by
+        transfer.verified_at = timezone.now()
+        
+        if status == 'rejected':
+            transfer.rejection_reason = rejection_reason
+        elif status == 'confirmed':
+            # Create a FeePayment record
+            admission_purpose, _ = PaymentPurpose.objects.get_or_create(
+                code='admission',
+                defaults={'name': 'Application Fee', 'description': 'Admission application fee'}
+            )
+            
+            # Get or create application fee type
+            fee_type, _ = FeeType.objects.get_or_create(
+                school=transfer.student.school,
+                name='Application Fee',
+                defaults={
+                    'amount': transfer.amount, # Use the amount they transferred
+                    'description': 'Admission application fee',
+                    'is_mandatory': True,
+                    'is_active': True
+                }
+            )
+            
+            # Record payment
+            FeePayment.objects.create(
+                student=transfer.student,
+                fee_type=fee_type,
+                amount=transfer.amount,
+                payment_purpose=admission_purpose,
+                payment_method='bank_transfer',
+                reference_number=transfer.reference,
+                processed_by=verified_by
+            )
+            
+            # Update checklist
+            AdmissionService.update_checklist_item(transfer.student, 'payment_complete', True)
+            
+        transfer.save()
+        return transfer
     
     @staticmethod
     def send_slip_email(applicant, slip):

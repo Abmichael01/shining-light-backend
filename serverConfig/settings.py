@@ -89,6 +89,7 @@ REST_AUTH = {
     'TOKEN_MODEL': None,  # Disable token authentication, use session only
     'USER_DETAILS_SERIALIZER': 'api.serializers.UserSerializer',
     'LOGIN_SERIALIZER': 'api.serializers.LoginSerializer',
+    'PASSWORD_RESET_SERIALIZER': 'api.serializers.auth.CustomPasswordResetSerializer',
 }
 
 # Session Security Settings

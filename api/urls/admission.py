@@ -27,6 +27,9 @@ from api.views.admission import (
     application_slip,
     notify_applicants,
     count_filtered_applicants,
+    submit_bank_transfer,
+    list_bank_transfers,
+    verify_bank_transfer,
 )
 
 # Create router for viewsets
@@ -64,6 +67,11 @@ urlpatterns = [
     path('payment/initialize/', initialize_payment, name='admission-payment-initialize'),
     path('payment/verify/', verify_payment, name='admission-payment-verify'),
     path('payment/webhook/', paystack_webhook, name='paystack-webhook'),
+    path('payment/bank-transfer/', submit_bank_transfer, name='admission-submit-bank-transfer'),
+    
+    # Admin Verification
+    path('admin/bank-transfers/', list_bank_transfers, name='admission-admin-list-bank-transfers'),
+    path('admin/bank-transfers/<int:pk>/verify/', verify_bank_transfer, name='admission-admin-verify-bank-transfer'),
     
     # Submission
     path('submit/', submit_application, name='admission-submit'),

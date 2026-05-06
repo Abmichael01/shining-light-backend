@@ -16,7 +16,8 @@ from api.models import (
     PaymentPurpose,
     FeePayment,
     School,
-    Class
+    Class,
+    AdmissionBankTransfer
 )
 from api.models.user import User
 from api.serializers.student import BioDataSerializer, GuardianSerializer, DocumentSerializer
@@ -264,6 +265,22 @@ class PaymentPurposeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
+class AdmissionBankTransferSerializer(serializers.ModelSerializer):
+    """Serializer for AdmissionBankTransfer model"""
+    
+    student_name = serializers.CharField(source='student.get_full_name', read_only=True)
+    verified_by_name = serializers.CharField(source='verified_by.email', read_only=True)
+    
+    class Meta:
+        model = AdmissionBankTransfer
+        fields = [
+            'id', 'student', 'student_name', 'amount', 'reference', 'screenshot',
+            'status', 'rejection_reason', 'created_at', 'updated_at',
+            'verified_by', 'verified_by_name', 'verified_at'
+        ]
+        read_only_fields = ['id', 'status', 'created_at', 'updated_at', 'verified_by', 'verified_at', 'student_name', 'verified_by_name']
+
+
 class PaymentStatusSerializer(serializers.Serializer):
     """Serializer for checking payment status"""
     
@@ -274,3 +291,8 @@ class PaymentStatusSerializer(serializers.Serializer):
     receipt_number = serializers.CharField(read_only=True, required=False)
     wants_mock_exam = serializers.BooleanField(read_only=True)
     mock_exam_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
+    # New fields for bank transfer
+    has_pending_transfer = serializers.BooleanField(read_only=True)
+    pending_transfer_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    bank_details = serializers.DictField(read_only=True)
