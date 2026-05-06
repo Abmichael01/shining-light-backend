@@ -204,17 +204,32 @@ else:
 # Cache Configuration
 # https://docs.djangoproject.com/en/5.2/topics/cache/
 
-if ENV == 'production':
-    # Redis cache for production using django-redis
+REDIS_URL = os.getenv('REDIS_URL')
+
+if REDIS_URL:
+    # Use Redis if URL is provided in .env
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
-            'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
+            'LOCATION': REDIS_URL,
             'OPTIONS': {
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
             },
             'KEY_PREFIX': 'shinninglight',
-            'TIMEOUT': 7200,  # 2 hours to match CBT session timeout
+            'TIMEOUT': 7200,
+        }
+    }
+elif ENV == 'production':
+    # Fallback for production if REDIS_URL is missing but ENV is production
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': 'redis://127.0.0.1:6379/1',
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+            'KEY_PREFIX': 'shinninglight',
+            'TIMEOUT': 7200,
         }
     }
 else:
@@ -223,7 +238,7 @@ else:
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
             'LOCATION': 'unique-snowflake',
-            'TIMEOUT': 7200,  # 2 hours to match CBT session timeout
+            'TIMEOUT': 7200,
         }
     }
 
