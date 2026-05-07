@@ -40,14 +40,15 @@ def login_with_passcode(request):
         if not all([admission_number, passcode]):
             return Response({'error': 'Admission number and passcode are required'}, status=status.HTTP_400_BAD_REQUEST)
         try:
-            student = Student.objects.get(admission_number=admission_number)
-        except Student.DoesNotExist: return Response({'error': 'Invalid admission number'}, status=status.HTTP_400_BAD_REQUEST)
+            from django.db.models import Q
+            student = Student.objects.get(Q(admission_number=admission_number) | Q(application_number=admission_number))
+        except Student.DoesNotExist: return Response({'error': 'Invalid admission or application number'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             CBTPasscodeService.validate_passcode(passcode=passcode, student_id=str(student.id))
             used_passcode_data = CBTPasscodeService.use_passcode(passcode=passcode, ip_address=request.META.get('REMOTE_ADDR'), 
                                                                 user_agent=request.META.get('HTTP_USER_AGENT', ''))
         except ValueError: return Response({'error': 'Invalid admission number or passcode'}, status=status.HTTP_400_BAD_REQUEST)
-        session_data = CBTSessionService.create_session(student_id=student.admission_number, passcode=passcode, 
+        session_data = CBTSessionService.create_session(student_id=str(student.id), passcode=passcode, 
                                                        ip_address=request.META.get('REMOTE_ADDR'), user_agent=request.META.get('HTTP_USER_AGENT', ''))
         response = Response({
             'success': True, 'message': 'Login successful',

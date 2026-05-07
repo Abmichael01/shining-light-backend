@@ -669,3 +669,61 @@ def send_login_notification_email(user, request=None):
         print(f"Error sending login notification: {str(e)}")
         return False
 
+def send_admission_reversal_email(student, reason=None):
+    """
+    Send email notification to student/guardian when admission is reversed
+    
+    Args:
+        student: Student model instance
+        reason: Optional custom reason for reversal
+    """
+    try:
+        recipient_emails = get_student_recipient_emails(student)
+        
+        if not recipient_emails:
+            print(f"Warning: No email found for student {student.id}")
+            return False
+            
+        default_reason = "Your admission was reversed due to some technical reason, please we will get back to you soon when it is fixed. Thanks for your patience from the ICT Dept."
+        actual_reason = reason if reason and reason.strip() else default_reason
+        
+        context = {
+            'student_name': student.get_full_name(),
+            'application_number': student.application_number,
+            'reason': actual_reason,
+            'year': datetime.datetime.now().year,
+        }
+        
+        subject = 'Important: Admission Status Update - Shining Light School'
+        
+        content = f"""
+<p>Dear Parent/Guardian of {context['student_name']},</p>
+<p>We are writing to inform you of an update regarding the admission status for your ward (Application Number: <strong>{context['application_number']}</strong>).</p>
+<div style="background-color: #fff7ed; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #ffedd5;">
+    <p style="margin: 5px 0;"><strong>Notice:</strong></p>
+    <p style="font-size: 16px; line-height: 1.6; color: #9a3412;">
+        {context['reason']}
+    </p>
+</div>
+<p>If you have any questions, please contact the school administration or the ICT department.</p>
+<p>Best regards,<br>Shining Light School Administration</p>
+"""
+        plain_message = f"Important update regarding admission for {context['student_name']} (APP: {context['application_number']}). Notice: {actual_reason}"
+        
+        html_message = wrap_with_base_template(subject, content)
+        
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=recipient_emails
+        )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send()
+        
+        print(f"Admission reversal email sent to {recipient_emails} for student {student.id}")
+        return True
+        
+    except Exception as e:
+        print(f"Error sending admission reversal email: {str(e)}")
+        return False

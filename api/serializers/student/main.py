@@ -181,7 +181,7 @@ class CBTStudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
         fields = [
-            'student_id', 'admission_number', 'full_name', 'class_name',
+            'student_id', 'admission_number', 'application_number', 'full_name', 'class_name',
             'school_name', 'passport_photo', 'current_exam_seat', 'registered_subjects'
         ]
         read_only_fields = fields

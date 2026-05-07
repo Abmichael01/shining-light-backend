@@ -48,14 +48,18 @@ class StudentActionsMixin:
             with transaction.atomic():
                 from api.models import User
                 from datetime import date
+                from api.utils.email import generate_password
                 
                 if not student.user:
                     biodata = student.biodata
                     username = f"{biodata.first_name.lower()}.{biodata.surname.lower()}@school.com"
                     
+                    # Use provided password or auto-generate one
+                    generated_password = request.data.get('password') or generate_password()
+                    
                     user = User.objects.create_user(
                         email=username,
-                        password=request.data.get('password', 'temp123'),
+                        password=generated_password,
                         user_type='student'
                     )
                     student.user = user
@@ -138,4 +142,87 @@ class StudentActionsMixin:
             return Response(
                 {'detail': f'Error sending credentials: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    @action(detail=False, methods=['post'])
+    def bulk_reverse_admission(self, request):
+        """
+        Reverse multiple admissions at once
+        """
+        student_ids = request.data.get('student_ids', [])
+        reversal_reason = request.data.get('reason', '')
+        
+        if not student_ids:
+            return Response({'detail': 'No students selected'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        students = Student.objects.filter(id__in=student_ids, status__in=['accepted', 'enrolled'])
+        count = students.count()
+        
+        if count == 0:
+            return Response({'detail': 'No valid students found for reversal'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            with transaction.atomic():
+                from datetime import date
+                from api.utils.email import send_admission_reversal_email
+                
+                for student in students:
+                    student.status = 'applicant'
+                    student.admission_number = None
+                    student.rejection_reason = reversal_reason
+                    student.reviewed_by = request.user
+                    student.review_date = date.today()
+                    student.save()
+                    
+                    # Send notification email
+                    send_admission_reversal_email(student, reversal_reason)
+                
+                return Response({
+                    'detail': f'Successfully reversed {count} admissions',
+                    'count': count
+                })
+                
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'])
+    def reverse_admission(self, request, pk=None):
+        """
+        Reverse an admission and convert back to applicant
+        Sends notification email to student
+        """
+        student = self.get_object()
+        
+        if student.status not in ['accepted', 'enrolled']:
+            return Response(
+                {'detail': 'Only admitted or enrolled students can have their admission reversed'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        reversal_reason = request.data.get('reason', '')
+        
+        try:
+            with transaction.atomic():
+                from datetime import date
+                from api.utils.email import send_admission_reversal_email
+                
+                # Update status and metadata
+                student.status = 'applicant'
+                student.admission_number = None
+                student.rejection_reason = reversal_reason
+                student.reviewed_by = request.user
+                student.review_date = date.today()
+                student.save()
+                
+                # Send notification email
+                send_admission_reversal_email(student, reversal_reason)
+                
+                return Response({
+                    'detail': 'Admission reversed successfully',
+                    'student': StudentSerializer(student).data
+                })
+                
+        except Exception as e:
+            return Response(
+                {'detail': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
             )
