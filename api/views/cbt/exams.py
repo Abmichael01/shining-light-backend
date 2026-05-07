@@ -45,7 +45,19 @@ def submit_cbt_exam(request, exam_id):
         if StudentExam.objects.filter(student=student_obj, exam=exam).exists():
             return Response({'error': 'Already taken this exam'}, status=status.HTTP_400_BAD_REQUEST)
         
-        questions_qs = list(exam.questions.all())
+        if exam.is_multi_subject:
+            # Fetch questions from subject groups
+            questions_qs = []
+            q_to_subject = {}
+            for group in exam.subject_groups.all().order_by('order'):
+                group_questions = list(group.questions.all())
+                questions_qs.extend(group_questions)
+                for q in group_questions:
+                    q_to_subject[q.id] = group.subject
+        else:
+            questions_qs = list(exam.questions.all())
+            q_to_subject = {q.id: q.subject for q in questions_qs}
+            
         questions_dict = {str(q.id): q for q in questions_qs}
         
         score = 0
@@ -91,34 +103,36 @@ def submit_cbt_exam(request, exam_id):
         if student_answers_to_create:
             StudentAnswer.objects.bulk_create(student_answers_to_create)
         
-        student_subject = StudentSubject.objects.filter(
-            student=student_obj, 
-            subject=exam.subject, 
-            session_term=exam.session_term,
-            is_active=True
-        ).first()
+        # Use exam.subject for single-subject, or skip for multi-subject CA/Exam updates
+        if not exam.is_multi_subject:
+            student_subject = StudentSubject.objects.filter(
+                student=student_obj, 
+                subject=exam.subject, 
+                session_term=exam.session_term,
+                is_active=True
+            ).first()
 
-        if student_subject:
-            from decimal import Decimal
-            score_decimal = Decimal(str(round(score, 2)))
-            # Map the CBT score to the correct field based on the Exam Type
-            if exam.exam_type == 'test':
-                student_subject.ca_score = score_decimal
-            elif exam.exam_type == 'exam':
-                student_subject.objective_score = score_decimal
-            student_subject.save()
+            if student_subject:
+                from decimal import Decimal
+                score_decimal = Decimal(str(round(score, 2)))
+                if exam.exam_type == 'test':
+                    student_subject.ca_score = score_decimal
+                elif exam.exam_type == 'exam':
+                    student_subject.objective_score = score_decimal
+                student_subject.save()
 
         # Handle Admission Exam Results
         if exam.exam_type == 'admission':
             from api.models import AdmissionExamResult, AdmissionExamSubjectResult
             from collections import defaultdict
             
-            # Group scores by subject
+            # Group scores by the MAPPED subject (from ExamSubjectGroup if multi-subject)
             subject_scores = defaultdict(lambda: {'score': 0, 'total': 0})
             for sa in student_answers_to_create:
-                subj = sa.question.subject
-                subject_scores[subj]['score'] += float(sa.marks_obtained)
-                subject_scores[subj]['total'] += float(sa.question.marks or 1)
+                subj = q_to_subject.get(sa.question.id)
+                if subj:
+                    subject_scores[subj]['score'] += float(sa.marks_obtained)
+                    subject_scores[subj]['total'] += float(sa.question.marks or 1)
             
             # Create or update main result
             admission_result, created = AdmissionExamResult.objects.get_or_create(

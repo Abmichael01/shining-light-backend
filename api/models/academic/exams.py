@@ -105,6 +105,7 @@ class Exam(models.Model):
     STATUS_CHOICES = [('draft', 'Draft'), ('active', 'Active'), ('completed', 'Completed'), ('cancelled', 'Cancelled')]
     
     title = models.CharField(_('exam title'), max_length=200)
+    description = models.TextField(_('description'), blank=True, null=True)
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exams', verbose_name=_('subject'), null=True, blank=True)
     exam_class = models.ForeignKey(Class, on_delete=models.SET_NULL, null=True, blank=True, related_name='admission_exams', verbose_name=_('exam class'))
     topics = models.ManyToManyField(Topic, blank=True, related_name='exams', verbose_name=_('topics'))
@@ -124,6 +125,7 @@ class Exam(models.Model):
     allow_calculator = models.BooleanField(_('allow calculator'), default=False)
     
     is_applicant_exam = models.BooleanField(_('is applicant exam'), default=False)
+    is_multi_subject = models.BooleanField(_('is multi-subject'), default=False)
     question_selection_count = models.PositiveIntegerField(_('question selection count'), null=True, blank=True)
     
     status = models.CharField(_('status'), max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -224,3 +226,21 @@ class CBTExamCode(models.Model):
             self.is_used = True
             self.used_at = timezone.now()
             self.save(update_fields=['is_used', 'used_at'])
+
+
+class ExamSubjectGroup(models.Model):
+    """Manually defined subject group within an exam"""
+    
+    exam = models.ForeignKey(Exam, on_delete=models.CASCADE, related_name='subject_groups', verbose_name=_('exam'))
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE, related_name='exam_groups', verbose_name=_('subject'))
+    questions = models.ManyToManyField(Question, blank=True, related_name='exam_groups', verbose_name=_('questions'))
+    order = models.PositiveIntegerField(_('order'), default=0)
+    
+    class Meta:
+        verbose_name = _('Exam Subject Group')
+        verbose_name_plural = _('Exam Subject Groups')
+        ordering = ['order', 'id']
+        unique_together = [['exam', 'subject']]
+
+    def __str__(self):
+        return f"{self.exam.title} - {self.subject.name}"

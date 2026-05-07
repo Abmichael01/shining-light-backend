@@ -5,6 +5,7 @@ import base64
 import uuid
 from .base import BioDataSerializer, GuardianSerializer, DocumentSerializer, BiometricSerializer
 from .subjects import StudentSubjectSerializer
+from .admission_results import AdmissionExamResultSerializer
 
 class StudentSerializer(serializers.ModelSerializer):
     """Serializer for Student model with nested related data"""
@@ -14,6 +15,7 @@ class StudentSerializer(serializers.ModelSerializer):
     documents = DocumentSerializer(many=True, read_only=True)
     biometric = BiometricSerializer(read_only=True)
     subject_registrations = StudentSubjectSerializer(many=True, read_only=True)
+    admission_result = AdmissionExamResultSerializer(read_only=True)
     
     # Related names for display
     school_name = serializers.CharField(source='school.name', read_only=True)
@@ -45,6 +47,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
             # Nested data
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
+            'admission_result',
             'all_subjects_cleared', 'has_staff_parent', 'staff_parents_details',
             'recipient_emails'
         ]
@@ -53,7 +56,7 @@ class StudentSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at', 'created_by', 'reviewed_by',
             'school_name', 'school_type', 'class_name', 'department_name', 'club_name',
             'biodata', 'guardians', 'documents', 'biometric', 'subject_registrations',
-            'all_subjects_cleared'
+            'admission_result', 'all_subjects_cleared'
         ]
     
     def get_full_name(self, obj):

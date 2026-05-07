@@ -27,6 +27,7 @@ from .academic import (
     ExternalExam,
     ExternalExamResult,
     ExternalExamAccess,
+    ExamSubjectGroup,
 )
 from .student import (
     Student,
@@ -141,4 +142,5 @@ __all__ = [
     'ExternalExamAccess',
     'AdmissionExamResult',
     'AdmissionExamSubjectResult',
+    'ExamSubjectGroup',
 ]

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork, SystemSetting, PastQuestion
+from api.models import School, Session, SessionTerm, Class, Department, SubjectGroup, Subject, Topic, Grade, Question, Club, ExamHall, CBTExamCode, Exam, Assignment, Staff, SchemeOfWork, SystemSetting, PastQuestion, ExamSubjectGroup
 from django.core.files.base import ContentFile
 import base64
 import uuid
@@ -460,26 +460,41 @@ class CBTExamCodeSerializer(serializers.ModelSerializer):
         return obj.student.get_full_name() if hasattr(obj.student, 'get_full_name') else ''
 
 
+class ExamSubjectGroupSerializer(serializers.ModelSerializer):
+    """Serializer for ExamSubjectGroup model"""
+    subject_name = serializers.CharField(source='subject.name', read_only=True)
+    question_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = ExamSubjectGroup
+        fields = ['id', 'subject', 'subject_name', 'order', 'question_count']
+    
+    def get_question_count(self, obj):
+        return obj.questions.count()
+
+
 class ExamSerializer(serializers.ModelSerializer):
     """Serializer for Exam model"""
     subject_name = serializers.CharField(source='subject.name', read_only=True)
     subject_code = serializers.CharField(source='subject.code', read_only=True)
-    class_name = serializers.CharField(source='subject.class_model.name', read_only=True)
-    school_name = serializers.CharField(source='subject.school.name', read_only=True)
+    class_name = serializers.CharField(source='exam_class.name', read_only=True)
+    exam_class_name = serializers.CharField(source='exam_class.name', read_only=True)
+    school_name = serializers.CharField(source='exam_class.school.name', read_only=True)
     session_term_name = serializers.CharField(source='session_term.name', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     total_students = serializers.SerializerMethodField()
     students_taken = serializers.SerializerMethodField()
     questions = serializers.SerializerMethodField()
+    subject_groups = ExamSubjectGroupSerializer(many=True, read_only=True)
     
     class Meta:
         model = Exam
         fields = [
-            'id', 'title', 'subject', 'subject_name', 'subject_code', 'class_name', 'school_name',
+            'id', 'title', 'description', 'subject', 'subject_name', 'subject_code', 'exam_class', 'exam_class_name', 'class_name', 'school_name',
             'exam_type', 'session_term', 'session_term_name', 'duration_minutes', 'total_marks', 'pass_mark',
             'total_questions', 'shuffle_questions', 'shuffle_options', 'show_results_immediately',
             'allow_review', 'allow_calculator', 'status', 'instructions', 'questions', 'created_by', 'created_by_name',
-            'is_applicant_exam', 'total_students', 'students_taken', 'created_at', 'updated_at'
+            'is_applicant_exam', 'is_multi_subject', 'subject_groups', 'total_students', 'students_taken', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'created_at', 'updated_at', 'total_students', 'students_taken']
     
@@ -500,7 +515,12 @@ class ExamSerializer(serializers.ModelSerializer):
         # Check if specific question IDs are provided in context (from randomized selection)
         specific_question_ids = self.context.get('specific_question_ids')
         
-        if specific_question_ids:
+        if obj.is_multi_subject and not specific_question_ids:
+            # Grouped order
+            questions = []
+            for group in obj.subject_groups.all().order_by('order'):
+                questions.extend(group.questions.all())
+        elif specific_question_ids:
             # Preserve the order from specific_question_ids
             # Fetch all questions first
             from api.models import Question

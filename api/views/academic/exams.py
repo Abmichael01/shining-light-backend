@@ -4,7 +4,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from api.models import Exam, ExamHall, PastQuestion, Student, StudentExam, StudentAnswer
+from api.models import Exam, ExamHall, PastQuestion, Student, StudentExam, StudentAnswer, ExamSubjectGroup
 from api.serializers import ExamSerializer, ExamHallSerializer, PastQuestionSerializer
 from api.serializers.exam import StudentExamResultSerializer
 from api.permissions import IsSchoolAdmin, IsAdminOrStaff
@@ -73,9 +73,21 @@ class ExamViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         questions_data = request.data.get("questions", [])
+        subject_groups_data = request.data.get("subject_groups", [])
         exam = serializer.save(created_by=request.user)
-        if questions_data:
+        
+        if exam.is_multi_subject and subject_groups_data:
+            for group_data in subject_groups_data:
+                group = ExamSubjectGroup.objects.create(
+                    exam=exam,
+                    subject_id=group_data.get('subject'),
+                    order=group_data.get('order', 0)
+                )
+                if group_data.get('questions'):
+                    group.questions.set(group_data.get('questions'))
+        elif questions_data:
             exam.questions.set(questions_data)
+            
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
@@ -88,9 +100,39 @@ class ExamViewSet(viewsets.ModelViewSet):
         )
         serializer.is_valid(raise_exception=True)
         questions_data = request.data.get("questions", [])
-        if questions_data:
-            instance.questions.set(questions_data)
-        self.perform_update(serializer)
+        subject_groups_data = request.data.get("subject_groups", [])
+        
+        exam = serializer.save()
+        
+        if exam.is_multi_subject:
+            # Update subject groups
+            existing_groups = {g.id: g for g in exam.subject_groups.all()}
+            updated_group_ids = []
+            
+            for group_data in subject_groups_data:
+                group_id = group_data.get('id')
+                if group_id and group_id in existing_groups:
+                    group = existing_groups[group_id]
+                    group.subject_id = group_data.get('subject')
+                    group.order = group_data.get('order', 0)
+                    group.save()
+                else:
+                    group = ExamSubjectGroup.objects.create(
+                        exam=exam,
+                        subject_id=group_data.get('subject'),
+                        order=group_data.get('order', 0)
+                    )
+                
+                if group_data.get('questions') is not None:
+                    group.questions.set(group_data.get('questions'))
+                updated_group_ids.append(group.id)
+            
+            # Delete removed groups
+            exam.subject_groups.exclude(id__in=updated_group_ids).delete()
+        else:
+            if questions_data:
+                instance.questions.set(questions_data)
+                
         return Response(serializer.data)
 
     @action(detail=True, methods=["get"])

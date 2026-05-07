@@ -21,9 +21,11 @@ class StudentViewSet(StudentActionsMixin, viewsets.ModelViewSet):
     """
     pagination_class = StandardResultsSetPagination
     queryset = Student.objects.select_related(
-        'school', 'class_model', 'department', 'club', 'user', 'biodata', 'biometric'
+        'school', 'class_model', 'department', 'club', 'user', 'biodata', 'biometric',
+        'admission_result__exam',
     ).prefetch_related(
-        'guardians', 'documents', 'subject_registrations'
+        'guardians', 'documents', 'subject_registrations',
+        'admission_result__subject_results__subject',
     ).all().order_by('-created_at')
     permission_classes = [IsAdminOrStaff]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
