@@ -124,6 +124,7 @@ class SystemSetting(models.Model):
     student_maintenance_message = models.TextField(_('student maintenance message'), default='Student portal is temporarily unavailable.')
     allow_ca_score_editing = models.BooleanField(_('allow CA score editing'), default=True)
     require_result_entry_approval = models.BooleanField(_('require result entry approval'), default=True)
+    show_admission_exam_results = models.BooleanField(_('show admission results to applicants'), default=False)
     
     # Bank Details for Transfers
     bank_name = models.CharField(_('bank name'), max_length=100, blank=True)

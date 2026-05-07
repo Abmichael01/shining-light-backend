@@ -36,7 +36,9 @@ from .student import (
     Biometric,
     StudentSubject,
     ResultScoreSubmission,
-    TermReport
+    TermReport,
+    AdmissionExamResult,
+    AdmissionExamSubjectResult
 )
 from .staff import (
     Staff,
@@ -137,4 +139,6 @@ __all__ = [
     'ExternalExam',
     'ExternalExamResult',
     'ExternalExamAccess',
+    'AdmissionExamResult',
+    'AdmissionExamSubjectResult',
 ]

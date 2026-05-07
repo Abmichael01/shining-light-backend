@@ -18,7 +18,8 @@ from api.views.cbt import (
     submit_cbt_exam,
     get_practice_subjects,
     create_practice_exam,
-    submit_practice_exam
+    submit_practice_exam,
+    get_my_admission_result
 )
 
 urlpatterns = [
@@ -62,4 +63,7 @@ urlpatterns = [
     path('practice/subjects/', get_practice_subjects, name='get-practice-subjects'),
     path('practice/create/', create_practice_exam, name='create-practice-exam'),
     path('practice/submit/', submit_practice_exam, name='submit-practice-exam'),
+    
+    # Admission Results
+    path('admission-result/', get_my_admission_result, name='get-my-admission-result'),
 ]

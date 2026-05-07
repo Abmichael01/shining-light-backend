@@ -107,6 +107,54 @@ def submit_cbt_exam(request, exam_id):
             elif exam.exam_type == 'exam':
                 student_subject.objective_score = score_decimal
             student_subject.save()
+
+        # Handle Admission Exam Results
+        if exam.exam_type == 'admission':
+            from api.models import AdmissionExamResult, AdmissionExamSubjectResult
+            from collections import defaultdict
+            
+            # Group scores by subject
+            subject_scores = defaultdict(lambda: {'score': 0, 'total': 0})
+            for sa in student_answers_to_create:
+                subj = sa.question.subject
+                subject_scores[subj]['score'] += float(sa.marks_obtained)
+                subject_scores[subj]['total'] += float(sa.question.marks or 1)
+            
+            # Create or update main result
+            admission_result, created = AdmissionExamResult.objects.get_or_create(
+                student=student_obj,
+                exam=exam,
+                defaults={
+                    'total_score': round(score, 2),
+                    'total_marks': total_marks,
+                    'percentage': round(percentage, 2),
+                    'passed': score >= exam.pass_mark
+                }
+            )
+            
+            if not created:
+                admission_result.total_score = round(score, 2)
+                admission_result.total_marks = total_marks
+                admission_result.percentage = round(percentage, 2)
+                admission_result.passed = score >= exam.pass_mark
+                admission_result.save()
+            
+            # Create subject-level results
+            subject_results = []
+            for subj, data in subject_scores.items():
+                subject_results.append(
+                    AdmissionExamSubjectResult(
+                        result=admission_result,
+                        subject=subj,
+                        score=round(data['score'], 2),
+                        total_marks=data['total']
+                    )
+                )
+            
+            if subject_results:
+                # Clear existing if any (to avoid duplicates on retry)
+                AdmissionExamSubjectResult.objects.filter(result=admission_result).delete()
+                AdmissionExamSubjectResult.objects.bulk_create(subject_results)
             
         return Response({
             'success': True, 

@@ -101,7 +101,7 @@ class Exam(models.Model):
     
     id = models.CharField(_('exam ID'), max_length=20, primary_key=True, editable=False)
     
-    EXAM_TYPE_CHOICES = [('test', 'Test'), ('exam', 'Examination'), ('quiz', 'Quiz'), ('practice', 'Practice')]
+    EXAM_TYPE_CHOICES = [('test', 'Test'), ('exam', 'Examination'), ('quiz', 'Quiz'), ('practice', 'Practice'), ('admission', 'Admission')]
     STATUS_CHOICES = [('draft', 'Draft'), ('active', 'Active'), ('completed', 'Completed'), ('cancelled', 'Cancelled')]
     
     title = models.CharField(_('exam title'), max_length=200)
