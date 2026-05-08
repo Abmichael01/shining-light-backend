@@ -15,7 +15,7 @@ import datetime
 
 from api.models import (
     Student, BioData, Guardian, Document, AdmissionSettings,
-    School, Class, PaymentPurpose, ApplicationSlip
+    School, Class, PaymentPurpose, ApplicationSlip, AdmissionBankTransfer
 )
 from api.models.user import User
 from api.serializers.admission import (
@@ -34,7 +34,7 @@ from api.serializers.admission import (
 )
 from api.serializers.student import BioDataSerializer, GuardianSerializer, DocumentSerializer
 from api.services.admission_service import AdmissionService
-from api.permissions import IsApplicant
+from api.permissions import IsApplicant, IsSchoolAdmin
 
 
 class AdmissionSettingsViewSet(viewsets.ModelViewSet):
@@ -44,7 +44,7 @@ class AdmissionSettingsViewSet(viewsets.ModelViewSet):
     """
     queryset = AdmissionSettings.objects.all()
     serializer_class = AdmissionSettingsSerializer
-    permission_classes = [IsAdminUser]
+    permission_classes = [IsSchoolAdmin]
     
     def get_queryset(self):
         """Allow filtering by school"""
@@ -635,7 +635,7 @@ def submit_bank_transfer(request):
 
 
 @api_view(['GET'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsSchoolAdmin])
 def list_bank_transfers(request):
     """
     List all bank transfer submissions (Admin only)
@@ -651,7 +651,7 @@ def list_bank_transfers(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsSchoolAdmin])
 def verify_bank_transfer(request, pk):
     """
     Verify or reject a bank transfer (Admin only)
@@ -1074,7 +1074,7 @@ class PaymentPurposeViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = PaymentPurposeSerializer
     permission_classes = [AllowAny]
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsSchoolAdmin])
 def count_filtered_applicants(request):
     """
     Get count of applicants matching filters for notification
@@ -1097,7 +1097,7 @@ def count_filtered_applicants(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAdminUser])
+@permission_classes([IsSchoolAdmin])
 def notify_applicants(request):
     """
     Send notifications to applicants based on filters or selection

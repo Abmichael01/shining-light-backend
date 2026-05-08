@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.db import transaction
 from api.models import (
     Student, BioData, Guardian, FeePayment, AdmissionSettings, 
-    ApplicationSlip, PaymentPurpose, AdmissionBankTransfer, SystemSetting
+    ApplicationSlip, PaymentPurpose, AdmissionBankTransfer, SystemSetting, FeeType
 )
 from api.models.user import User
 
