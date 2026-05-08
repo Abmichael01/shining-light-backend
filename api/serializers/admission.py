@@ -242,12 +242,14 @@ class ApplicationSlipSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     school_name = serializers.CharField(source='student.school.name', read_only=True)
     class_name = serializers.CharField(source='student.class_model.name', read_only=True)
+    seat_number = serializers.CharField(source='student.seat_number', read_only=True)
+    passport_photo = serializers.ImageField(source='student.passport_photo', read_only=True)
     
     class Meta:
         model = ApplicationSlip
         fields = [
             'id', 'student', 'student_name', 'school_name', 'class_name',
-            'application_number', 'screening_date', 'pdf_file', 'generated_at'
+            'application_number', 'seat_number', 'passport_photo', 'screening_date', 'pdf_file', 'generated_at'
         ]
         read_only_fields = fields
     

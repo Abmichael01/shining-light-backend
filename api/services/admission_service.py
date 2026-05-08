@@ -281,6 +281,9 @@ class AdmissionService:
             raise ValueError(message)
         
         # Update applicant
+        if not applicant.seat_number:
+            applicant.seat_number = AdmissionService.generate_seat_number(applicant.school)
+            
         applicant.application_submitted_at = timezone.now()
         applicant.status = 'under_review'
         applicant.save()
@@ -302,19 +305,14 @@ class AdmissionService:
             application_slip.screening_date = screening_date
             application_slip.save()
         
-        # Generate PDF slip
-        from api.utils.slip_generator import generate_slip_pdf
-        pdf_file = generate_slip_pdf(applicant, application_slip)
-        application_slip.pdf_file.save(pdf_file.name, pdf_file, save=True)
-        
-        # Send email notification
-        AdmissionService.send_slip_email(applicant, application_slip)
+        # No backend PDF generation needed as per user request (frontend handles it)
+        # AdmissionService.send_slip_email(applicant, application_slip)
         
         return {
             'application_number': applicant.application_number,
+            'seat_number': applicant.seat_number,
             'screening_date': screening_date.strftime('%B %d, %Y'),
             'application_slip_id': application_slip.id,
-            'slip_url': application_slip.pdf_file.url if application_slip.pdf_file else None,
             'submitted_at': applicant.application_submitted_at
         }
     
