@@ -230,7 +230,6 @@ class ApplicantDashboardSerializer(serializers.ModelSerializer):
 class ApplicationSubmissionSerializer(serializers.Serializer):
     """Serializer for final application submission"""
     
-    seat_number = serializers.CharField(read_only=True)
     application_number = serializers.CharField(read_only=True)
     application_slip_url = serializers.URLField(read_only=True)
     submitted_at = serializers.DateTimeField(read_only=True)
@@ -242,14 +241,13 @@ class ApplicationSlipSerializer(serializers.ModelSerializer):
     student_name = serializers.SerializerMethodField()
     school_name = serializers.CharField(source='student.school.name', read_only=True)
     class_name = serializers.CharField(source='student.class_model.name', read_only=True)
-    seat_number = serializers.CharField(source='student.seat_number', read_only=True)
     passport_photo = serializers.ImageField(source='student.passport_photo', read_only=True)
     
     class Meta:
         model = ApplicationSlip
         fields = [
             'id', 'student', 'student_name', 'school_name', 'class_name',
-            'application_number', 'seat_number', 'passport_photo', 'screening_date', 'pdf_file', 'generated_at'
+            'application_number', 'passport_photo', 'screening_date', 'pdf_file', 'generated_at'
         ]
         read_only_fields = fields
     

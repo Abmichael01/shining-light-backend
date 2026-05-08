@@ -281,9 +281,6 @@ class AdmissionService:
             raise ValueError(message)
         
         # Update applicant
-        if not applicant.seat_number:
-            applicant.seat_number = AdmissionService.generate_seat_number(applicant.school)
-            
         applicant.application_submitted_at = timezone.now()
         applicant.status = 'under_review'
         applicant.save()
