@@ -623,7 +623,7 @@ def submit_bank_transfer(request):
             screenshot=screenshot
         )
         
-        serializer = AdmissionBankTransferSerializer(transfer)
+        serializer = AdmissionBankTransferSerializer(transfer, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
         
     except Student.DoesNotExist:
@@ -646,7 +646,7 @@ def list_bank_transfers(request):
     if status_filter:
         transfers = transfers.filter(status=status_filter)
         
-    serializer = AdmissionBankTransferSerializer(transfers, many=True)
+    serializer = AdmissionBankTransferSerializer(transfers, many=True, context={'request': request})
     return Response(serializer.data)
 
 
@@ -673,7 +673,7 @@ def verify_bank_transfer(request, pk):
             rejection_reason=rejection_reason
         )
         
-        serializer = AdmissionBankTransferSerializer(transfer)
+        serializer = AdmissionBankTransferSerializer(transfer, context={'request': request})
         return Response(serializer.data)
         
     except AdmissionBankTransfer.DoesNotExist:
