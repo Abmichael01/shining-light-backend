@@ -391,3 +391,7 @@ EBULKSMS_USERNAME = os.getenv('EBULKSMS_USERNAME')
 EBULKSMS_API_KEY = os.getenv('EBULKSMS_API_KEY')
 EBULKSMS_SENDER_ID = os.getenv('EBULKSMS_SENDER_ID', 'ShiningL')
 EBULKSMS_API_URL = os.getenv('EBULKSMS_API_URL', 'https://api.ebulksms.com/sendsms.json')
+
+# OpenAI Configuration (AI features: question generator, etc.)
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')

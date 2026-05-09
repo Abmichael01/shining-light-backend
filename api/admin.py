@@ -1536,3 +1536,14 @@ class CommunicationTemplateAdmin(admin.ModelAdmin):
 class BiometricStationAdmin(admin.ModelAdmin):
     list_display = ['name', 'api_key', 'location', 'is_active', 'last_seen']
     readonly_fields = ['api_key', 'last_seen', 'created_at']
+
+
+from .models import AIFeature
+
+@admin.register(AIFeature)
+class AIFeatureAdmin(admin.ModelAdmin):
+    list_display = ['name', 'slug', 'audience', 'status', 'is_active', 'order']
+    list_filter = ['audience', 'status', 'is_active']
+    search_fields = ['name', 'slug', 'description']
+    list_editable = ['is_active', 'order']
+    readonly_fields = ['created_at', 'updated_at']

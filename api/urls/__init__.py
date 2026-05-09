@@ -87,4 +87,7 @@ urlpatterns = [
     
     # System Settings
     path('system-settings/', SystemSettingViewSet.as_view({'get': 'retrieve', 'patch': 'partial_update', 'put': 'update'}), name='system-settings'),
+
+    # AI features (catalog + individual features)
+    path('ai/', include('api.urls.ai')),
 ]

@@ -73,6 +73,7 @@ from .communication import CommunicationTemplate, GuardianMessage
 from .leave import LeaveRequest
 from .assignment import Assignment, AssignmentSubmission
 from .biometrics import BiometricStation
+from .ai import AIFeature
 
 __all__ = [
     'User',
@@ -132,6 +133,7 @@ __all__ = [
     'CommunicationTemplate',
     'GuardianMessage',
     'BiometricStation',
+    'AIFeature',
     'SystemSetting',
     'GalleryGroup',
     'GalleryImage',
