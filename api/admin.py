@@ -44,6 +44,8 @@ from .models import (
     StaffWalletTransaction,
     StaffBeneficiary,
     CommunicationTemplate,
+    AIMessageDraft,
+    AIActionLog,
     BiometricStation
 )
 
@@ -1532,6 +1534,49 @@ class CommunicationTemplateAdmin(admin.ModelAdmin):
     list_filter = ['type', 'created_at']
     search_fields = ['name', 'subject', 'content']
     readonly_fields = ['created_at', 'updated_at']
+
+
+@admin.register(AIMessageDraft)
+class AIMessageDraftAdmin(admin.ModelAdmin):
+    list_display = ['id', 'channel', 'target_group', 'subject', 'status', 'created_by', 'created_at']
+    list_filter = ['channel', 'target_group', 'status', 'created_at']
+    search_fields = ['subject', 'content', 'prompt']
+    readonly_fields = [
+        'ai_model',
+        'send_summary',
+        'error_message',
+        'rejection_reason',
+        'approved_at',
+        'rejected_at',
+        'sent_at',
+        'created_at',
+        'updated_at',
+    ]
+
+
+@admin.register(AIActionLog)
+class AIActionLogAdmin(admin.ModelAdmin):
+    list_display = ['id', 'action_type', 'status', 'approved_by', 'approved_at', 'reverted_at']
+    list_filter = ['action_type', 'status', 'approved_at', 'reverted_at']
+    search_fields = ['summary', 'label']
+    readonly_fields = [
+        'action_type',
+        'label',
+        'summary',
+        'payload',
+        'result',
+        'changes',
+        'status',
+        'error_message',
+        'approved_by',
+        'reverted_by',
+        'approved_at',
+        'reverted_at',
+        'created_at',
+        'updated_at',
+    ]
+
+
 @admin.register(BiometricStation)
 class BiometricStationAdmin(admin.ModelAdmin):
     list_display = ['name', 'api_key', 'location', 'is_active', 'last_seen']

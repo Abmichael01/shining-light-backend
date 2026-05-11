@@ -22,6 +22,20 @@ DEFAULT_FEATURES = [
         'is_active': True,
         'order': 1,
     },
+    {
+        'slug': 'message-draft-approvals',
+        'name': 'AI Communications',
+        'description': (
+            'Draft school emails or SMS from a simple instruction, review the '
+            'AI copy, and send only after admin approval.'
+        ),
+        'audience': 'admin',
+        'status': 'available',
+        'icon': 'MailCheck',
+        'route': '/school-admin/communications?ai=drafts',
+        'is_active': True,
+        'order': 2,
+    },
 ]
 
 

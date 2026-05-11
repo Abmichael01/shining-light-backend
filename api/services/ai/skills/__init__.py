@@ -20,5 +20,11 @@ def execute_tool(name: str, args: dict, user: Any = None):
         return data_retrieval.get_data_summary(**args, user=user)
     if name == "list_records":
         return data_retrieval.list_records(**args, user=user)
+    if name == "create_message_draft":
+        return data_retrieval.create_message_draft(**args, user=user)
+    if name == "update_fee_type_amount":
+        return data_retrieval.update_fee_type_amount(**args, user=user)
+    if name == "update_record_fields":
+        return data_retrieval.update_record_fields(**args, user=user)
     
     return {"error": f"Tool '{name}' not found in registry."}

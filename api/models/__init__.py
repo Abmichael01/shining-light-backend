@@ -69,11 +69,11 @@ from .scheduling import (
     Schedule,
     ScheduleEntry
 )
-from .communication import CommunicationTemplate, GuardianMessage
+from .communication import CommunicationTemplate, GuardianMessage, AIMessageDraft
 from .leave import LeaveRequest
 from .assignment import Assignment, AssignmentSubmission
 from .biometrics import BiometricStation
-from .ai import AIFeature
+from .ai import AIFeature, AIActionLog
 
 __all__ = [
     'User',
@@ -132,8 +132,10 @@ __all__ = [
     'AssignmentSubmission',
     'CommunicationTemplate',
     'GuardianMessage',
+    'AIMessageDraft',
     'BiometricStation',
     'AIFeature',
+    'AIActionLog',
     'SystemSetting',
     'GalleryGroup',
     'GalleryImage',

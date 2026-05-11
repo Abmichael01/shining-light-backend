@@ -7,7 +7,7 @@ each request includes:
     - the full message history
     - the new user message
 
-Returns the assistant's next reply as plain text.
+Returns the assistant's next reply and any approval actions the UI should render.
 """
 
 import json
@@ -34,6 +34,40 @@ def load_context_json(filename: str) -> Dict[str, Any]:
 
 PAGE_CONTEXT_HINTS = load_context_json("pages.json")
 SCHOOL_INFO = load_context_json("school_info.json")
+
+def build_admin_learning_memory(user_type: str) -> str:
+    """Small behavior-memory summary from recent admin AI activity."""
+    if user_type != 'admin':
+        return ""
+
+    try:
+        from api.models import AIActionLog, AIMessageDraft
+
+        rejected_reasons = list(
+            AIMessageDraft.objects.filter(status='rejected')
+            .exclude(rejection_reason='')
+            .order_by('-rejected_at')
+            .values_list('rejection_reason', flat=True)[:5]
+        )
+        approved_actions = list(
+            AIActionLog.objects.filter(status='approved')
+            .order_by('-approved_at')
+            .values_list('summary', flat=True)[:5]
+        )
+    except Exception:
+        return ""
+
+    lines = []
+    if rejected_reasons:
+        lines.append("Recent admin feedback on rejected AI drafts:")
+        lines.extend(f"- {reason[:220]}" for reason in rejected_reasons)
+    if approved_actions:
+        lines.append("Recent AI actions admins approved:")
+        lines.extend(f"- {summary[:220]}" for summary in approved_actions if summary)
+
+    if not lines:
+        return ""
+    return "\nADMIN AI MEMORY:\n" + "\n".join(lines) + "\nUse this as preference guidance, not as guaranteed current facts.\n"
 
 def build_system_prompt(page_type: str = "", user: Any = None) -> str:
     """Compose the full system prompt from static info, page hints, and user identity."""
@@ -68,14 +102,31 @@ def build_system_prompt(page_type: str = "", user: Any = None) -> str:
             "Only focus on this specific page if the user asks about 'this page', 'here', "
             "or 'what I am seeing'. Otherwise, remain a general assistant for the whole school.\n\n"
         )
+
+    base += build_admin_learning_memory(user_type)
     
     base += (
         "Guidelines:\n"
+        "- Be warm and friendly. Greet the user naturally and show a supportive, helpful attitude.\n"
         "- You are a general expert. Answer any question about school management, even if "
         "it's not related to the current page.\n"
         "- Use the 'CURRENT LOCATION' hint only to add specific context when the user "
         "refers to their immediate screen.\n"
         "- You can query live school data (students, fees, etc.) using available tools.\n"
+        "- For emails or SMS, use create_message_draft when an admin asks you to draft or prepare "
+        "a message. Never claim a message has been sent; explain that the draft must be reviewed "
+        "and approved from Communications > AI Assist.\n"
+        "- If an admin clearly asks to change a fee type amount, use update_fee_type_amount to "
+        "prepare the change for approval. This does not update the fee immediately. When the tool "
+        "returns an approval action, tell the admin to use the approval button below and do not "
+        "claim the fee has been updated until it has been approved.\n"
+        "- If an admin clearly asks to edit any other school record, use update_record_fields to "
+        "prepare the edit for approval. For student name edits, call update_record_fields with "
+        "model_name='students', the student/application/admission ID as record_id, and "
+        "fields={'full_name': 'Surname Firstname Othernames'}. Never claim a record has been "
+        "updated until the approval action succeeds.\n"
+        "- Do not directly change data without an approval action. If a requested edit is ambiguous, "
+        "ask for the exact record ID or field before preparing the action.\n"
         "- **Formatting**: Always use Markdown for readability. Use bullet points for lists, "
         "bold text for emphasis, and tables for data comparisons. Avoid large blocks of plain text.\n"
         "- Keep replies concise and grounded in the management system data.\n"
@@ -105,12 +156,17 @@ class ChatService:
                 raise ValueError(f"Message too long (max {MAX_MESSAGE_CHARS} characters)")
 
     @staticmethod
-    def reply(messages: List[Dict[str, str]], page_type: str = "", user: Any = None) -> str:
+    def reply(messages: List[Dict[str, str]], page_type: str = "", user: Any = None) -> Dict[str, Any]:
         """Generate the next assistant reply, handling tool calls if needed."""
         ChatService.validate_messages(messages)
 
         system_prompt = build_system_prompt(page_type, user)
-        openai_messages = [{"role": "system", "content": system_prompt}, *messages]
+        sanitized_messages = [
+            {"role": m["role"], "content": m.get("content") or ""}
+            for m in messages
+        ]
+        openai_messages = [{"role": "system", "content": system_prompt}, *sanitized_messages]
+        actions = []
 
         client = get_openai_client()
         
@@ -135,12 +191,14 @@ class ChatService:
                 
                 # Execute the skill via dispatcher with user context
                 result = execute_tool(func_name, func_args, user=user)
+                if isinstance(result, dict) and result.get("requires_approval") and result.get("action"):
+                    actions.append(result["action"])
                 
                 openai_messages.append({
                     "tool_call_id": tool_call.id,
                     "role": "tool",
                     "name": func_name,
-                    "content": json.dumps(result),
+                    "content": json.dumps(result, default=str),
                 })
             
             # 3. Final completion with tool results
@@ -148,6 +206,9 @@ class ChatService:
                 model=get_default_model(),
                 messages=openai_messages,
             )
-            return final_response.choices[0].message.content or ""
+            return {
+                "reply": final_response.choices[0].message.content or "",
+                "actions": actions,
+            }
         
-        return message.content or ""
+        return {"reply": message.content or "", "actions": []}
