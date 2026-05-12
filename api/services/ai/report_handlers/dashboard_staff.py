@@ -18,7 +18,7 @@ class StaffOverviewHandler(ReportHandler):
         total = Staff.objects.count()
 
         by_role = list(
-            Staff.objects.values('role')
+            Staff.objects.values('staff_type')
             .annotate(count=Count('id'))
             .order_by('-count')
         )

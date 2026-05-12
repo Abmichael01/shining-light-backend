@@ -20,8 +20,8 @@ class QuestionBankStaleHandler(ReportHandler):
         sixty_days_ago = timezone.now() - timedelta(days=60)
 
         subjects = Subject.objects.annotate(
-            question_count=Count('question'),
-            last_question=Max('question__created_at'),
+            question_count=Count('questions'),
+            last_question=Max('questions__created_at'),
         )
 
         stale = []

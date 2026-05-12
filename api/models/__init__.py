@@ -136,6 +136,8 @@ __all__ = [
     'BiometricStation',
     'AIFeature',
     'AIActionLog',
+    'StudentAITutorChat',
+    'StudentAITutorMessage',
     'SystemSetting',
     'GalleryGroup',
     'GalleryImage',

@@ -15,6 +15,11 @@ from api.views.ai import (
     message_draft_approve_send,
     message_draft_reject,
 )
+from api.views.ai_student import (
+    start_tutor_session,
+    list_tutor_sessions,
+    tutor_chat_detail,
+)
 
 urlpatterns = [
     path('features/', list_ai_features, name='ai-features'),
@@ -31,4 +36,9 @@ urlpatterns = [
     path('message-drafts/<int:draft_id>/', message_draft_detail, name='ai-message-draft-detail'),
     path('message-drafts/<int:draft_id>/approve-send/', message_draft_approve_send, name='ai-message-draft-approve-send'),
     path('message-drafts/<int:draft_id>/reject/', message_draft_reject, name='ai-message-draft-reject'),
+    
+    # Student AI Tutor
+    path('student/tutor/sessions/', list_tutor_sessions, name='ai-student-tutor-sessions'),
+    path('student/tutor/sessions/start/', start_tutor_session, name='ai-student-tutor-start'),
+    path('student/tutor/sessions/<int:chat_id>/', tutor_chat_detail, name='ai-student-tutor-chat'),
 ]
