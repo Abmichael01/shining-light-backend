@@ -124,6 +124,11 @@ class SystemSetting(models.Model):
     student_maintenance_message = models.TextField(_('student maintenance message'), default='Student portal is temporarily unavailable.')
     allow_ca_score_editing = models.BooleanField(_('allow CA score editing'), default=True)
     require_result_entry_approval = models.BooleanField(_('require result entry approval'), default=True)
+    is_ai_enabled = models.BooleanField(_('enable student AI'), default=False)
+    ai_disabled_message = models.TextField(
+        _('AI disabled message'), 
+        default='AI features are temporarily unavailable for students. Please check back later.'
+    )
     show_admission_exam_results = models.BooleanField(_('show admission results to applicants'), default=False)
     
     # Bank Details for Transfers
