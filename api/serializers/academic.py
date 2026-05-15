@@ -226,8 +226,8 @@ class SessionTermSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = SessionTerm
-        fields = ['id', 'session', 'term_name', 'term_order', 'start_date', 'end_date', 'registration_deadline', 'is_current', 'is_subject_registration_open', 'created_at']
-        read_only_fields = ['id', 'term_order', 'created_at']
+        fields = ['id', 'session', 'term_name', 'term_order', 'start_date', 'end_date', 'registration_deadline', 'is_current', 'is_subject_registration_open', 'rankings_calculated_at', 'created_at']
+        read_only_fields = ['id', 'term_order', 'rankings_calculated_at', 'created_at']
 
 
 class SessionSerializer(serializers.ModelSerializer):

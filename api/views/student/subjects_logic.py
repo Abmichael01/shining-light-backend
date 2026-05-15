@@ -422,4 +422,6 @@ class SubjectLogicMixin:
                     for i, r in enumerate(arm_reps):
                         if last is not None and r.average_score < last: pos = i + 1
                         TermReport.objects.filter(pk=r.id).update(class_position=pos, total_students=total); last = r.average_score
+
+            SessionTerm.objects.filter(pk=session_term_id).update(rankings_calculated_at=timezone.now())
         return Response({'message': 'Rankings success'})
