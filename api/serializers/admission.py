@@ -283,15 +283,19 @@ class AdmissionBankTransferSerializer(serializers.ModelSerializer):
 
 class PaymentStatusSerializer(serializers.Serializer):
     """Serializer for checking payment status"""
-    
+
     has_paid = serializers.BooleanField(read_only=True)
     amount_paid = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     required_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     payment_date = serializers.DateTimeField(read_only=True, required=False)
     receipt_number = serializers.CharField(read_only=True, required=False)
     wants_mock_exam = serializers.BooleanField(read_only=True)
+    # Granular fee breakdown
+    application_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     mock_exam_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-    
+    mock_fee_charged = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    application_fee_configured = serializers.BooleanField(read_only=True)
+
     # New fields for bank transfer
     has_pending_transfer = serializers.BooleanField(read_only=True)
     pending_transfer_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)

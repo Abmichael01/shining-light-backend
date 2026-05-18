@@ -316,70 +316,75 @@ class AdmissionService:
     @staticmethod
     def check_payment_status(applicant):
         """
-        Check if applicant has paid application fee
-        
-        Args:
-            applicant: Student instance
-            
-        Returns:
-            dict: Payment status information
+        Check if applicant has paid application fee.
+
+        Returns a granular breakdown so the frontend can render
+        "Application Fee + (optional) Mock Exam Fee = Total" rather than a
+        single opaque number. This keeps the base admission fee visible
+        even when the applicant opts out of mock.
         """
-        # Get admission settings for fee amount
-        try:
-            settings = AdmissionSettings.objects.get(school=applicant.school)
-            required_amount = settings.application_fee_amount
-        except AdmissionSettings.DoesNotExist:
-            required_amount = 0
-        
+        from decimal import Decimal
+        from api.models import SystemSetting
+
+        sys_settings = SystemSetting.load()
+
+        # Robust lookup: .filter().first() avoids the silent fall-through that
+        # used to drop the fee to 0 whenever the per-school settings row
+        # couldn't be found.
+        admission_settings = (
+            AdmissionSettings.objects
+            .filter(school=applicant.school)
+            .order_by('-updated_at')
+            .first()
+        )
+        application_fee = Decimal(admission_settings.application_fee_amount) if admission_settings else Decimal('0')
+        mock_exam_fee = Decimal(sys_settings.mock_exam_fee) if sys_settings else Decimal('0')
+
+        # Mock is always additive — never replaces or removes the admission fee.
+        mock_fee_charged = mock_exam_fee if applicant.wants_mock_exam else Decimal('0')
+        required_amount = application_fee + mock_fee_charged
+
         # Get payment purpose for admission
         try:
             admission_purpose = PaymentPurpose.objects.get(code='admission')
         except PaymentPurpose.DoesNotExist:
             admission_purpose = None
-        
-        # Add mock exam fee if requested
-        if applicant.wants_mock_exam:
-            from api.models import SystemSetting
-            sys_settings = SystemSetting.load()
-            required_amount += sys_settings.mock_exam_fee
-        
+
         # Check for payment
-        payment_query = FeePayment.objects.filter(
-            student=applicant
-        )
-        
+        payment_query = FeePayment.objects.filter(student=applicant)
         if admission_purpose:
             payment_query = payment_query.filter(payment_purpose=admission_purpose)
-        
+
         total_paid = sum([p.amount for p in payment_query])
-        
         latest_payment = payment_query.order_by('-payment_date').first()
-        
+
         # Check for pending bank transfers
         pending_transfer = AdmissionBankTransfer.objects.filter(
             student=applicant,
             status='pending'
         ).first()
-        
-        # Get bank details from system settings
-        sys_settings = SystemSetting.load()
+
         bank_details = {
             'bank_name': sys_settings.bank_name,
             'account_name': sys_settings.account_name,
             'account_number': sys_settings.account_number,
         }
-        
+
         return {
             'has_paid': total_paid >= required_amount and required_amount > 0,
             'amount_paid': total_paid,
             'required_amount': required_amount,
+            # Granular breakdown so the UI can render line items.
+            'application_fee': application_fee,
+            'mock_exam_fee': mock_exam_fee,
+            'mock_fee_charged': mock_fee_charged,
+            'application_fee_configured': application_fee > 0,
             'payment_date': latest_payment.payment_date if latest_payment else None,
             'receipt_number': latest_payment.receipt_number if latest_payment else None,
             'wants_mock_exam': applicant.wants_mock_exam,
-            'mock_exam_fee': sys_settings.mock_exam_fee if applicant.wants_mock_exam else 0,
             'has_pending_transfer': pending_transfer is not None,
             'pending_transfer_amount': pending_transfer.amount if pending_transfer else 0,
-            'bank_details': bank_details
+            'bank_details': bank_details,
         }
     
     @staticmethod
