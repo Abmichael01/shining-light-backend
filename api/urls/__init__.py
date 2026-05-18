@@ -1,6 +1,14 @@
 from django.urls import path, include
 from api.views import LoginView, CheckAdminView, convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
 from api.views.staff import staff_me, staff_students, staff_student_detail_update, staff_wallet, staff_wallet_transactions
+from api.views.staff_documents import (
+    my_staff_documents,
+    my_staff_document_detail,
+    staff_changes_list,
+    staff_changes_summary,
+    staff_change_approve,
+    staff_change_reject,
+)
 from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
 from api.views.config import school_configs
@@ -67,6 +75,13 @@ urlpatterns = [
     path('staff-portal/transactions/', staff_wallet_transactions, name='staff-wallet-transactions'),
     path('staff-portal/students/', staff_students, name='staff-students'),
     path('staff-portal/students/<str:student_id>/', staff_student_detail_update, name='staff-student-detail'),
+    path('staff-portal/documents/', my_staff_documents, name='my-staff-documents'),
+    path('staff-portal/documents/<int:pk>/', my_staff_document_detail, name='my-staff-document-detail'),
+    # Admin: staff change review queue
+    path('staff-changes/', staff_changes_list, name='staff-changes-list'),
+    path('staff-changes/summary/', staff_changes_summary, name='staff-changes-summary'),
+    path('staff-changes/<int:pk>/approve/', staff_change_approve, name='staff-change-approve'),
+    path('staff-changes/<int:pk>/reject/', staff_change_reject, name='staff-change-reject'),
     # Student portal (self-service)
     path('student-portal/me/', student_me, name='student-me'),
     # Reports

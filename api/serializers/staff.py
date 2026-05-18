@@ -14,7 +14,9 @@ from api.models import (
     StaffWalletTransaction,
     LoanTenure,
     User,
-    Student
+    Student,
+    StaffDocument,
+    StaffChangeRequest,
 )
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -592,9 +594,63 @@ class SalaryPaymentSerializer(serializers.ModelSerializer):
             'processed_by_email'
         ]
         read_only_fields = ['id', 'net_amount', 'created_at', 'updated_at']
-    
+
     def get_staff_name(self, obj):
         """Return staff member's full name"""
         return obj.staff.get_full_name()
+
+
+class StaffDocumentSerializer(serializers.ModelSerializer):
+    document_type_display = serializers.CharField(source='get_document_type_display', read_only=True)
+
+    class Meta:
+        model = StaffDocument
+        fields = [
+            'id',
+            'document_type',
+            'document_type_display',
+            'document_file',
+            'label',
+            'verified',
+            'verified_at',
+            'uploaded_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'verified', 'verified_at', 'uploaded_at', 'updated_at']
+
+
+class StaffChangeRequestSerializer(serializers.ModelSerializer):
+    staff_id = serializers.CharField(source='staff.staff_id', read_only=True)
+    staff_name = serializers.SerializerMethodField()
+    change_type_display = serializers.CharField(source='get_change_type_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    reviewed_by_email = serializers.CharField(source='reviewed_by.email', read_only=True)
+    document_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StaffChangeRequest
+        fields = [
+            'id',
+            'staff', 'staff_id', 'staff_name',
+            'change_type', 'change_type_display',
+            'field_name',
+            'old_value', 'new_value',
+            'document', 'document_url',
+            'status', 'status_display',
+            'submitted_at',
+            'reviewed_at', 'reviewed_by', 'reviewed_by_email',
+            'review_notes',
+        ]
+        read_only_fields = fields
+
+    def get_staff_name(self, obj):
+        return obj.staff.get_full_name()
+
+    def get_document_url(self, obj):
+        if obj.document and obj.document.document_file:
+            request = self.context.get('request')
+            url = obj.document.document_file.url
+            return request.build_absolute_uri(url) if request else url
+        return None
 
 

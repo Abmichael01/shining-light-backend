@@ -2,10 +2,33 @@ from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from api.models.academic import SystemSetting
 from api.models.ai.student_tutor import StudentAITutorChat, StudentAITutorMessage
 from api.services.ai.tutor_service import TutorService
 from api.serializers.student import StudentSerializer
 import json
+
+
+def _student_ai_block_response(request):
+    """Return a 403 Response if student AI is disabled by admin, else None.
+
+    Admins/staff are never affected — the `is_ai_enabled` flag is labeled
+    'enable student AI' on the model and only restricts the student portal.
+    """
+    if not hasattr(request.user, 'student_profile'):
+        return None
+    settings_obj = SystemSetting.load()
+    if settings_obj.is_ai_enabled:
+        return None
+    return Response(
+        {
+            'error': settings_obj.ai_disabled_message
+                     or 'AI features are temporarily unavailable for students.',
+            'ai_disabled': True,
+        },
+        status=status.HTTP_403_FORBIDDEN,
+    )
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -15,7 +38,11 @@ def start_tutor_session(request):
         # Ensure user is a student
         if not hasattr(request.user, 'student_profile'):
             return Response({'error': 'Only students can access the AI Tutor.'}, status=status.HTTP_403_FORBIDDEN)
-        
+
+        blocked = _student_ai_block_response(request)
+        if blocked is not None:
+            return blocked
+
         student = request.user.student_profile
         subject_id = request.data.get('subject_id')
         topic_id = request.data.get('topic_id')
@@ -53,7 +80,11 @@ def list_tutor_sessions(request):
     """List previous AI Tutor sessions for the student."""
     if not hasattr(request.user, 'student_profile'):
         return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
-    
+
+    blocked = _student_ai_block_response(request)
+    if blocked is not None:
+        return blocked
+
     chats = request.user.student_profile.ai_tutor_chats.select_related('subject', 'topic').all()
     data = [
         {
@@ -74,6 +105,10 @@ def list_tutor_sessions(request):
 @permission_classes([IsAuthenticated])
 def tutor_chat_detail(request, chat_id):
     """Get history or send a message to a specific tutor session."""
+    blocked = _student_ai_block_response(request)
+    if blocked is not None:
+        return blocked
+
     try:
         chat = StudentAITutorChat.objects.get(pk=chat_id, student=request.user.student_profile)
     except StudentAITutorChat.DoesNotExist:

@@ -48,7 +48,9 @@ from .staff import (
     StaffEducationSerializer,
     SalaryGradeSerializer,
     StaffSalarySerializer,
-    SalaryPaymentSerializer
+    SalaryPaymentSerializer,
+    StaffDocumentSerializer,
+    StaffChangeRequestSerializer,
 )
 from .loans import (
     StaffWalletSerializer,

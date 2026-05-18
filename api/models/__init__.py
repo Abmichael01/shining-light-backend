@@ -52,7 +52,9 @@ from .staff import (
     StaffWallet,
     StaffWalletTransaction,
     LoanTenure,
-    StaffBeneficiary
+    StaffBeneficiary,
+    StaffDocument,
+    StaffChangeRequest,
 )
 from .fee import (
     FeeType,
@@ -127,6 +129,8 @@ __all__ = [
     'Schedule',
     'ScheduleEntry',
     'StaffBeneficiary',
+    'StaffDocument',
+    'StaffChangeRequest',
     'LeaveRequest',
     'Assignment',
     'AssignmentSubmission',

@@ -371,9 +371,15 @@ def staff_me(request):
             serializer = StaffSerializer(staff, context={'request': request})
             return Response(serializer.data)
 
+        from api.services.staff_audit import record_profile_changes, snapshot_staff
+
+        before = snapshot_staff(staff)
         update_serializer = StaffPortalUpdateSerializer(staff, data=request.data, partial=True, context={'request': request})
         update_serializer.is_valid(raise_exception=True)
         update_serializer.save()
+        staff.refresh_from_db()
+        after = snapshot_staff(staff)
+        record_profile_changes(staff, before, after)
         return Response(StaffSerializer(staff, context={'request': request}).data)
     except Exception as e:
         import traceback
