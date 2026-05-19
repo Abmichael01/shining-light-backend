@@ -10,6 +10,7 @@ class Document(models.Model):
         ('birth_certificate', 'Birth Certificate'),
         ('primary_certificate', 'Primary School Certificate'),
         ('bece_certificate', 'BECE Certificate'),
+        ('previous_school_cert', 'Previous School Certificate'),
         ('passport', 'Passport Photograph'),
         ('other', 'Other'),
     ]
