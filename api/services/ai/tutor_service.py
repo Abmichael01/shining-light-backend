@@ -331,11 +331,20 @@ class TutorService:
         "}\n\n"
 
         "DIAGNOSTIC PHASE (phase='diagnostic', when you first meet a student on a topic):\n"
-        "- Start by greeting warmly. Introduce yourself if it's the first message.\n"
-        "- Ask 1-2 questions to gauge their current understanding of the topic. If a subject/topic is specified, ask about it.\n"
-        "- If NO subject/topic is specified, help them identify WHAT they want to learn and IN WHICH SUBJECT.\n"
-        '- suggested_actions for diagnostic: Offer options like "I know this topic well", "I know a little bit", "I am completely new to this", "I need help with a specific problem".\n'
-        "- Keep diagnostic messages BRIEF — 2-3 sentences. Save the teaching for after you know their level.\n\n"
+        "- DO NOT teach the topic yet. Your only job in this phase is to gauge readiness.\n"
+        "- Greet warmly and acknowledge what they asked about (e.g. 'Great choice — chemical reactions!').\n"
+        "- Identify 2-3 PREREQUISITE concepts the student should know BEFORE learning this topic. "
+        "Example: for 'Quadratic Equations' → (1) basic algebra, (2) factorisation, (3) balancing simple equations. "
+        "For 'Photosynthesis' → (1) what cells are, (2) what plants need to grow, (3) basic chemistry of gases.\n"
+        "- List those 2-3 prerequisites in a short bulleted list inside the `content` field.\n"
+        "- Ask the student plainly: 'Are you comfortable with these, or should we revise them first?'\n"
+        "- The `suggested_actions` field MUST contain EXACTLY these three options "
+        '(or near-paraphrases): "I know these — continue", "Revise the basics first", "I\'m not sure".\n'
+        "- Keep this message SHORT — 4-6 sentences total including the prerequisite list. NO deep teaching.\n"
+        "- On the NEXT turn, branch based on their reply:\n"
+        "    * If 'I know these — continue' → switch to phase='teaching' and dive into the topic.\n"
+        "    * If 'Revise the basics first' → switch to phase='teaching' and teach the FIRST prerequisite (then offer to do the next).\n"
+        "    * If 'I'm not sure' → ask ONE quick check-question on the most fundamental prerequisite, then decide.\n\n"
 
         "TEACHING PHASE (phase='teaching', after diagnostic):\n"
         "- Based on their answer about their level, teach at the appropriate depth.\n"
@@ -412,9 +421,11 @@ class TutorService:
         curriculum_context = _get_student_curriculum_context(chat)
 
         diagnostic_instruction = (
-            "This is the FIRST interaction. Start with a warm greeting and assess the student's "
-            "current knowledge level. Be brief — 2-3 sentences. Ask what they know about the topic "
-            "and how you can best help them."
+            "This is the FIRST interaction. Acknowledge what they asked about, then identify 2-3 "
+            "prerequisite concepts they should know BEFORE learning this topic. List the prerequisites "
+            "as a short bulleted list. Ask if they are comfortable with these or should revise the basics first. "
+            "suggested_actions MUST be: ['I know these — continue', 'Revise the basics first', \"I'm not sure\"]. "
+            "DO NOT teach the topic yet — only diagnose readiness. Keep it under 6 sentences."
         )
         teaching_instruction = (
             "Continue teaching based on what you now know about the student. Build on previous exchanges."
