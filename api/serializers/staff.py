@@ -48,10 +48,12 @@ class StaffEducationSerializer(serializers.ModelSerializer):
             'degree',
             'degree_display',
             'certificate',
+            'verified',
+            'verified_at',
             'created_at',
             'updated_at'
         ]
-        read_only_fields = ['id', 'staff', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'staff', 'verified', 'verified_at', 'created_at', 'updated_at']
 
     def create(self, validated_data):
         return self._save_with_base64(None, validated_data)
@@ -626,6 +628,11 @@ class StaffChangeRequestSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     reviewed_by_email = serializers.CharField(source='reviewed_by.email', read_only=True)
     document_url = serializers.SerializerMethodField()
+    # Generic "after" file URL: present whenever the change refers to a file
+    # that still lives on disk (an uploaded document or an education
+    # certificate). Front-end uses this to render an image preview or a
+    # "View file" link in the After panel.
+    attachment_url = serializers.SerializerMethodField()
 
     class Meta:
         model = StaffChangeRequest
@@ -636,6 +643,8 @@ class StaffChangeRequestSerializer(serializers.ModelSerializer):
             'field_name',
             'old_value', 'new_value',
             'document', 'document_url',
+            'education',
+            'attachment_url',
             'status', 'status_display',
             'submitted_at',
             'reviewed_at', 'reviewed_by', 'reviewed_by_email',
@@ -646,11 +655,27 @@ class StaffChangeRequestSerializer(serializers.ModelSerializer):
     def get_staff_name(self, obj):
         return obj.staff.get_full_name()
 
+    def _absolute(self, url):
+        request = self.context.get('request')
+        return request.build_absolute_uri(url) if request else url
+
     def get_document_url(self, obj):
         if obj.document and obj.document.document_file:
-            request = self.context.get('request')
-            url = obj.document.document_file.url
-            return request.build_absolute_uri(url) if request else url
+            return self._absolute(obj.document.document_file.url)
+        return None
+
+    def get_attachment_url(self, obj):
+        # Document upload/replace → the doc's file
+        if obj.document and obj.document.document_file:
+            return self._absolute(obj.document.document_file.url)
+        # Education certificate change → the education record's cert file
+        if (
+            obj.education
+            and obj.change_type in ('education_create', 'education_update')
+            and obj.field_name == 'certificate'
+            and obj.education.certificate
+        ):
+            return self._absolute(obj.education.certificate.url)
         return None
 
 

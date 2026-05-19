@@ -2,8 +2,8 @@ from django.urls import path, include
 from api.views import LoginView, CheckAdminView, convert_html_to_pdf, convert_html_to_image, convert_multiple_html_to_pdf, convert_multiple_html_to_images_zip
 from api.views.staff import staff_me, staff_students, staff_student_detail_update, staff_wallet, staff_wallet_transactions
 from api.views.staff_documents import (
-    my_staff_documents,
-    my_staff_document_detail,
+    my_staff_education,
+    my_staff_education_detail,
     staff_changes_list,
     staff_changes_summary,
     staff_change_approve,
@@ -75,8 +75,8 @@ urlpatterns = [
     path('staff-portal/transactions/', staff_wallet_transactions, name='staff-wallet-transactions'),
     path('staff-portal/students/', staff_students, name='staff-students'),
     path('staff-portal/students/<str:student_id>/', staff_student_detail_update, name='staff-student-detail'),
-    path('staff-portal/documents/', my_staff_documents, name='my-staff-documents'),
-    path('staff-portal/documents/<int:pk>/', my_staff_document_detail, name='my-staff-document-detail'),
+    path('staff-portal/education/', my_staff_education, name='my-staff-education'),
+    path('staff-portal/education/<int:pk>/', my_staff_education_detail, name='my-staff-education-detail'),
     # Admin: staff change review queue
     path('staff-changes/', staff_changes_list, name='staff-changes-list'),
     path('staff-changes/summary/', staff_changes_summary, name='staff-changes-summary'),

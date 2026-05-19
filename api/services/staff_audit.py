@@ -5,7 +5,7 @@ the audit log gives admins approve/rollback control after the fact.
 """
 from typing import Iterable, Mapping
 
-from api.models import Staff, StaffChangeRequest, StaffDocument
+from api.models import Staff, StaffChangeRequest, StaffDocument, StaffEducation
 
 
 PROFILE_FIELDS_TRACKED = (
@@ -77,6 +77,29 @@ def record_document_change(
         field_name=document.document_type if document else '',
         old_value=old_filename,
         new_value=new_filename,
+    )
+
+
+def record_education_change(
+    staff: Staff,
+    education: StaffEducation | None,
+    change_type: str,
+    old_value: str = '',
+    new_value: str = '',
+    field_name: str = '',
+) -> StaffChangeRequest:
+    """Record an education record create / update / delete.
+
+    For 'education_delete', the FK is left null because the row no longer
+    exists. For create/update we keep the FK so admin can deep-link to it.
+    """
+    return StaffChangeRequest.objects.create(
+        staff=staff,
+        education=education if change_type != 'education_delete' else None,
+        change_type=change_type,
+        field_name=field_name,
+        old_value=old_value,
+        new_value=new_value,
     )
 
 

@@ -2,7 +2,7 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from api.models.user import User
-from .staff import Staff
+from .staff import Staff, StaffEducation
 from .staff_document import StaffDocument
 
 
@@ -19,6 +19,9 @@ class StaffChangeRequest(models.Model):
         ('document_upload', 'Document Uploaded'),
         ('document_replace', 'Document Replaced'),
         ('document_delete', 'Document Deleted'),
+        ('education_create', 'Education Record Added'),
+        ('education_update', 'Education Record Updated'),
+        ('education_delete', 'Education Record Deleted'),
     ]
     STATUS_CHOICES = [
         ('pending_review', 'Pending Review'),
@@ -41,6 +44,13 @@ class StaffChangeRequest(models.Model):
     new_value = models.TextField(blank=True)
     document = models.ForeignKey(
         StaffDocument,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='change_requests',
+    )
+    education = models.ForeignKey(
+        StaffEducation,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,

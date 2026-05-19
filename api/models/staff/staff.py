@@ -126,7 +126,19 @@ class StaffEducation(models.Model):
     year_of_graduation = models.PositiveIntegerField()
     degree = models.CharField(max_length=20, choices=DEGREE_CHOICES, blank=True)
     certificate = models.FileField(upload_to='staff/certificates/', null=True, blank=True)
-    
+
+    # Verification — admin-created records default verified; staff-created
+    # / staff-edited records flip back to unverified pending admin review.
+    verified = models.BooleanField(default=True)
+    verified_by = models.ForeignKey(
+        'User',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='staff_education_verified',
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
