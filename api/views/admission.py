@@ -468,15 +468,15 @@ def applicant_documents(request):
 EDITABLE_DOCUMENT_STATUSES = ('applicant', 'under_review')
 
 
-@api_view(['PUT', 'DELETE'])
+@api_view(['PUT'])
 @permission_classes([IsApplicant])
 def applicant_document_detail(request, pk):
     """
-    Manage a specific applicant document.
-    PUT: replace the uploaded file (e.g. student fixes a mistake). Resets
-         verification so admin re-checks the new file.
-    DELETE: remove the document entirely.
-    Both are only allowed while the application is still applicant/under_review.
+    Replace an applicant document.
+
+    Applicants cannot delete a document once uploaded — they can only
+    swap the file via PUT. This keeps a paper trail and prevents
+    accidentally-empty required slots before submission.
     """
     try:
         student = Student.objects.get(user=request.user)
@@ -494,32 +494,21 @@ def applicant_document_detail(request, pk):
             status=status.HTTP_403_FORBIDDEN,
         )
 
-    if request.method == 'PUT':
-        new_file = request.FILES.get('document_file')
-        if not new_file:
-            return Response(
-                {'error': 'document_file is required.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        old_file = document.document_file
-        document.document_file = new_file
-        document.verified = False
-        document.verified_by = None
-        document.verified_at = None
-        document.save(update_fields=['document_file', 'verified', 'verified_by', 'verified_at', 'updated_at'])
-        if old_file and old_file.name and old_file.name != document.document_file.name:
-            old_file.delete(save=False)
-        return Response(DocumentSerializer(document).data, status=status.HTTP_200_OK)
-
-    # DELETE
-    document.delete()
-
-    required_types = ['birth_certificate', 'passport']
-    uploaded_types = Document.objects.filter(student=student).values_list('document_type', flat=True)
-    has_required = all(doc_type in uploaded_types for doc_type in required_types)
-    AdmissionService.update_checklist_item(student, 'documents_complete', has_required)
-
-    return Response(status=status.HTTP_204_NO_CONTENT)
+    new_file = request.FILES.get('document_file')
+    if not new_file:
+        return Response(
+            {'error': 'document_file is required.'},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    old_file = document.document_file
+    document.document_file = new_file
+    document.verified = False
+    document.verified_by = None
+    document.verified_at = None
+    document.save(update_fields=['document_file', 'verified', 'verified_by', 'verified_at', 'updated_at'])
+    if old_file and old_file.name and old_file.name != document.document_file.name:
+        old_file.delete(save=False)
+    return Response(DocumentSerializer(document).data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
