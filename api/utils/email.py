@@ -669,6 +669,70 @@ def send_login_notification_email(user, request=None):
         print(f"Error sending login notification: {str(e)}")
         return False
 
+def send_staff_change_notification(staff, summary: str, change_count: int = 1):
+    """Email all active admins that a staff member submitted a profile or
+    document change. Sent on the staff_me PATCH path (batched per request)
+    and on each education record create/update/delete.
+
+    Best-effort: failures are logged but do not block the API response.
+    """
+    try:
+        from api.models import User
+        admin_emails = list(
+            User.objects.filter(user_type='admin', is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+        if not admin_emails:
+            return False
+
+        subject = f'Staff Change Submitted — {staff.get_full_name()}'
+        plural = 's' if change_count > 1 else ''
+        review_path = '/school-admin/staff/profile-change-requests'
+        content = f"""
+<p>Hi Admin,</p>
+<p>
+    <strong>{staff.get_full_name()}</strong> ({staff.staff_id}) just submitted
+    {change_count} change{plural} that need{'' if change_count > 1 else 's'} your review.
+</p>
+<div style="background-color: #f8fafc; padding: 16px; border-radius: 8px; margin: 16px 0; border: 1px solid #e2e8f0;">
+    <p style="margin: 0; white-space: pre-line;">{summary}</p>
+</div>
+<p>Open the review queue to approve or reject:</p>
+<p>
+    <a href="{review_path}"
+       style="display:inline-block;padding:10px 16px;background:#0f172a;color:#fff;
+              text-decoration:none;border-radius:6px;font-weight:600;">
+        Open Review Queue
+    </a>
+</p>
+<p style="font-size:12px;color:#64748b;">
+    The change is already applied to {staff.get_full_name()}'s profile but is
+    flagged unverified until you approve.
+</p>
+"""
+        plain_message = (
+            f"{staff.get_full_name()} ({staff.staff_id}) submitted "
+            f"{change_count} change{plural} for your review.\n\n{summary}\n\n"
+            f"Open the review queue at {review_path}"
+        )
+        html_message = wrap_with_base_template(subject, content)
+
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[settings.DEFAULT_FROM_EMAIL],
+            bcc=admin_emails,
+        )
+        msg.attach_alternative(html_message, "text/html")
+        msg.send(fail_silently=True)
+        return True
+    except Exception as e:
+        print(f"Error sending staff change notification: {e}")
+        return False
+
+
 def send_admission_reversal_email(student, reason=None):
     """
     Send email notification to student/guardian when admission is reversed

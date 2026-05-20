@@ -371,7 +371,11 @@ def staff_me(request):
             serializer = StaffSerializer(staff, context={'request': request})
             return Response(serializer.data)
 
-        from api.services.staff_audit import record_profile_changes, snapshot_staff
+        from api.services.staff_audit import (
+            record_profile_changes,
+            snapshot_staff,
+            notify_admins_of_gated_changes,
+        )
 
         before = snapshot_staff(staff)
         update_serializer = StaffPortalUpdateSerializer(staff, data=request.data, partial=True, context={'request': request})
@@ -379,7 +383,12 @@ def staff_me(request):
         update_serializer.save()
         staff.refresh_from_db()
         after = snapshot_staff(staff)
+        # Low-risk fields that actually landed on the record.
         record_profile_changes(staff, before, after)
+        # High-risk fields that were diverted into pending gated requests.
+        gated = getattr(update_serializer, 'gated_changes', None) or []
+        if gated:
+            notify_admins_of_gated_changes(staff, gated)
         return Response(StaffSerializer(staff, context={'request': request}).data)
     except Exception as e:
         import traceback

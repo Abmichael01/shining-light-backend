@@ -7,11 +7,16 @@ from .staff_document import StaffDocument
 
 
 class StaffChangeRequest(models.Model):
-    """Audit log of staff-initiated changes that admin must review.
+    """Staff-initiated change record reviewed by an admin.
 
-    A row is created every time a staff member changes anything about their
-    profile or documents. The change is applied immediately (so staff aren't
-    blocked) but admins see what changed and can approve or roll it back.
+    Hybrid model:
+      * `is_gated=False` — low-risk edits (e.g. address, marital status). The
+        new value is written to the Staff record immediately and this row is
+        an audit entry. `applied_at` is set at creation.
+      * `is_gated=True`  — high-risk edits (e.g. bank account, phone, DOB).
+        The new value is kept in `new_value` only. The Staff record is NOT
+        updated until an admin approves; on approve we copy new_value → field
+        and set `applied_at`. On reject we leave Staff untouched.
     """
 
     CHANGE_TYPE_CHOICES = [
@@ -62,6 +67,19 @@ class StaffChangeRequest(models.Model):
         choices=STATUS_CHOICES,
         default='pending_review',
     )
+    is_gated = models.BooleanField(
+        default=False,
+        help_text=_(
+            'True means the Staff record was NOT updated yet — admin approval '
+            'is required to apply new_value. False means the change was applied '
+            'immediately and this row is audit-only.'
+        ),
+    )
+    applied_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text=_('When new_value was actually written to the Staff record.'),
+    )
     submitted_at = models.DateTimeField(auto_now_add=True)
     reviewed_by = models.ForeignKey(
         User,
@@ -79,6 +97,7 @@ class StaffChangeRequest(models.Model):
         indexes = [
             models.Index(fields=['status', '-submitted_at']),
             models.Index(fields=['staff', '-submitted_at']),
+            models.Index(fields=['staff', 'status', 'is_gated']),
         ]
 
     def __str__(self):

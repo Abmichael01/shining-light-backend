@@ -225,7 +225,8 @@ class StaffSerializer(serializers.ModelSerializer):
     children = serializers.PrimaryKeyRelatedField(many=True, queryset=Student.objects.all(), required=False, write_only=True)
     children_details = serializers.SerializerMethodField()
     current_salary = StaffSalarySerializer(read_only=True)
-    
+    pending_changes = serializers.SerializerMethodField()
+
     class Meta:
         model = Staff
         fields = [
@@ -268,6 +269,7 @@ class StaffSerializer(serializers.ModelSerializer):
             'status',
             'status_display',
             'education_records',
+            'pending_changes',
             'created_at',
             'updated_at',
             'created_by',
@@ -278,6 +280,29 @@ class StaffSerializer(serializers.ModelSerializer):
     def get_full_name(self, obj):
         """Return staff member's full name"""
         return obj.get_full_name()
+
+    def get_pending_changes(self, obj):
+        """Map of {field_name: {new_value, submitted_at}} for gated
+        profile_field rows still awaiting admin approval. Frontend uses
+        this to show a "pending approval" badge beside each field label."""
+        from api.models import StaffChangeRequest
+        qs = (
+            StaffChangeRequest.objects
+            .filter(
+                staff=obj,
+                change_type='profile_field',
+                is_gated=True,
+                status='pending_review',
+            )
+            .values_list('field_name', 'new_value', 'submitted_at')
+        )
+        return {
+            field_name: {
+                'new_value': new_value,
+                'submitted_at': submitted_at.isoformat() if submitted_at else None,
+            }
+            for field_name, new_value, submitted_at in qs
+        }
 
     def get_children_details(self, obj):
         """Return basic details for linked children"""
@@ -337,7 +362,19 @@ class StaffSerializer(serializers.ModelSerializer):
 
 
 class StaffPortalUpdateSerializer(serializers.ModelSerializer):
-    """Serializer for staff self-service updates"""
+    """Staff self-service update.
+
+    Hybrid approval gate: high-risk fields (bank, identity, phone) do NOT
+    write to the Staff record here — they create a gated StaffChangeRequest
+    and only apply once an admin approves. Low-risk fields (address, photo,
+    etc.) apply immediately and produce an audit row.
+
+    The set of high-risk fields is owned by api.services.staff_field_policy.
+
+    The view (`staff_me`) is responsible for emitting audit rows for the
+    low-risk fields that did apply. This serializer surfaces the gated
+    fields via `self.gated_changes` so the view can log them too.
+    """
 
     passport_photo = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
@@ -363,6 +400,18 @@ class StaffPortalUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def update(self, instance, validated_data):
+        from api.services.staff_field_policy import is_high_risk_field
+
+        # Split incoming fields by risk tier. High-risk fields are pulled
+        # out of validated_data so they never reach the instance.
+        gated_pairs = []  # list of (field_name, new_value_stringified)
+        for field in list(validated_data.keys()):
+            if field == 'passport_photo':
+                continue  # photo is low-risk and handled below
+            if is_high_risk_field(field):
+                new_value = validated_data.pop(field)
+                gated_pairs.append((field, new_value))
+
         passport_photo_data = validated_data.pop('passport_photo', None)
 
         if passport_photo_data is not None:
@@ -381,7 +430,61 @@ class StaffPortalUpdateSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
 
         instance.save()
+
+        # Expose the gated requests we created so the view can include them
+        # in its email notification batch.
+        self.gated_changes = self._upsert_gated_requests(instance, gated_pairs)
         return instance
+
+    def _upsert_gated_requests(self, staff, gated_pairs):
+        """Create or update a single pending gated row per (staff, field).
+
+        Conflict policy: if there is already a pending gated request for a
+        field, we update its new_value with the latest submission and reset
+        submitted_at. Old_value stays as the original (so admin sees
+        original → latest, not last-pending → latest). Rejected/approved
+        rows are immutable and never reused.
+        """
+        from django.utils import timezone
+        from api.models import StaffChangeRequest
+
+        created_or_updated = []
+        for field_name, new_value in gated_pairs:
+            new_str = '' if new_value is None else str(new_value)
+            current_str = '' if getattr(staff, field_name, None) is None else str(getattr(staff, field_name))
+            if new_str == current_str:
+                # Nothing to gate — value is identical.
+                continue
+            pending = (
+                StaffChangeRequest.objects
+                .filter(
+                    staff=staff,
+                    change_type='profile_field',
+                    field_name=field_name,
+                    status='pending_review',
+                    is_gated=True,
+                )
+                .order_by('-submitted_at')
+                .first()
+            )
+            if pending:
+                pending.new_value = new_str
+                pending.submitted_at = timezone.now()
+                pending.save(update_fields=['new_value', 'submitted_at'])
+                created_or_updated.append(pending)
+            else:
+                created_or_updated.append(
+                    StaffChangeRequest.objects.create(
+                        staff=staff,
+                        change_type='profile_field',
+                        field_name=field_name,
+                        old_value=current_str,
+                        new_value=new_str,
+                        is_gated=True,
+                        applied_at=None,
+                    )
+                )
+        return created_or_updated
 
 
 class StaffRegistrationSerializer(serializers.ModelSerializer):

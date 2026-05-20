@@ -4,11 +4,17 @@ from api.views.staff import staff_me, staff_students, staff_student_detail_updat
 from api.views.staff_documents import (
     my_staff_education,
     my_staff_education_detail,
+    my_staff_documents,
+    my_staff_document_detail,
+    admin_staff_documents,
+    admin_staff_document_detail,
     staff_changes_list,
+    staff_changes_grouped,
     staff_changes_summary,
     staff_change_approve,
     staff_change_reject,
 )
+from api.views.admin_accounts import admin_accounts, admin_account_detail
 from api.views.student import student_me
 from api.views.dashboard import admin_dashboard_stats, student_growth_chart, payment_growth_chart, staff_dashboard_stats, staff_recent_assignments, student_dashboard_stats
 from api.views.config import school_configs
@@ -77,11 +83,20 @@ urlpatterns = [
     path('staff-portal/students/<str:student_id>/', staff_student_detail_update, name='staff-student-detail'),
     path('staff-portal/education/', my_staff_education, name='my-staff-education'),
     path('staff-portal/education/<int:pk>/', my_staff_education_detail, name='my-staff-education-detail'),
+    path('staff-portal/documents/', my_staff_documents, name='my-staff-documents'),
+    path('staff-portal/documents/<int:pk>/', my_staff_document_detail, name='my-staff-document-detail'),
+    # Admin: direct staff document management (bypasses approval gate)
+    path('staff/<int:staff_pk>/documents/', admin_staff_documents, name='admin-staff-documents'),
+    path('staff/<int:staff_pk>/documents/<int:pk>/', admin_staff_document_detail, name='admin-staff-document-detail'),
     # Admin: staff change review queue
     path('staff-changes/', staff_changes_list, name='staff-changes-list'),
+    path('staff-changes/grouped/', staff_changes_grouped, name='staff-changes-grouped'),
     path('staff-changes/summary/', staff_changes_summary, name='staff-changes-summary'),
     path('staff-changes/<int:pk>/approve/', staff_change_approve, name='staff-change-approve'),
     path('staff-changes/<int:pk>/reject/', staff_change_reject, name='staff-change-reject'),
+    # Admin account management (under settings)
+    path('admin-accounts/', admin_accounts, name='admin-accounts'),
+    path('admin-accounts/<int:pk>/', admin_account_detail, name='admin-account-detail'),
     # Student portal (self-service)
     path('student-portal/me/', student_me, name='student-me'),
     # Reports
